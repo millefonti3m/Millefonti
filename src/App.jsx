@@ -1,0 +1,1085 @@
+import { useState, useEffect, useRef } from "react";
+
+const C = {
+  bg:"#f4f7fb", surface:"#ffffff", card:"#ffffff", cardAlt:"#f0f5ff",
+  border:"#dde5f0", borderLight:"#eaf0f8",
+  accent:"#2e7cf6", accentLight:"#e8f0fe",
+  green:"#1aaa6e", greenLight:"#e6f9f1",
+  orange:"#f07c1a", orangeLight:"#fff3e6",
+  red:"#e03e5a", redLight:"#fdedf0",
+  yellow:"#f5a623", yellowLight:"#fff8e8",
+  teal:"#0ea5a0", tealLight:"#e5f7f7",
+  purple:"#8b5cf6", purpleLight:"#f3edff",
+  pink:"#ec4899", pinkLight:"#fdf0f7",
+  text:"#1a2640", textSoft:"#3d5270", muted:"#8098b8", mutedLight:"#b0c2d8",
+  white:"#ffffff",
+  shadow:"0 2px 12px rgba(46,124,246,0.08)",
+  shadowMd:"0 4px 24px rgba(46,124,246,0.12)",
+};
+const MONO = "'DM Mono', 'Courier New', monospace";
+const SANS = "'DM Sans', 'Segoe UI', sans-serif";
+
+const now = Date.now();
+
+// All ECGs start unassigned (cardiologo:null). Admin assigns them manually.
+const INIT_ECGS = [
+  { id:"ECG-F01", origine:"farmacia", farmacia:"Farmacia Centrale Roma",   paziente:"M.R., 58a, M", ts:now-5400000,  stato:"in_attesa", urgenza:"urgente", note:"Palpitazioni episodiche",    cardiologo:null, chat:[] },
+  { id:"ECG-F02", origine:"farmacia", farmacia:"Farmacia Salute Milano",   paziente:"A.G., 72a, F", ts:now-2700000,  stato:"in_attesa", urgenza:"normale", note:"Dolore toracico da sforzo",  cardiologo:null, chat:[] },
+  { id:"ECG-F03", origine:"farmacia", farmacia:"Farmacia Verde Napoli",    paziente:"L.P., 45a, M", ts:now-18000000, stato:"refertato",  urgenza:"normale", note:"Check-up annuale",           cardiologo:"Dr. Rossi", chat:[] },
+  { id:"ECG-A01", origine:"azienda",  azienda:"Med Lavoro Torino",  batch:"FCA-Mirafiori-2024-04", paziente:"R.B., 42a, M", ts:now-3600000,  stato:"in_attesa", urgenza:"normale", note:"Idoneità annuale", cardiologo:null, chat:[] },
+  { id:"ECG-A02", origine:"azienda",  azienda:"Med Lavoro Torino",  batch:"FCA-Mirafiori-2024-04", paziente:"D.F., 51a, M", ts:now-3600000,  stato:"in_attesa", urgenza:"normale", note:"Idoneità annuale", cardiologo:null, chat:[] },
+  { id:"ECG-A03", origine:"azienda",  azienda:"Med Lavoro Torino",  batch:"Iveco-Torino-2024-04",  paziente:"P.L., 38a, F", ts:now-7200000,  stato:"refertato",  urgenza:"normale", note:"Idoneità annuale", cardiologo:"Dr. Conti", chat:[] },
+  { id:"ECG-P01", origine:"pubblico", paziente:"M.B., 62a, M", servizio:"ecg",   ts:now-7200000,  stato:"refertato",  urgenza:"normale", note:"Check-up annuale",              cardiologo:"Dr. Rossi", chat:[], appuntamento:"2024-04-15 09:00" },
+  { id:"ECG-P02", origine:"pubblico", paziente:"L.S., 54a, F", servizio:"score2",ts:now-1800000,  stato:"in_attesa",  urgenza:"normale", note:"Prelievo + PAO + SCORE2",       cardiologo:null, chat:[], appuntamento:"2024-04-22 11:30", risultati:{ colTot:235, hdl:48, pas:142, fumatore:false } },
+  { id:"ECG-F04", origine:"farmacia", farmacia:"Farmacia Bianchi Torino",  paziente:"G.M., 65a, M", ts:now-1200000,  stato:"in_attesa", urgenza:"normale", note:"Pre-operatorio",              cardiologo:"Dr. Conti", chat:[] },
+  { id:"ECG-F05", origine:"farmacia", farmacia:"Farmacia Centrale Roma",   paziente:"S.T., 48a, F", ts:now-900000,   stato:"in_attesa", urgenza:"urgente", note:"Sincope recente",            cardiologo:null, chat:[] },
+];
+
+const CARDIOLOGI_DATA = {
+  "Dr. Rossi":  { referti:19, guadagno:285, rating:4.8 },
+  "Dr. Conti":  { referti:6,  guadagno:90,  rating:4.9 },
+  "Dr. Ferrari":{ referti:11, guadagno:165, rating:4.7 },
+  "Dr. Bianchi":{ referti:28, guadagno:420, rating:4.9 },
+};
+
+const ME_FARMACIA = "Farmacia Centrale Roma";
+const ME_AZIENDA = "Med Lavoro Torino";
+const ME_CARDIOLOGO_DEFAULT = "Dr. Rossi";
+
+const generaSlots = () => {
+  const slots = [];
+  const oggi = new Date();
+  for (let g=1; g<=14; g++) {
+    const data = new Date(oggi);
+    data.setDate(oggi.getDate()+g);
+    if (data.getDay()===0) continue;
+    const orari = data.getDay()===6
+      ? ["09:00","09:30","10:00","10:30","11:00"]
+      : ["09:00","09:30","10:00","10:30","11:00","11:30","15:00","15:30","16:00","16:30","17:00","17:30"];
+    const occupati = Math.floor(Math.random()*4);
+    slots.push({ data: data.toISOString().slice(0,10), giorno: data.toLocaleDateString("it-IT",{weekday:"short",day:"2-digit",month:"short"}), orari: orari.slice(occupati) });
+  }
+  return slots;
+};
+
+const fmt = ts => { const d=new Date(ts); return d.toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit"})+" "+d.toLocaleTimeString("it-IT",{hour:"2-digit",minute:"2-digit"}); };
+
+const useSLA = (ecg) => {
+  const [left,setLeft] = useState(null);
+  useEffect(()=>{
+    if (ecg.stato!=="in_attesa") return;
+    const slaMs = ecg.urgenza==="urgente"?2*3600000:4*3600000;
+    const tick = ()=>setLeft(ecg.ts+slaMs-Date.now());
+    tick();
+    const id = setInterval(tick,1000);
+    return ()=>clearInterval(id);
+  },[ecg]);
+  return left;
+};
+
+const SLATimer = ({ ecg, compact }) => {
+  const left = useSLA(ecg);
+  if (left===null) return null;
+  const expired = left<0, urgent = left<1800000;
+  const h = Math.abs(Math.floor(left/3600000)), m = Math.abs(Math.floor((left%3600000)/60000)), s = Math.abs(Math.floor((left%60000)/1000));
+  const color = expired?C.red:urgent?C.orange:C.teal;
+  const bg = expired?C.redLight:urgent?C.orangeLight:C.tealLight;
+  const label = `${h}h ${String(m).padStart(2,"0")}m ${String(s).padStart(2,"0")}s`;
+  if (compact) return <span style={{ color, background:bg, border:`1px solid ${color}33`, padding:"2px 10px", borderRadius:20, fontSize:11, fontFamily:MONO, whiteSpace:"nowrap" }}>{expired?"⚠ scaduto":`⏱ ${label}`}</span>;
+  return (
+    <div style={{ background:bg, border:`1px solid ${color}33`, borderRadius:12, padding:"14px 18px", display:"flex", alignItems:"center", gap:14 }}>
+      <span style={{ fontSize:22 }}>{expired?"⚠️":"⏱"}</span>
+      <div>
+        <div style={{ color:C.muted, fontFamily:MONO, fontSize:10, letterSpacing:1.5, marginBottom:3 }}>SLA {ecg.urgenza==="urgente"?"2H":"4H"} — {expired?"SCADUTO":"RIMANENTE"}</div>
+        <div style={{ color, fontFamily:MONO, fontSize:20, fontWeight:"bold", letterSpacing:1 }}>{label}</div>
+      </div>
+    </div>
+  );
+};
+
+const Badge = ({ stato, urgenza }) => {
+  if (urgenza==="urgente"&&stato==="in_attesa") return <span style={{ background:C.redLight, color:C.red, border:`1px solid ${C.red}33`, padding:"3px 12px", borderRadius:20, fontSize:11, fontFamily:SANS, fontWeight:600 }}>● Urgente</span>;
+  if (stato==="in_attesa") return <span style={{ background:C.orangeLight, color:C.orange, border:`1px solid ${C.orange}33`, padding:"3px 12px", borderRadius:20, fontSize:11, fontFamily:SANS, fontWeight:600 }}>○ In attesa</span>;
+  if (stato==="prenotato") return <span style={{ background:C.yellowLight, color:C.yellow, border:`1px solid ${C.yellow}33`, padding:"3px 12px", borderRadius:20, fontSize:11, fontFamily:SANS, fontWeight:600 }}>📅 Prenotato</span>;
+  return <span style={{ background:C.greenLight, color:C.green, border:`1px solid ${C.green}33`, padding:"3px 12px", borderRadius:20, fontSize:11, fontFamily:SANS, fontWeight:600 }}>✓ Refertato</span>;
+};
+
+const OrigineTag = ({ ecg }) => {
+  if (ecg.origine==="azienda") return <span style={{ background:C.purpleLight, color:C.purple, border:`1px solid ${C.purple}33`, borderRadius:6, padding:"2px 8px", fontSize:10, fontWeight:600 }}>🏢 Azienda</span>;
+  if (ecg.origine==="pubblico") return <span style={{ background:C.pinkLight, color:C.pink, border:`1px solid ${C.pink}33`, borderRadius:6, padding:"2px 8px", fontSize:10, fontWeight:600 }}>👤 Privato</span>;
+  return <span style={{ background:C.tealLight, color:C.teal, border:`1px solid ${C.teal}33`, borderRadius:6, padding:"2px 8px", fontSize:10, fontWeight:600 }}>💊 Farmacia</span>;
+};
+
+const StatCard = ({ label, value, color, sub, icon }) => (
+  <div style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:16, padding:"20px 24px", flex:1, minWidth:120, boxShadow:C.shadow }}>
+    {icon && <div style={{ fontSize:22, marginBottom:8 }}>{icon}</div>}
+    <div style={{ color:C.muted, fontSize:11, fontFamily:SANS, fontWeight:500, marginBottom:6, letterSpacing:0.5 }}>{label}</div>
+    <div style={{ color:color||C.accent, fontSize:30, fontFamily:MONO, fontWeight:"bold", lineHeight:1 }}>{value}</div>
+    {sub && <div style={{ color:C.muted, fontSize:12, fontFamily:SANS, marginTop:6 }}>{sub}</div>}
+  </div>
+);
+
+const UploadZone = ({ onFile }) => {
+  const [drag,setDrag] = useState(false);
+  const [file,setFile] = useState(null);
+  const id = useRef("fu-"+Math.random().toString(36).slice(2,7)).current;
+  return (
+    <div>
+      <label style={{ color:C.textSoft, fontSize:12, fontFamily:SANS, fontWeight:600, display:"block", marginBottom:8 }}>CARICA REFERTO PDF</label>
+      <div onDragOver={e=>{e.preventDefault();setDrag(true)}} onDragLeave={()=>setDrag(false)}
+        onDrop={e=>{e.preventDefault();setDrag(false);const f=e.dataTransfer.files[0];setFile(f);onFile?.(f)}}
+        onClick={()=>document.getElementById(id).click()}
+        style={{ border:`2px dashed ${drag?C.accent:C.border}`, borderRadius:14, padding:"28px 20px", textAlign:"center", cursor:"pointer", background:drag?C.accentLight:"#f8faff" }}>
+        <input id={id} type="file" accept=".pdf,.png,.jpg" style={{display:"none"}} onChange={e=>{const f=e.target.files[0];setFile(f);onFile?.(f)}} />
+        {file ? <div style={{ color:C.green, fontWeight:600, fontSize:14 }}>✓ {file.name}</div>
+               : <><div style={{fontSize:28,marginBottom:8}}>📎</div><div style={{color:C.textSoft,fontSize:14,fontWeight:500}}>Trascina o clicca per selezionare</div><div style={{color:C.muted,fontSize:12,marginTop:4}}>PDF · PNG · JPG</div></>}
+      </div>
+    </div>
+  );
+};
+
+const inputStyle = { background:C.bg, border:`1px solid ${C.border}`, borderRadius:10, padding:"11px 14px", color:C.text, fontFamily:SANS, fontSize:14, width:"100%", outline:"none" };
+const labelStyle = { color:C.textSoft, fontSize:12, fontFamily:SANS, fontWeight:600, display:"block", marginBottom:7 };
+const btnPrimary = (active) => ({ background:active?C.accent:C.border, color:active?C.white:C.muted, border:"none", borderRadius:10, padding:"13px 0", cursor:active?"pointer":"not-allowed", fontFamily:SANS, fontWeight:700, fontSize:15, width:"100%", boxShadow:active?`0 4px 16px ${C.accent}44`:"none" });
+
+const Logo = ({ size=34 }) => (
+  <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+    <div style={{ width:size, height:size, background:"linear-gradient(135deg,#2e7cf6,#0ea5a0)", borderRadius:size/3, display:"flex", alignItems:"center", justifyContent:"center", fontSize:size*0.5, color:"white", fontWeight:700, fontFamily:SANS, boxShadow:"0 2px 8px rgba(46,124,246,0.25)" }}>M</div>
+    <div style={{ display:"flex", flexDirection:"column", lineHeight:1 }}>
+      <span style={{ fontFamily:SANS, fontWeight:700, fontSize:size*0.55, color:C.text, letterSpacing:-0.3 }}>Millefonti</span>
+      <span style={{ fontFamily:MONO, fontSize:size*0.28, color:C.muted, letterSpacing:2, marginTop:2 }}>ECG · REFERTAZIONE</span>
+    </div>
+  </div>
+);
+
+// ── LOGIN ─────────────────────────────────────────────────────────────────
+const Login = ({ onLogin, onSelectCardiologo }) => {
+  const [showCardiologi, setShowCardiologi] = useState(false);
+  const roles = [
+    { id:"pubblico",   label:"Pubblico — Cittadini",             icon:"👤", desc:"Prenota ECG o stima rischio CV" },
+    { id:"farmacia",   label:"Farmacia",                         icon:"💊", desc:"Carica ECG, ricevi referti" },
+    { id:"azienda",    label:"Azienda — Medicina del lavoro",    icon:"🏢", desc:"Upload batch per visite di idoneità" },
+    { id:"cardiologo", label:"Cardiologo",                       icon:"🫀", desc:"Vedi ed esegui i referti assegnati" },
+    { id:"admin",      label:"Admin",                            icon:"⚙️", desc:"Dashboard e controllo piattaforma" },
+  ];
+
+  if (showCardiologi) return (
+    <div style={{ minHeight:"100vh", background:"linear-gradient(135deg,#e8f2ff,#f4f7fb,#e8f9f4)", display:"flex", alignItems:"center", justifyContent:"center", padding:24, fontFamily:SANS }}>
+      <div style={{ maxWidth:440, width:"100%" }}>
+        <button onClick={()=>setShowCardiologi(false)} style={{ background:"transparent", border:"none", color:C.muted, fontSize:13, cursor:"pointer", marginBottom:20, fontWeight:500 }}>← Torna alla scelta ruolo</button>
+        <h2 style={{ color:C.text, fontSize:24, fontWeight:700, marginBottom:6 }}>Seleziona il tuo profilo</h2>
+        <p style={{ color:C.muted, fontSize:13, marginBottom:24 }}>Vedrai <strong>solo gli ECG che l'admin ti ha assegnato</strong> — nessun accesso alla coda generale</p>
+        <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+          {Object.entries(CARDIOLOGI_DATA).map(([nome,d])=>(
+            <button key={nome} onClick={()=>{ onSelectCardiologo(nome); onLogin("cardiologo"); }}
+              style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:14, padding:"16px 20px", cursor:"pointer", display:"flex", alignItems:"center", gap:14, textAlign:"left", boxShadow:C.shadow }}>
+              <div style={{ width:40, height:40, background:C.accentLight, borderRadius:12, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18 }}>🫀</div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontWeight:700, fontSize:14, color:C.text }}>{nome}</div>
+                <div style={{ fontSize:12, color:C.muted, marginTop:3 }}>{d.referti} referti · ★ {d.rating}</div>
+              </div>
+              <span style={{ color:C.mutedLight }}>›</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ minHeight:"100vh", background:"linear-gradient(135deg,#e8f2ff,#f4f7fb,#e8f9f4)", display:"flex", alignItems:"center", justifyContent:"center", padding:24, fontFamily:SANS }}>
+      <div style={{ position:"fixed", top:-100, right:-100, width:400, height:400, borderRadius:"50%", background:"radial-gradient(circle,#2e7cf618,transparent 70%)", pointerEvents:"none" }} />
+      <div style={{ position:"fixed", bottom:-80, left:-80, width:300, height:300, borderRadius:"50%", background:"radial-gradient(circle,#1aaa6e12,transparent 70%)", pointerEvents:"none" }} />
+      <div style={{ position:"relative", zIndex:1, textAlign:"center", maxWidth:440, width:"100%" }}>
+        <div style={{ width:72, height:72, background:"linear-gradient(135deg,#2e7cf6,#0ea5a0)", borderRadius:22, display:"flex", alignItems:"center", justifyContent:"center", fontSize:32, color:"white", fontWeight:700, margin:"0 auto 22px", boxShadow:"0 8px 28px rgba(46,124,246,0.3)" }}>M</div>
+        <h1 style={{ color:C.text, fontSize:42, fontWeight:700, margin:"0 0 4px", letterSpacing:-1.2 }}>Millefonti</h1>
+        <p style={{ color:C.muted, fontFamily:MONO, fontSize:11, letterSpacing:3, marginBottom:8, textTransform:"uppercase" }}>ECG · Refertazione</p>
+        <p style={{ color:C.textSoft, fontSize:14, marginBottom:36 }}>Cardiologia accessibile per cittadini, farmacie, aziende</p>
+        <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+          {roles.map(r=>(
+            <button key={r.id} onClick={()=>r.id==="cardiologo"?setShowCardiologi(true):onLogin(r.id)}
+              style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:16, padding:"16px 20px", cursor:"pointer", display:"flex", alignItems:"center", gap:14, textAlign:"left", boxShadow:C.shadow }}>
+              <div style={{ width:42, height:42, background:`linear-gradient(135deg,${C.accentLight},${C.tealLight})`, borderRadius:11, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>{r.icon}</div>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontWeight:700, fontSize:14, color:C.text }}>{r.label}</div>
+                <div style={{ color:C.muted, fontSize:12, marginTop:2 }}>{r.desc}</div>
+              </div>
+              <span style={{ color:C.mutedLight, fontSize:18 }}>›</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── PUBBLICO ─────────────────────────────────────────────────────────────
+const PubblicoView = ({ setEcgs }) => {
+  const [step, setStep] = useState(-1); // -1=home, 0-2=booking
+  const [servizio, setServizio] = useState(null);
+  const [slotScelto, setSlotScelto] = useState(null);
+  const [form, setForm] = useState({ nome:"", cognome:"", email:"", telefono:"", note:"" });
+  const [confermato, setConfermato] = useState(false);
+  const slots = useRef(generaSlots()).current;
+
+  const reset = () => { setStep(-1); setServizio(null); setSlotScelto(null); setForm({ nome:"", cognome:"", email:"", telefono:"", note:"" }); setConfermato(false); };
+
+  const avvia = (s) => { setServizio(s); setStep(0); };
+
+  const conferma = () => {
+    setEcgs(prev=>[...prev,{
+      id:`ECG-P${Date.now().toString().slice(-4)}`, origine:"pubblico",
+      paziente:`${form.nome} ${form.cognome}`, servizio,
+      ts:Date.now(), stato:"prenotato", urgenza:"normale",
+      note:form.note||"—", cardiologo:null, chat:[],
+      appuntamento:`${slotScelto.data} ${slotScelto.ora}`,
+      ...(servizio==="score2"?{risultati:{}}:{})
+    }]);
+    setConfermato(true);
+  };
+
+  if (step===-1) return (
+    <div style={{ padding:32, maxWidth:700, margin:"0 auto" }}>
+      <div style={{ textAlign:"center", marginBottom:40 }}>
+        <div style={{ display:"inline-block", background:"linear-gradient(135deg,#fdf0f7,#e5f7f7)", borderRadius:20, padding:"8px 20px", fontFamily:MONO, fontSize:11, letterSpacing:2, color:C.teal, textTransform:"uppercase", marginBottom:16 }}>Prenotazione online · Risposta rapida</div>
+        <h1 style={{ color:C.text, fontSize:38, fontWeight:700, marginBottom:10, letterSpacing:-1 }}>La tua <span style={{ color:C.teal }}>salute del cuore</span><br/>con un appuntamento.</h1>
+        <p style={{ color:C.muted, fontSize:15, maxWidth:460, margin:"0 auto" }}>Scegli il servizio, prenota uno slot disponibile nei prossimi 14 giorni, e vieni in ambulatorio.</p>
+      </div>
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:20, marginBottom:32 }}>
+        <div onClick={()=>avvia("ecg")} style={{ background:"linear-gradient(135deg,#fff,#e5f7f7)", border:`2px solid ${C.teal}33`, borderRadius:20, padding:28, cursor:"pointer", boxShadow:C.shadow }} onMouseEnter={e=>{e.currentTarget.style.borderColor=C.teal+"99"}} onMouseLeave={e=>{e.currentTarget.style.borderColor=C.teal+"33"}}>
+          <div style={{ width:60, height:60, background:C.tealLight, borderRadius:18, display:"flex", alignItems:"center", justifyContent:"center", fontSize:30, marginBottom:18 }}>🫀</div>
+          <h3 style={{ color:C.text, fontSize:20, fontWeight:700, marginBottom:6 }}>ECG con referto cardiologico</h3>
+          <p style={{ color:C.muted, fontSize:13, marginBottom:18, lineHeight:1.5 }}>Tracciato a 12 derivazioni con referto firmato da un cardiologo OMCeO. Valido per sport, lavoro, certificazioni.</p>
+          {["Tracciato ECG 12 derivazioni","Referto PDF firmato","Valido per sport · lavoro · certificazioni"].map(t=>(
+            <div key={t} style={{ display:"flex", alignItems:"center", gap:8, fontSize:12, color:C.textSoft, marginBottom:6 }}><span style={{ color:C.teal, fontWeight:700 }}>✓</span>{t}</div>
+          ))}
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", paddingTop:16, borderTop:`1px solid ${C.teal}22`, marginTop:12 }}>
+            <div style={{ color:C.teal, fontSize:28, fontWeight:700, fontFamily:MONO }}>50€</div>
+            <button style={{ background:C.teal, color:C.white, border:"none", borderRadius:10, padding:"10px 20px", cursor:"pointer", fontWeight:700, fontSize:14 }}>Prenota →</button>
+          </div>
+        </div>
+        <div onClick={()=>avvia("score2")} style={{ background:"linear-gradient(135deg,#fff,#fdf0f7)", border:`2px solid ${C.pink}33`, borderRadius:20, padding:28, cursor:"pointer", boxShadow:C.shadow }} onMouseEnter={e=>{e.currentTarget.style.borderColor=C.pink+"99"}} onMouseLeave={e=>{e.currentTarget.style.borderColor=C.pink+"33"}}>
+          <div style={{ position:"relative" }}>
+            <div style={{ position:"absolute", top:-8, right:-8, background:C.yellow, color:C.white, borderRadius:20, padding:"3px 12px", fontSize:11, fontWeight:700 }}>★ Più richiesto</div>
+          </div>
+          <div style={{ width:60, height:60, background:C.pinkLight, borderRadius:18, display:"flex", alignItems:"center", justifyContent:"center", fontSize:30, marginBottom:18 }}>📊</div>
+          <h3 style={{ color:C.text, fontSize:20, fontWeight:700, marginBottom:6 }}>Stima il tuo rischio CV</h3>
+          <p style={{ color:C.muted, fontSize:13, marginBottom:18, lineHeight:1.5 }}>Conosci la tua probabilità di evento cardiovascolare nei prossimi 10 anni con il calcolatore SCORE2.</p>
+          {["Prelievo (col. tot + HDL)","Misurazione pressione arteriosa","Calcolo SCORE2 + report PDF"].map(t=>(
+            <div key={t} style={{ display:"flex", alignItems:"center", gap:8, fontSize:12, color:C.textSoft, marginBottom:6 }}><span style={{ color:C.pink, fontWeight:700 }}>✓</span>{t}</div>
+          ))}
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", paddingTop:16, borderTop:`1px solid ${C.pink}22`, marginTop:12 }}>
+            <div style={{ color:C.pink, fontSize:28, fontWeight:700, fontFamily:MONO }}>30€</div>
+            <button style={{ background:C.pink, color:C.white, border:"none", borderRadius:10, padding:"10px 20px", cursor:"pointer", fontWeight:700, fontSize:14 }}>Prenota →</button>
+          </div>
+        </div>
+      </div>
+      <div style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:16, padding:"20px 28px", display:"flex", justifyContent:"space-around", alignItems:"center", flexWrap:"wrap", gap:16, boxShadow:C.shadow }}>
+        {[["🏥","Ambulatorio fisico"],["⚡","Risultati rapidi"],["🛡️","Privacy GDPR"],["💳","Pagamento sicuro"]].map(([i,t])=>(
+          <div key={t} style={{ display:"flex", alignItems:"center", gap:10 }}>
+            <span style={{ fontSize:22 }}>{i}</span>
+            <span style={{ color:C.textSoft, fontWeight:600, fontSize:13 }}>{t}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  const colorTema = servizio==="ecg"?C.teal:C.pink;
+  const prezzo = servizio==="ecg"?"50€":"30€";
+
+  if (confermato) return (
+    <div style={{ padding:32, maxWidth:560, margin:"0 auto", textAlign:"center" }}>
+      <div style={{ width:96, height:96, background:C.greenLight, borderRadius:"50%", display:"flex", alignItems:"center", justifyContent:"center", fontSize:44, margin:"40px auto 24px" }}>✅</div>
+      <h2 style={{ color:C.green, fontSize:28, fontWeight:700, marginBottom:6 }}>Prenotazione confermata!</h2>
+      <p style={{ color:C.muted, fontSize:15, marginBottom:30 }}>Riceverai un'email di conferma a {form.email}</p>
+      <div style={{ background:C.white, border:`2px solid ${colorTema}33`, borderRadius:18, padding:24, textAlign:"left", boxShadow:C.shadow, marginBottom:20 }}>
+        <div style={{ color:colorTema, fontFamily:MONO, fontSize:11, letterSpacing:2, textTransform:"uppercase", fontWeight:700, marginBottom:14 }}>Riepilogo appuntamento</div>
+        {[["Servizio",servizio==="ecg"?"ECG con referto":"Stima rischio CV (SCORE2)"],["Data",new Date(slotScelto.data).toLocaleDateString("it-IT",{weekday:"long",day:"2-digit",month:"long"})],["Orario",slotScelto.ora],["Paziente",`${form.nome} ${form.cognome}`],["Costo",prezzo]].map(([k,v])=>(
+          <div key={k} style={{ display:"flex", justifyContent:"space-between", padding:"10px 0", borderBottom:`1px solid ${C.borderLight}`, fontSize:14 }}>
+            <span style={{ color:C.muted }}>{k}</span><span style={{ color:C.text, fontWeight:600 }}>{v}</span>
+          </div>
+        ))}
+      </div>
+      {servizio==="score2" && <div style={{ background:C.yellowLight, border:`1px solid ${C.yellow}33`, borderRadius:12, padding:"14px 18px", marginBottom:20, fontSize:13, color:C.textSoft, textAlign:"left" }}>⏰ Per il prelievo: presentarsi a <strong>digiuno da almeno 8 ore</strong>.</div>}
+      <button onClick={reset} style={btnPrimary(true)}>← Torna alla home</button>
+    </div>
+  );
+
+  return (
+    <div style={{ padding:32, maxWidth:560, margin:"0 auto" }}>
+      <button onClick={reset} style={{ background:"transparent", border:"none", color:C.muted, fontSize:13, cursor:"pointer", marginBottom:20, fontWeight:500 }}>← Torna ai servizi</button>
+      <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:20 }}>
+        <div style={{ width:48, height:48, background:servizio==="ecg"?C.tealLight:C.pinkLight, borderRadius:14, display:"flex", alignItems:"center", justifyContent:"center", fontSize:24 }}>{servizio==="ecg"?"🫀":"📊"}</div>
+        <div>
+          <h2 style={{ color:C.text, fontSize:22, fontWeight:700 }}>{servizio==="ecg"?"ECG con referto":"Stima rischio CV"}</h2>
+          <div style={{ color:colorTema, fontFamily:MONO, fontSize:14, fontWeight:700 }}>{prezzo}</div>
+        </div>
+      </div>
+      <div style={{ display:"flex", gap:8, marginBottom:28 }}>
+        {["Dati","Data e orario","Conferma"].map((s,i)=>(
+          <div key={s} style={{ flex:1, height:6, borderRadius:6, background:i<=step?colorTema:C.border }} />
+        ))}
+      </div>
+
+      {step===0 && (
+        <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+            {[["nome","Nome"],["cognome","Cognome"]].map(([k,l])=>(
+              <div key={k}><label style={labelStyle}>{l}</label><input style={inputStyle} value={form[k]} onChange={e=>setForm(p=>({...p,[k]:e.target.value}))} placeholder={l} /></div>
+            ))}
+          </div>
+          {[["email","Email","email@esempio.it"],["telefono","Telefono","+39 333 000 0000"]].map(([k,l,ph])=>(
+            <div key={k}><label style={labelStyle}>{l}</label><input style={inputStyle} value={form[k]} onChange={e=>setForm(p=>({...p,[k]:e.target.value}))} placeholder={ph} /></div>
+          ))}
+          <div><label style={labelStyle}>Note (sintomi, motivo visita)</label><textarea style={{...inputStyle, height:80, resize:"vertical"}} value={form.note} onChange={e=>setForm(p=>({...p,note:e.target.value}))} placeholder="Facoltativo" /></div>
+          {servizio==="score2" && <div style={{ background:C.yellowLight, border:`1px solid ${C.yellow}33`, borderRadius:10, padding:"12px 16px", fontSize:13, color:C.textSoft }}>⏰ Presentarsi a <strong>digiuno da almeno 8 ore</strong> prima dell'appuntamento.</div>}
+          <button onClick={()=>setStep(1)} style={btnPrimary(!!(form.nome&&form.cognome&&form.email))}>Scegli data e orario →</button>
+        </div>
+      )}
+
+      {step===1 && (
+        <div>
+          <p style={{ color:C.muted, fontSize:13, marginBottom:16 }}>Seleziona un giorno e un orario disponibile nei prossimi 14 giorni.</p>
+          <div style={{ display:"flex", flexDirection:"column", gap:12, maxHeight:380, overflowY:"auto" }}>
+            {slots.map(s=>(
+              <div key={s.data} style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:14, padding:"14px 16px", boxShadow:C.shadow }}>
+                <div style={{ color:C.muted, fontSize:11, fontFamily:MONO, textTransform:"uppercase", letterSpacing:1, marginBottom:10 }}>{s.giorno}</div>
+                <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
+                  {s.orari.map(o=>{
+                    const sel = slotScelto?.data===s.data&&slotScelto?.ora===o;
+                    return <button key={o} onClick={()=>setSlotScelto({data:s.data,ora:o})} style={{ background:sel?colorTema:C.bg, color:sel?C.white:C.text, border:`1.5px solid ${sel?colorTema:C.border}`, borderRadius:8, padding:"7px 14px", cursor:"pointer", fontFamily:MONO, fontSize:13, fontWeight:600 }}>{o}</button>;
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{ marginTop:16, display:"flex", gap:10 }}>
+            <button onClick={()=>setStep(0)} style={{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:10, padding:"12px 0", cursor:"pointer", fontFamily:SANS, fontWeight:600, fontSize:14, flex:1, color:C.muted }}>← Indietro</button>
+            <button onClick={()=>setStep(2)} style={{...btnPrimary(!!slotScelto), flex:2}}>Conferma →</button>
+          </div>
+        </div>
+      )}
+
+      {step===2 && (
+        <div>
+          <div style={{ background:C.white, border:`2px solid ${colorTema}33`, borderRadius:16, padding:22, boxShadow:C.shadow, marginBottom:16 }}>
+            <div style={{ color:colorTema, fontFamily:MONO, fontSize:11, letterSpacing:2, textTransform:"uppercase", fontWeight:700, marginBottom:14 }}>Riepilogo prenotazione</div>
+            {[["Servizio",servizio==="ecg"?"ECG con referto":"Stima rischio CV (SCORE2)"],["Paziente",`${form.nome} ${form.cognome}`],["Email",form.email],["Telefono",form.telefono||"—"],["Data",new Date(slotScelto.data).toLocaleDateString("it-IT",{weekday:"long",day:"2-digit",month:"long"})],["Orario",slotScelto.ora],["Costo",prezzo]].map(([k,v])=>(
+              <div key={k} style={{ display:"flex", justifyContent:"space-between", padding:"9px 0", borderBottom:`1px solid ${C.borderLight}`, fontSize:14 }}>
+                <span style={{ color:C.muted }}>{k}</span><span style={{ color:C.text, fontWeight:600 }}>{v}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ display:"flex", gap:10 }}>
+            <button onClick={()=>setStep(1)} style={{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:10, padding:"12px 0", cursor:"pointer", fontFamily:SANS, fontWeight:600, fontSize:14, flex:1, color:C.muted }}>← Indietro</button>
+            <button onClick={conferma} style={{...btnPrimary(true), flex:2}}>Conferma prenotazione ✓</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── FARMACIA ─────────────────────────────────────────────────────────────
+const FarmaciaView = ({ ecgs, setEcgs }) => {
+  const [tab, setTab] = useState("upload");
+  const [file, setFile] = useState(null);
+  const [form, setForm] = useState({ paziente:"", eta:"", sesso:"M", note:"", urgenza:"normale" });
+  const [sent, setSent] = useState(false);
+  const miei = ecgs.filter(e=>e.origine==="farmacia"&&e.farmacia===ME_FARMACIA);
+
+  const invia = () => {
+    if (!file||!form.paziente) return;
+    setEcgs(prev=>[...prev,{ id:`ECG-F${Date.now().toString().slice(-4)}`, origine:"farmacia", farmacia:ME_FARMACIA, paziente:`${form.paziente}, ${form.eta}a, ${form.sesso}`, ts:Date.now(), stato:"in_attesa", urgenza:form.urgenza, note:form.note||"—", cardiologo:null, chat:[] }]);
+    setSent(true);
+  };
+
+  const tabBtn = (id,label) => (
+    <button onClick={()=>setTab(id)} style={{ background:tab===id?C.white:"transparent", border:tab===id?`1px solid ${C.border}`:"1px solid transparent", borderRadius:10, padding:"8px 20px", cursor:"pointer", fontFamily:SANS, fontWeight:600, fontSize:13, color:tab===id?C.accent:C.muted, boxShadow:tab===id?C.shadow:"none" }}>{label}</button>
+  );
+
+  return (
+    <div style={{ padding:32, maxWidth:700, margin:"0 auto" }}>
+      <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:28 }}>
+        <div style={{ width:52, height:52, background:"linear-gradient(135deg,#e5f7f7,#f4f7fb)", borderRadius:16, display:"flex", alignItems:"center", justifyContent:"center", fontSize:26 }}>💊</div>
+        <div><h2 style={{ color:C.text, fontSize:24, fontWeight:700 }}>Farmacia · {ME_FARMACIA}</h2><div style={{ color:C.muted, fontSize:13, marginTop:2 }}>Carica ECG e monitora i tuoi referti</div></div>
+      </div>
+      <div style={{ display:"flex", gap:6, marginBottom:24, background:C.bg, borderRadius:12, padding:4, width:"fit-content" }}>
+        {tabBtn("upload","Carica ECG")}
+        {tabBtn("storico","I miei referti")}
+      </div>
+
+      {tab==="upload" && (
+        sent ? (
+          <div style={{ background:C.white, border:`2px solid ${C.green}33`, borderRadius:20, padding:40, textAlign:"center", boxShadow:C.shadow }}>
+            <div style={{ fontSize:48, marginBottom:16 }}>✅</div>
+            <h3 style={{ color:C.green, fontSize:22, fontWeight:700, marginBottom:6 }}>ECG inviato!</h3>
+            <p style={{ color:C.muted, fontSize:14, marginBottom:20 }}>Il referto arriverà entro {form.urgenza==="urgente"?"2":"4"} ore.</p>
+            <button onClick={()=>{setSent(false);setFile(null);setForm({ paziente:"", eta:"", sesso:"M", note:"", urgenza:"normale" })}} style={{ background:C.accent, color:C.white, border:"none", borderRadius:10, padding:"12px 28px", cursor:"pointer", fontWeight:700, fontSize:14 }}>Carica un altro →</button>
+          </div>
+        ) : (
+          <div style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:20, padding:28, boxShadow:C.shadow }}>
+            <h3 style={{ color:C.text, fontSize:17, fontWeight:700, marginBottom:20 }}>Nuovo ECG da refertare</h3>
+            <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+              <div><label style={labelStyle}>NOME PAZIENTE</label><input style={inputStyle} value={form.paziente} onChange={e=>setForm(p=>({...p,paziente:e.target.value}))} placeholder="Cognome Nome" /></div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+                <div><label style={labelStyle}>ETÀ</label><input style={inputStyle} type="number" value={form.eta} onChange={e=>setForm(p=>({...p,eta:e.target.value}))} placeholder="es. 58" /></div>
+                <div><label style={labelStyle}>SESSO</label>
+                  <select style={inputStyle} value={form.sesso} onChange={e=>setForm(p=>({...p,sesso:e.target.value}))}>
+                    <option value="M">Maschio</option><option value="F">Femmina</option>
+                  </select>
+                </div>
+              </div>
+              <div><label style={labelStyle}>URGENZA</label>
+                <div style={{ display:"flex", gap:8 }}>
+                  {[["normale","Normale (4h)"],["urgente","Urgente (2h)"]].map(([v,l])=>(
+                    <button key={v} onClick={()=>setForm(p=>({...p,urgenza:v}))} style={{ flex:1, padding:"10px 0", borderRadius:10, cursor:"pointer", border:`1.5px solid ${form.urgenza===v?(v==="urgente"?C.red:C.accent):C.border}`, background:form.urgenza===v?(v==="urgente"?C.redLight:C.accentLight):C.bg, color:form.urgenza===v?(v==="urgente"?C.red:C.accent):C.muted, fontWeight:600, fontSize:13 }}>{l}</button>
+                  ))}
+                </div>
+              </div>
+              <div><label style={labelStyle}>NOTE CLINICHE</label><textarea style={{...inputStyle, height:70, resize:"vertical"}} value={form.note} onChange={e=>setForm(p=>({...p,note:e.target.value}))} placeholder="Sintomi, motivo..." /></div>
+              <UploadZone onFile={setFile} />
+              <button onClick={invia} style={btnPrimary(!!(file&&form.paziente&&form.eta))}>Invia per refertazione →</button>
+            </div>
+          </div>
+        )
+      )}
+
+      {tab==="storico" && (
+        <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+          {miei.length===0 && <div style={{ textAlign:"center", padding:40, color:C.muted }}>Nessun ECG ancora caricato</div>}
+          {miei.map(e=>(
+            <div key={e.id} style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:14, padding:"16px 20px", boxShadow:C.shadow, display:"flex", alignItems:"center", gap:14, flexWrap:"wrap" }}>
+              <div style={{ flex:1, minWidth:160 }}>
+                <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
+                  <span style={{ fontFamily:MONO, color:C.muted, fontSize:11 }}>{e.id}</span>
+                  <Badge stato={e.stato} urgenza={e.urgenza} />
+                </div>
+                <div style={{ color:C.text, fontSize:15, fontWeight:600 }}>{e.paziente}</div>
+                <div style={{ color:C.muted, fontSize:12, marginTop:2 }}>{fmt(e.ts)} · {e.note}</div>
+              </div>
+              {e.stato==="refertato" && <div style={{ background:C.greenLight, color:C.green, border:`1px solid ${C.green}33`, borderRadius:10, padding:"8px 16px", fontSize:13, fontWeight:700, cursor:"pointer" }}>📄 Scarica PDF</div>}
+              {e.stato==="in_attesa" && !e.cardiologo && <div style={{ background:C.yellowLight, color:C.yellow, border:`1px solid ${C.yellow}33`, borderRadius:10, padding:"8px 16px", fontSize:12, fontWeight:600 }}>⏳ In coda</div>}
+              {e.stato==="in_attesa" && e.cardiologo && <div style={{ background:C.accentLight, color:C.accent, border:`1px solid ${C.accent}33`, borderRadius:10, padding:"8px 16px", fontSize:12, fontWeight:600 }}>🫀 In refertazione</div>}
+              {e.stato==="in_attesa" && <SLATimer ecg={e} compact />}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── AZIENDA ─────────────────────────────────────────────────────────────
+const AziendaView = ({ ecgs, setEcgs }) => {
+  const [tab, setTab] = useState("dashboard");
+  const [batchNome, setBatchNome] = useState("");
+  const [lavoratori, setLavoratori] = useState([{ paziente:"", eta:"", sesso:"M", mansione:"", note:"" }]);
+  const [sent, setSent] = useState(false);
+  const piano = { piano:"Aziende Plus", limite:150, usati:42, canoneMensile:1500, prezzoUnit:10 };
+  const miei = ecgs.filter(e=>e.origine==="azienda"&&e.azienda===ME_AZIENDA);
+
+  const tabBtn = (id,label) => (
+    <button onClick={()=>setTab(id)} style={{ background:tab===id?C.white:"transparent", border:tab===id?`1px solid ${C.border}`:"1px solid transparent", borderRadius:10, padding:"8px 20px", cursor:"pointer", fontFamily:SANS, fontWeight:600, fontSize:13, color:tab===id?C.purple:C.muted, boxShadow:tab===id?C.shadow:"none" }}>{label}</button>
+  );
+
+  const inviaLotto = () => {
+    if (!batchNome||lavoratori.some(l=>!l.paziente)) return;
+    const nuovi = lavoratori.map((l,i)=>({ id:`ECG-A${Date.now().toString().slice(-4)}-${i}`, origine:"azienda", azienda:ME_AZIENDA, batch:batchNome, paziente:`${l.paziente}, ${l.eta}a, ${l.sesso}`, ts:Date.now(), stato:"in_attesa", urgenza:"normale", note:l.mansione?`Mansione: ${l.mansione}. ${l.note}`:(l.note||"Idoneità annuale"), cardiologo:null, chat:[] }));
+    setEcgs(prev=>[...prev,...nuovi]);
+    setSent(true);
+  };
+
+  return (
+    <div style={{ padding:32, maxWidth:800, margin:"0 auto" }}>
+      <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:28 }}>
+        <div style={{ width:52, height:52, background:"linear-gradient(135deg,#f3edff,#f4f7fb)", borderRadius:16, display:"flex", alignItems:"center", justifyContent:"center", fontSize:26 }}>🏢</div>
+        <div><h2 style={{ color:C.text, fontSize:24, fontWeight:700 }}>{ME_AZIENDA}</h2><div style={{ color:C.muted, fontSize:13, marginTop:2 }}>Piano {piano.piano} · {piano.usati}/{piano.limite} ECG usati</div></div>
+        <div style={{ marginLeft:"auto", background:`linear-gradient(135deg,${C.purpleLight},#eaf2ff)`, borderRadius:14, padding:"10px 18px", textAlign:"right" }}>
+          <div style={{ color:C.purple, fontFamily:MONO, fontSize:22, fontWeight:"bold" }}>{piano.canoneMensile}€</div>
+          <div style={{ color:C.muted, fontSize:11 }}>canone mensile</div>
+        </div>
+      </div>
+      <div style={{ display:"flex", gap:6, marginBottom:24, background:C.bg, borderRadius:12, padding:4, width:"fit-content" }}>
+        {tabBtn("dashboard","Dashboard")}
+        {tabBtn("upload","Carica lotto")}
+        {tabBtn("storico","Storico")}
+      </div>
+
+      {tab==="dashboard" && (
+        <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+          <div style={{ display:"flex", gap:14, flexWrap:"wrap" }}>
+            <StatCard label="ECG nel mese" value={piano.usati} color={C.purple} sub={`su ${piano.limite} inclusi`} icon="📋" />
+            <StatCard label="Ancora disponibili" value={piano.limite-piano.usati} color={C.green} sub="nel piano mensile" icon="✅" />
+            <StatCard label="Referti completati" value={miei.filter(e=>e.stato==="refertato").length} color={C.accent} sub="questo mese" icon="📄" />
+            <StatCard label="In attesa" value={miei.filter(e=>e.stato==="in_attesa").length} color={C.orange} icon="⏳" />
+          </div>
+          <div style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:16, padding:20, boxShadow:C.shadow }}>
+            <div style={{ color:C.muted, fontSize:12, fontWeight:700, letterSpacing:1, textTransform:"uppercase", marginBottom:12 }}>Utilizzo mensile</div>
+            <div style={{ background:C.bg, borderRadius:8, height:12, overflow:"hidden" }}>
+              <div style={{ height:"100%", background:`linear-gradient(90deg,${C.purple},${C.accent})`, width:`${(piano.usati/piano.limite)*100}%`, borderRadius:8, transition:"width 0.5s" }} />
+            </div>
+            <div style={{ display:"flex", justifyContent:"space-between", marginTop:8, fontSize:12, color:C.muted }}>
+              <span>{piano.usati} usati</span><span>{piano.limite-piano.usati} rimasti · extracosto {piano.prezzoUnit}€/cad</span>
+            </div>
+          </div>
+          <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+            <div style={{ color:C.textSoft, fontWeight:700, fontSize:13, marginBottom:4 }}>Ultimi lotti</div>
+            {[...new Set(miei.map(e=>e.batch))].slice(0,3).map(b=>{
+              const nel = miei.filter(e=>e.batch===b);
+              return (
+                <div key={b} style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:14, padding:"14px 20px", display:"flex", alignItems:"center", gap:12, boxShadow:C.shadow }}>
+                  <div style={{ width:40, height:40, background:C.purpleLight, borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, flexShrink:0 }}>📂</div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ color:C.text, fontWeight:700, fontSize:14 }}>{b}</div>
+                    <div style={{ color:C.muted, fontSize:12, marginTop:2 }}>{nel.length} ECG · {nel.filter(e=>e.stato==="refertato").length} refertati · {nel.filter(e=>e.stato==="in_attesa").length} in attesa</div>
+                  </div>
+                  <span style={{ color:C.purple, fontFamily:MONO, fontWeight:700 }}>{nel.length * piano.prezzoUnit}€</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {tab==="upload" && (
+        sent ? (
+          <div style={{ background:C.white, border:`2px solid ${C.green}33`, borderRadius:20, padding:40, textAlign:"center", boxShadow:C.shadow }}>
+            <div style={{ fontSize:48, marginBottom:16 }}>✅</div>
+            <h3 style={{ color:C.green, fontSize:22, fontWeight:700, marginBottom:6 }}>Lotto inviato!</h3>
+            <p style={{ color:C.muted, fontSize:14, marginBottom:20 }}>{lavoratori.length} ECG del lotto <strong>{batchNome}</strong> ricevuti. Refertazione entro 24 ore.</p>
+            <button onClick={()=>{setSent(false);setBatchNome("");setLavoratori([{ paziente:"", eta:"", sesso:"M", mansione:"", note:"" }])}} style={{ background:C.purple, color:C.white, border:"none", borderRadius:10, padding:"12px 28px", cursor:"pointer", fontWeight:700, fontSize:14 }}>Carica un altro lotto →</button>
+          </div>
+        ) : (
+          <div style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:20, padding:28, boxShadow:C.shadow }}>
+            <h3 style={{ color:C.text, fontSize:17, fontWeight:700, marginBottom:6 }}>Nuovo lotto ECG</h3>
+            <p style={{ color:C.muted, fontSize:13, marginBottom:20 }}>Inserisci un nome per il lotto (es. "FCA-Mirafiori-Mag2025") e i lavoratori.</p>
+            <div style={{ marginBottom:20 }}>
+              <label style={labelStyle}>NOME LOTTO</label>
+              <input style={inputStyle} value={batchNome} onChange={e=>setBatchNome(e.target.value)} placeholder="es. FCA-Mirafiori-Mag2025" />
+            </div>
+            <div style={{ color:C.textSoft, fontWeight:700, fontSize:13, marginBottom:10 }}>Lavoratori ({lavoratori.length})</div>
+            <div style={{ display:"flex", flexDirection:"column", gap:10, marginBottom:16 }}>
+              {lavoratori.map((l,i)=>(
+                <div key={i} style={{ background:C.bg, borderRadius:14, padding:16, border:`1px solid ${C.border}` }}>
+                  <div style={{ color:C.muted, fontFamily:MONO, fontSize:11, marginBottom:10 }}>LAVORATORE {i+1}</div>
+                  <div style={{ display:"grid", gridTemplateColumns:"1fr auto auto", gap:10, marginBottom:10 }}>
+                    <input style={inputStyle} placeholder="Cognome Nome" value={l.paziente} onChange={e=>setLavoratori(prev=>prev.map((p,j)=>j===i?{...p,paziente:e.target.value}:p))} />
+                    <input style={{...inputStyle, width:70}} type="number" placeholder="Età" value={l.eta} onChange={e=>setLavoratori(prev=>prev.map((p,j)=>j===i?{...p,eta:e.target.value}:p))} />
+                    <select style={{...inputStyle, width:90}} value={l.sesso} onChange={e=>setLavoratori(prev=>prev.map((p,j)=>j===i?{...p,sesso:e.target.value}:p))}>
+                      <option value="M">M</option><option value="F">F</option>
+                    </select>
+                  </div>
+                  <input style={inputStyle} placeholder="Mansione (es. operaio, turnista)" value={l.mansione} onChange={e=>setLavoratori(prev=>prev.map((p,j)=>j===i?{...p,mansione:e.target.value}:p))} />
+                </div>
+              ))}
+            </div>
+            <button onClick={()=>setLavoratori(p=>[...p,{ paziente:"", eta:"", sesso:"M", mansione:"", note:"" }])} style={{ background:C.purpleLight, color:C.purple, border:`1px solid ${C.purple}33`, borderRadius:10, padding:"10px 0", cursor:"pointer", width:"100%", fontWeight:700, marginBottom:16 }}>+ Aggiungi lavoratore</button>
+            <UploadZone onFile={()=>{}} />
+            <div style={{ marginTop:14 }}><button onClick={inviaLotto} style={btnPrimary(!!(batchNome&&lavoratori.every(l=>l.paziente&&l.eta)))}>Invia lotto ({lavoratori.length} ECG) →</button></div>
+          </div>
+        )
+      )}
+
+      {tab==="storico" && (
+        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+          {miei.map(e=>(
+            <div key={e.id} style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:14, padding:"14px 20px", boxShadow:C.shadow, display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
+              <div style={{ flex:1, minWidth:160 }}>
+                <div style={{ display:"flex", gap:8, marginBottom:5 }}>
+                  <span style={{ fontFamily:MONO, color:C.muted, fontSize:11 }}>{e.id}</span>
+                  <Badge stato={e.stato} urgenza={e.urgenza} />
+                </div>
+                <div style={{ color:C.text, fontSize:14, fontWeight:600 }}>{e.paziente}</div>
+                <div style={{ color:C.muted, fontSize:12, marginTop:2 }}>📂 {e.batch}</div>
+              </div>
+              {e.stato==="refertato" && <div style={{ background:C.greenLight, color:C.green, borderRadius:10, padding:"8px 16px", fontSize:13, fontWeight:700, cursor:"pointer" }}>📄 Scarica</div>}
+              {e.stato==="in_attesa" && !e.cardiologo && <div style={{ background:C.yellowLight, color:C.yellow, borderRadius:10, padding:"8px 16px", fontSize:12, fontWeight:600 }}>⏳ In coda</div>}
+              {e.stato==="in_attesa" && e.cardiologo && <div style={{ background:C.purpleLight, color:C.purple, borderRadius:10, padding:"8px 16px", fontSize:12, fontWeight:600 }}>🫀 In refertazione</div>}
+            </div>
+          ))}
+          {miei.length===0 && <div style={{ textAlign:"center", padding:40, color:C.muted }}>Nessun ECG ancora caricato</div>}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── CARDIOLOGO ────────────────────────────────────────────────────────────
+// Vede SOLO gli ECG che l'admin gli ha assegnato esplicitamente.
+const CardiologoView = ({ ecgs, setEcgs, meCardiologo }) => {
+  const [selected, setSelected] = useState(null);
+  const [done, setDone] = useState(false);
+  const [file, setFile] = useState(null);
+
+  // Solo ECG assegnati a questo cardiologo
+  const mieiEcgs = ecgs.filter(e => e.cardiologo === meCardiologo);
+  const inAttesa = mieiEcgs.filter(e => e.stato === "in_attesa");
+  const refertatiMiei = mieiEcgs.filter(e => e.stato === "refertato");
+  const me = { referti: 0, guadagno: 0, rating: 4.9, ...Object.values(CARDIOLOGI_DATA).find((_,i)=>Object.keys(CARDIOLOGI_DATA)[i]===meCardiologo)||{} };
+  const guadagnoTot = (me.guadagno || 0) + refertatiMiei.reduce((s,e)=>s+(e.origine==="azienda"?10:15),0);
+
+  const handleReferti = () => {
+    if (!file || !selected) return;
+    setEcgs(prev => prev.map(e => e.id === selected.id ? { ...e, stato:"refertato" } : e));
+    setDone(true);
+  };
+
+  return (
+    <div style={{ display:"flex", height:"calc(100vh - 64px)" }}>
+      {/* Sidebar */}
+      <div style={{ width:320, borderRight:`1px solid ${C.border}`, display:"flex", flexDirection:"column", background:C.white, overflow:"hidden" }}>
+        <div style={{ padding:"20px 20px 16px", background:"linear-gradient(135deg,#e8f4ff,#e6f9f4)", borderBottom:`1px solid ${C.border}` }}>
+          <div style={{ color:C.muted, fontSize:12, fontWeight:600, marginBottom:4 }}>Guadagni — mese corrente</div>
+          <div style={{ color:C.green, fontFamily:MONO, fontSize:30, fontWeight:"bold" }}>{guadagnoTot}€</div>
+          <div style={{ display:"flex", gap:6, marginTop:10, flexWrap:"wrap" }}>
+            <span style={{ background:C.white, color:C.accent, border:`1px solid ${C.border}`, borderRadius:20, padding:"3px 12px", fontWeight:600, fontSize:12 }}>{(me.referti||0)+refertatiMiei.length} referti</span>
+            <span style={{ background:C.white, color:C.yellow, border:`1px solid ${C.border}`, borderRadius:20, padding:"3px 12px", fontWeight:600, fontSize:12 }}>★ {me.rating}</span>
+          </div>
+        </div>
+
+        <div style={{ padding:"14px 18px 6px", borderBottom:`1px solid ${C.borderLight}` }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+            <span style={{ color:C.textSoft, fontWeight:700, fontSize:13 }}>Da refertare</span>
+            <span style={{ background:C.accentLight, color:C.accent, borderRadius:20, padding:"2px 12px", fontSize:12, fontWeight:700 }}>{inAttesa.length}</span>
+          </div>
+        </div>
+
+        <div style={{ overflowY:"auto", flex:1 }}>
+          {inAttesa.map(ecg=>(
+            <div key={ecg.id} onClick={()=>{setSelected(ecg);setDone(false);setFile(null)}}
+              style={{ padding:"12px 18px", borderBottom:`1px solid ${C.borderLight}`, cursor:"pointer", background:selected?.id===ecg.id?C.accentLight:"transparent", borderLeft:`4px solid ${selected?.id===ecg.id?C.accent:"transparent"}` }}>
+              <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4, gap:6 }}>
+                <span style={{ fontFamily:MONO, color:C.muted, fontSize:11 }}>{ecg.id}</span>
+                <Badge stato={ecg.stato} urgenza={ecg.urgenza} />
+              </div>
+              <div style={{ marginBottom:3 }}><OrigineTag ecg={ecg} /></div>
+              <div style={{ color:C.text, fontSize:14, fontWeight:600 }}>{ecg.paziente}</div>
+              <div style={{ color:C.muted, fontSize:12, marginTop:2 }}>{ecg.origine==="azienda"?ecg.batch:ecg.origine==="farmacia"?ecg.farmacia:"Prenotazione online"}</div>
+              <div style={{ marginTop:6 }}><SLATimer ecg={ecg} compact /></div>
+            </div>
+          ))}
+          {inAttesa.length===0 && (
+            <div style={{ padding:40, textAlign:"center" }}>
+              <div style={{ fontSize:36, marginBottom:8 }}>🎉</div>
+              <div style={{ color:C.green, fontWeight:600, fontSize:14 }}>Coda vuota!</div>
+              <div style={{ color:C.mutedLight, fontSize:12, marginTop:6 }}>Nessun ECG assegnato in attesa</div>
+            </div>
+          )}
+        </div>
+
+        {/* Referti completati */}
+        {refertatiMiei.length>0 && (
+          <div style={{ borderTop:`1px solid ${C.border}`, padding:"12px 18px 6px" }}>
+            <div style={{ color:C.green, fontWeight:700, fontSize:12, marginBottom:8 }}>✓ Completati ({refertatiMiei.length})</div>
+            {refertatiMiei.slice(-3).map(e=>(
+              <div key={e.id} style={{ color:C.muted, fontSize:12, padding:"5px 0", borderBottom:`1px solid ${C.borderLight}` }}>
+                <span style={{ fontFamily:MONO }}>{e.id}</span> — {e.paziente}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Detail */}
+      <div style={{ flex:1, overflowY:"auto", padding:32, background:C.bg }}>
+        {!selected ? (
+          <div style={{ textAlign:"center", padding:"80px 0" }}>
+            <div style={{ fontSize:56, marginBottom:12 }}>🫀</div>
+            <div style={{ color:C.muted, fontSize:15 }}>Seleziona un ECG dalla lista</div>
+            <div style={{ color:C.mutedLight, fontSize:12, marginTop:6 }}>Vedi solo gli ECG che ti sono stati assegnati dall'admin</div>
+          </div>
+        ) : done ? (
+          <div style={{ textAlign:"center", padding:"80px 0" }}>
+            <div style={{ width:90, height:90, background:C.greenLight, borderRadius:"50%", display:"flex", alignItems:"center", justifyContent:"center", fontSize:40, margin:"0 auto 20px" }}>✅</div>
+            <div style={{ color:C.green, fontWeight:700, fontSize:22 }}>Referto inviato!</div>
+            <div style={{ color:C.green, fontFamily:MONO, fontSize:28, fontWeight:"bold", marginTop:20 }}>+{selected.origine==="azienda"?10:15}€ 💰</div>
+            <button onClick={()=>{setSelected(null);setDone(false)}} style={{ marginTop:24, background:C.accent, color:C.white, border:"none", borderRadius:10, padding:"11px 28px", cursor:"pointer", fontWeight:700, fontSize:14 }}>← Prossimo ECG</button>
+          </div>
+        ) : (
+          <div style={{ maxWidth:600 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap", marginBottom:14 }}>
+              <Badge stato={selected.stato} urgenza={selected.urgenza} />
+              <OrigineTag ecg={selected} />
+              <span style={{ fontFamily:MONO, color:C.muted, fontSize:12 }}>{selected.id}</span>
+            </div>
+            <h2 style={{ color:C.text, fontSize:24, fontWeight:700, marginBottom:4 }}>{selected.paziente}</h2>
+            <div style={{ color:C.muted, fontSize:13, marginBottom:22 }}>
+              {selected.origine==="azienda"?`${selected.azienda} · ${selected.batch}`:selected.origine==="farmacia"?selected.farmacia:`Prenotazione · ${selected.appuntamento||""}`} · {fmt(selected.ts)}
+            </div>
+            <div style={{ marginBottom:18 }}><SLATimer ecg={ecgs.find(e=>e.id===selected.id)||selected} /></div>
+            {selected.origine==="pubblico"&&selected.servizio==="score2"&&selected.risultati&&Object.keys(selected.risultati).length>0 && (
+              <div style={{ background:C.pinkLight, border:`1px solid ${C.pink}33`, borderRadius:16, padding:18, marginBottom:16 }}>
+                <div style={{ color:C.pink, fontSize:12, fontWeight:700, letterSpacing:1, textTransform:"uppercase", marginBottom:12 }}>📊 Dati per SCORE2</div>
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, fontSize:13 }}>
+                  <div><span style={{ color:C.muted }}>Col. Tot:</span> <strong>{selected.risultati.colTot} mg/dL</strong></div>
+                  <div><span style={{ color:C.muted }}>HDL:</span> <strong>{selected.risultati.hdl} mg/dL</strong></div>
+                  <div><span style={{ color:C.muted }}>PAS:</span> <strong>{selected.risultati.pas} mmHg</strong></div>
+                  <div><span style={{ color:C.muted }}>Fumatore:</span> <strong>{selected.risultati.fumatore?"Sì":"No"}</strong></div>
+                </div>
+              </div>
+            )}
+            <div style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:16, padding:20, marginBottom:16, boxShadow:C.shadow }}>
+              <div style={{ color:C.muted, fontWeight:600, fontSize:12, marginBottom:8 }}>NOTE CLINICHE</div>
+              <div style={{ color:C.text, fontSize:14 }}>{selected.note||"—"}</div>
+            </div>
+            <div style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:16, padding:20, marginBottom:16, boxShadow:C.shadow }}>
+              <div style={{ color:C.muted, fontWeight:600, fontSize:12, marginBottom:12 }}>TRACCIATO ECG</div>
+              <div style={{ background:"#f0f9f6", borderRadius:10, padding:"16px 12px" }}>
+                <svg width="100%" height="70" viewBox="0 0 480 70" preserveAspectRatio="none">
+                  <polyline points="0,35 20,35 30,8 42,64 52,35 82,35 92,29 102,35 132,35 142,7 154,65 164,35 194,35 204,29 214,35 244,35 254,7 266,65 276,35 306,35 316,29 326,35 356,35 366,7 378,65 388,35 420,35 430,29 440,35 480,35" fill="none" stroke={C.teal} strokeWidth="2.2" />
+                </svg>
+              </div>
+            </div>
+            <div style={{ marginBottom:18 }}><UploadZone onFile={setFile} /></div>
+            <button onClick={handleReferti} style={btnPrimary(!!file)}>
+              {file?`Invia referto (+${selected.origine==="azienda"?10:15}€) →`:"Carica un PDF per continuare"}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ── ADMIN ─────────────────────────────────────────────────────────────────
+const AdminView = ({ ecgs, setEcgs }) => {
+  const [tab, setTab] = useState("assegnazioni");
+  const [filtroStato, setFiltroStato] = useState("tutti");
+  const [filtroOrigine, setFiltroOrigine] = useState("tutti");
+  const [assegnazioneTemp, setAssegnazioneTemp] = useState({}); // ecgId -> cardiologo selezionato
+
+  const nomi = Object.keys(CARDIOLOGI_DATA);
+  const inAttesa = ecgs.filter(e=>e.stato==="in_attesa");
+  const refertati = ecgs.filter(e=>e.stato==="refertato");
+  const nonAssegnati = inAttesa.filter(e=>!e.cardiologo);
+  const assegnati = inAttesa.filter(e=>!!e.cardiologo);
+  const prenotazioni = ecgs.filter(e=>e.stato==="prenotato");
+  const urgenti = inAttesa.filter(e=>e.urgenza==="urgente");
+
+  const assegna = (ecgId) => {
+    const dest = assegnazioneTemp[ecgId];
+    if (!dest) return;
+    setEcgs(prev=>prev.map(e=>e.id===ecgId?{...e,cardiologo:dest}:e));
+    setAssegnazioneTemp(p=>({...p,[ecgId]:undefined}));
+  };
+
+  const riassegna = (ecgId, nuovoCardiologo) => {
+    setEcgs(prev=>prev.map(e=>e.id===ecgId?{...e,cardiologo:nuovoCardiologo}:e));
+  };
+
+  const tabBtn = (id,label,badge) => (
+    <button onClick={()=>setTab(id)} style={{ background:tab===id?C.white:"transparent", border:tab===id?`1px solid ${C.border}`:"1px solid transparent", borderRadius:10, padding:"8px 20px", cursor:"pointer", fontFamily:SANS, fontWeight:600, fontSize:13, color:tab===id?C.accent:C.muted, boxShadow:tab===id?C.shadow:"none", display:"flex", alignItems:"center", gap:6 }}>
+      {label}
+      {badge>0 && <span style={{ background:tab===id?C.accent:C.muted, color:C.white, borderRadius:20, padding:"1px 8px", fontSize:11 }}>{badge}</span>}
+    </button>
+  );
+
+  // Filtered ECGs for storico tab
+  const ecgsFiltrati = ecgs.filter(e=>{
+    if (filtroStato!=="tutti" && e.stato!==filtroStato) return false;
+    if (filtroOrigine!=="tutti" && e.origine!==filtroOrigine) return false;
+    return true;
+  });
+
+  return (
+    <div style={{ padding:32, maxWidth:960, margin:"0 auto" }}>
+      <div style={{ display:"flex", alignItems:"center", gap:16, marginBottom:28 }}>
+        <div style={{ width:52, height:52, background:"linear-gradient(135deg,#e8f0fe,#e5f7f7)", borderRadius:16, display:"flex", alignItems:"center", justifyContent:"center", fontSize:26 }}>⚙️</div>
+        <div><h2 style={{ color:C.text, fontSize:24, fontWeight:700 }}>Admin · Dashboard</h2><div style={{ color:C.muted, fontSize:13, marginTop:2 }}>Controllo totale · Assegnazione ECG</div></div>
+      </div>
+
+      {/* KPIs */}
+      <div style={{ display:"flex", gap:12, marginBottom:24, flexWrap:"wrap" }}>
+        <StatCard label="ECG totali" value={ecgs.length} color={C.accent} icon="📋" />
+        <StatCard label="Non assegnati" value={nonAssegnati.length} color={nonAssegnati.length>0?C.orange:C.green} icon="📥" sub={nonAssegnati.length>0?"→ da assegnare":"✓ tutti assegnati"} />
+        <StatCard label="In refertazione" value={assegnati.length} color={C.accent} icon="🫀" />
+        <StatCard label="Refertati" value={refertati.length} color={C.green} icon="✅" />
+        <StatCard label="Urgenti" value={urgenti.length} color={urgenti.length>0?C.red:C.green} icon="⚡" />
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display:"flex", gap:6, marginBottom:24, background:C.bg, borderRadius:12, padding:4, width:"fit-content", flexWrap:"wrap" }}>
+        {tabBtn("assegnazioni","Assegnazioni",nonAssegnati.length)}
+        {tabBtn("dashboard","Dashboard",0)}
+        {tabBtn("prenotazioni","Prenotazioni",prenotazioni.length)}
+        {tabBtn("storico","Storico ECG",0)}
+        {tabBtn("team","Team",0)}
+      </div>
+
+      {/* ── TAB: ASSEGNAZIONI ── */}
+      {tab==="assegnazioni" && (
+        <div>
+          {/* Non assegnati */}
+          {nonAssegnati.length>0 && (
+            <div style={{ marginBottom:32 }}>
+              <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
+                <div style={{ background:C.orangeLight, color:C.orange, borderRadius:10, padding:"4px 14px", fontWeight:700, fontSize:13 }}>📥 Da assegnare — {nonAssegnati.length} ECG</div>
+                <div style={{ color:C.muted, fontSize:12 }}>Questi ECG non sono ancora visibili a nessun cardiologo</div>
+              </div>
+              <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                {nonAssegnati.map(ecg=>(
+                  <div key={ecg.id} style={{ background:C.white, border:`2px solid ${C.orange}44`, borderRadius:16, padding:"18px 22px", boxShadow:C.shadow }}>
+                    <div style={{ display:"flex", alignItems:"flex-start", gap:14, flexWrap:"wrap" }}>
+                      <div style={{ flex:1, minWidth:200 }}>
+                        <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
+                          <span style={{ fontFamily:MONO, color:C.muted, fontSize:11 }}>{ecg.id}</span>
+                          <Badge stato={ecg.stato} urgenza={ecg.urgenza} />
+                          <OrigineTag ecg={ecg} />
+                        </div>
+                        <div style={{ color:C.text, fontSize:15, fontWeight:700 }}>{ecg.paziente}</div>
+                        <div style={{ color:C.muted, fontSize:12, marginTop:3 }}>
+                          {ecg.origine==="farmacia"?ecg.farmacia:ecg.origine==="azienda"?`${ecg.azienda} · ${ecg.batch}`:`Prenotazione · ${ecg.appuntamento||""}`}
+                          {" · "}{fmt(ecg.ts)}
+                        </div>
+                        {ecg.note && <div style={{ color:C.textSoft, fontSize:12, marginTop:4, fontStyle:"italic" }}>{ecg.note}</div>}
+                        <div style={{ marginTop:8 }}><SLATimer ecg={ecg} compact /></div>
+                      </div>
+                      <div style={{ display:"flex", gap:8, alignItems:"center", flexShrink:0, flexWrap:"wrap" }}>
+                        <select
+                          value={assegnazioneTemp[ecg.id]||""}
+                          onChange={e=>setAssegnazioneTemp(p=>({...p,[ecg.id]:e.target.value}))}
+                          style={{ background:C.bg, border:`1.5px solid ${C.accent}`, borderRadius:10, padding:"9px 14px", color:C.text, fontFamily:SANS, fontSize:13, outline:"none", minWidth:160 }}>
+                          <option value="">Scegli cardiologo...</option>
+                          {nomi.map(n=>(
+                            <option key={n} value={n}>{n} (★{CARDIOLOGI_DATA[n].rating})</option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={()=>assegna(ecg.id)}
+                          disabled={!assegnazioneTemp[ecg.id]}
+                          style={{ background:assegnazioneTemp[ecg.id]?C.accent:C.border, color:assegnazioneTemp[ecg.id]?C.white:C.muted, border:"none", borderRadius:10, padding:"10px 18px", cursor:assegnazioneTemp[ecg.id]?"pointer":"not-allowed", fontWeight:700, fontSize:13, whiteSpace:"nowrap" }}>
+                          Assegna →
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {nonAssegnati.length===0 && (
+            <div style={{ background:C.greenLight, border:`1px solid ${C.green}33`, borderRadius:14, padding:"18px 22px", marginBottom:24, display:"flex", alignItems:"center", gap:12 }}>
+              <span style={{ fontSize:24 }}>✅</span>
+              <div style={{ color:C.green, fontWeight:700 }}>Tutti gli ECG in attesa sono stati assegnati</div>
+            </div>
+          )}
+
+          {/* Già assegnati */}
+          {assegnati.length>0 && (
+            <div>
+              <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
+                <div style={{ background:C.accentLight, color:C.accent, borderRadius:10, padding:"4px 14px", fontWeight:700, fontSize:13 }}>🫀 In refertazione — {assegnati.length} ECG</div>
+                <div style={{ color:C.muted, fontSize:12 }}>Puoi riassegnare a un altro cardiologo in qualsiasi momento</div>
+              </div>
+              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                {assegnati.map(ecg=>(
+                  <div key={ecg.id} style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:14, padding:"14px 20px", boxShadow:C.shadow, display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
+                    <div style={{ flex:1, minWidth:180 }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
+                        <span style={{ fontFamily:MONO, color:C.muted, fontSize:11 }}>{ecg.id}</span>
+                        <Badge stato={ecg.stato} urgenza={ecg.urgenza} />
+                        <OrigineTag ecg={ecg} />
+                      </div>
+                      <div style={{ color:C.text, fontSize:14, fontWeight:600 }}>{ecg.paziente}</div>
+                    </div>
+                    <div style={{ display:"flex", alignItems:"center", gap:8, background:C.accentLight, borderRadius:10, padding:"6px 12px" }}>
+                      <span style={{ fontSize:14 }}>🫀</span>
+                      <span style={{ color:C.accent, fontWeight:700, fontSize:13 }}>{ecg.cardiologo}</span>
+                    </div>
+                    {/* Riassegna */}
+                    <select
+                      value={ecg.cardiologo||""}
+                      onChange={e=>riassegna(ecg.id, e.target.value)}
+                      style={{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:8, padding:"7px 10px", color:C.muted, fontFamily:SANS, fontSize:12, outline:"none" }}>
+                      {nomi.map(n=>(
+                        <option key={n} value={n}>{n===ecg.cardiologo?`✓ ${n}`:n}</option>
+                      ))}
+                    </select>
+                    <SLATimer ecg={ecg} compact />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── TAB: DASHBOARD ── */}
+      {tab==="dashboard" && (
+        <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+          <h3 style={{ color:C.text, fontWeight:700, fontSize:17, marginBottom:4 }}>Performance cardiologi</h3>
+          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+            {nomi.map(nome=>{
+              const d = CARDIOLOGI_DATA[nome];
+              const miei = ecgs.filter(e=>e.cardiologo===nome);
+              const fatti = miei.filter(e=>e.stato==="refertato").length;
+              const inCorso = miei.filter(e=>e.stato==="in_attesa").length;
+              return (
+                <div key={nome} style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:16, padding:"18px 24px", boxShadow:C.shadow, display:"flex", alignItems:"center", gap:16, flexWrap:"wrap" }}>
+                  <div style={{ width:44, height:44, background:C.accentLight, borderRadius:12, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>🫀</div>
+                  <div style={{ flex:1, minWidth:160 }}>
+                    <div style={{ color:C.text, fontWeight:700, fontSize:15 }}>{nome}</div>
+                    <div style={{ color:C.muted, fontSize:12, marginTop:2 }}>★ {d.rating} · {d.guadagno+fatti*15}€ guadagnati</div>
+                  </div>
+                  <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
+                    <div style={{ textAlign:"center", background:C.greenLight, borderRadius:10, padding:"8px 14px" }}>
+                      <div style={{ color:C.green, fontWeight:700, fontFamily:MONO, fontSize:18 }}>{fatti}</div>
+                      <div style={{ color:C.muted, fontSize:10, textTransform:"uppercase" }}>refertati</div>
+                    </div>
+                    <div style={{ textAlign:"center", background:inCorso>0?C.accentLight:C.bg, borderRadius:10, padding:"8px 14px" }}>
+                      <div style={{ color:inCorso>0?C.accent:C.muted, fontWeight:700, fontFamily:MONO, fontSize:18 }}>{inCorso}</div>
+                      <div style={{ color:C.muted, fontSize:10, textTransform:"uppercase" }}>in corso</div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── TAB: PRENOTAZIONI ── */}
+      {tab==="prenotazioni" && (
+        <div>
+          <h3 style={{ color:C.text, fontWeight:700, fontSize:17, marginBottom:14 }}>Prenotazioni online dal pubblico</h3>
+          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+            {prenotazioni.map(ecg=>(
+              <div key={ecg.id} style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:14, padding:"16px 22px", boxShadow:C.shadow, display:"flex", alignItems:"center", gap:14, flexWrap:"wrap" }}>
+                <div style={{ width:46, height:46, background:ecg.servizio==="score2"?C.pinkLight:C.tealLight, borderRadius:12, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22 }}>{ecg.servizio==="score2"?"📊":"🫀"}</div>
+                <div style={{ flex:1, minWidth:160 }}>
+                  <div style={{ color:C.text, fontWeight:700, fontSize:15 }}>{ecg.paziente}</div>
+                  <div style={{ color:C.muted, fontSize:12, marginTop:2 }}>{ecg.servizio==="score2"?"Stima rischio CV (SCORE2)":"ECG con referto"}</div>
+                </div>
+                <div style={{ background:C.cardAlt, borderRadius:10, padding:"6px 14px", fontFamily:MONO, fontSize:12, color:C.text, fontWeight:600 }}>📅 {ecg.appuntamento}</div>
+                <div style={{ display:"flex", gap:8 }}>
+                  <span style={{ background:C.yellowLight, color:C.yellow, border:`1px solid ${C.yellow}33`, borderRadius:20, padding:"3px 12px", fontSize:12, fontWeight:600 }}>⏳ Da confermare</span>
+                  <button onClick={()=>setEcgs(prev=>prev.map(e=>e.id===ecg.id?{...e,stato:"in_attesa"}:e))} style={{ background:C.accentLight, color:C.accent, border:`1px solid ${C.accent}33`, borderRadius:20, padding:"3px 12px", fontSize:12, fontWeight:700, cursor:"pointer" }}>✓ Conferma</button>
+                </div>
+              </div>
+            ))}
+            {prenotazioni.length===0 && <div style={{ textAlign:"center", padding:40, color:C.muted }}>Nessuna prenotazione in attesa di conferma</div>}
+          </div>
+        </div>
+      )}
+
+      {/* ── TAB: STORICO ── */}
+      {tab==="storico" && (
+        <div>
+          <div style={{ display:"flex", gap:8, marginBottom:16, flexWrap:"wrap" }}>
+            {[["tutti","Tutti"],["in_attesa","In attesa"],["refertato","Refertati"],["prenotato","Prenotazioni"]].map(([v,l])=>(
+              <button key={v} onClick={()=>setFiltroStato(v)} style={{ background:filtroStato===v?C.accent:C.white, color:filtroStato===v?C.white:C.muted, border:`1px solid ${filtroStato===v?C.accent:C.border}`, borderRadius:20, padding:"6px 16px", cursor:"pointer", fontWeight:600, fontSize:12 }}>{l}</button>
+            ))}
+            <div style={{ width:1, background:C.border }} />
+            {[["tutti","Tutti"],["farmacia","💊 Farmacia"],["azienda","🏢 Azienda"],["pubblico","👤 Pubblico"]].map(([v,l])=>(
+              <button key={v} onClick={()=>setFiltroOrigine(v)} style={{ background:filtroOrigine===v?C.teal:C.white, color:filtroOrigine===v?C.white:C.muted, border:`1px solid ${filtroOrigine===v?C.teal:C.border}`, borderRadius:20, padding:"6px 16px", cursor:"pointer", fontWeight:600, fontSize:12 }}>{l}</button>
+            ))}
+          </div>
+          <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+            {ecgsFiltrati.map(ecg=>(
+              <div key={ecg.id} style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:14, padding:"14px 20px", boxShadow:C.shadow, display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
+                <div style={{ flex:1, minWidth:180 }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:5 }}>
+                    <span style={{ fontFamily:MONO, color:C.muted, fontSize:11 }}>{ecg.id}</span>
+                    <Badge stato={ecg.stato} urgenza={ecg.urgenza} />
+                    <OrigineTag ecg={ecg} />
+                  </div>
+                  <div style={{ color:C.text, fontSize:14, fontWeight:600 }}>{ecg.paziente}</div>
+                  <div style={{ color:C.muted, fontSize:12, marginTop:2 }}>{fmt(ecg.ts)}</div>
+                </div>
+                <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                  {ecg.cardiologo
+                    ? <div style={{ background:C.accentLight, color:C.accent, borderRadius:10, padding:"6px 12px", fontSize:12, fontWeight:600 }}>🫀 {ecg.cardiologo}</div>
+                    : ecg.stato!=="prenotato" && <div style={{ background:C.orangeLight, color:C.orange, borderRadius:10, padding:"6px 12px", fontSize:12, fontWeight:600 }}>⚠ Non assegnato</div>
+                  }
+                </div>
+              </div>
+            ))}
+            {ecgsFiltrati.length===0 && <div style={{ textAlign:"center", padding:40, color:C.muted }}>Nessun ECG trovato</div>}
+          </div>
+        </div>
+      )}
+
+      {/* ── TAB: TEAM ── */}
+      {tab==="team" && (
+        <div>
+          <h3 style={{ color:C.text, fontWeight:700, fontSize:17, marginBottom:6 }}>Team cardiologi</h3>
+          <p style={{ color:C.muted, fontSize:13, marginBottom:20 }}>I cardiologi vedono <strong>solo gli ECG che assegni loro</strong> individualmente dal tab Assegnazioni. Non c'è accesso a canali o code generali.</p>
+          <div style={{ background:C.yellowLight, border:`1px solid ${C.yellow}33`, borderRadius:12, padding:"14px 18px", marginBottom:20, fontSize:13, color:C.textSoft }}>
+            💡 <strong>Come funziona:</strong> ogni ECG in arrivo finisce nella coda "Non assegnato" (tab Assegnazioni). Vai lì per scegliere chi lo prende in carico. Il cardiologo lo vedrà solo dopo l'assegnazione.
+          </div>
+          <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+            {nomi.map(nome=>{
+              const d = CARDIOLOGI_DATA[nome];
+              const mieiEcgs = ecgs.filter(e=>e.cardiologo===nome);
+              return (
+                <div key={nome} style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:16, padding:"20px 24px", boxShadow:C.shadow }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:14, flexWrap:"wrap" }}>
+                    <div style={{ width:46, height:46, background:C.accentLight, borderRadius:12, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20 }}>🫀</div>
+                    <div style={{ flex:1, minWidth:160 }}>
+                      <div style={{ color:C.text, fontWeight:700, fontSize:16 }}>{nome}</div>
+                      <div style={{ color:C.muted, fontSize:12, marginTop:2 }}>{d.referti+mieiEcgs.filter(e=>e.stato==="refertato").length} referti · ★ {d.rating}</div>
+                    </div>
+                    <div style={{ display:"flex", gap:10 }}>
+                      <div style={{ background:C.accentLight, borderRadius:10, padding:"8px 14px", textAlign:"center" }}>
+                        <div style={{ color:C.accent, fontWeight:700, fontFamily:MONO, fontSize:16 }}>{mieiEcgs.filter(e=>e.stato==="in_attesa").length}</div>
+                        <div style={{ color:C.muted, fontSize:10, textTransform:"uppercase" }}>assegnati</div>
+                      </div>
+                      <div style={{ background:C.greenLight, borderRadius:10, padding:"8px 14px", textAlign:"center" }}>
+                        <div style={{ color:C.green, fontWeight:700, fontFamily:MONO, fontSize:16 }}>{mieiEcgs.filter(e=>e.stato==="refertato").length}</div>
+                        <div style={{ color:C.muted, fontSize:10, textTransform:"uppercase" }}>refertati</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── SHELL ─────────────────────────────────────────────────────────────────
+const Shell = ({ role, onLogout, children, meCardiologo }) => {
+  const labels = { pubblico:"👤 Area pubblica", farmacia:`💊 ${ME_FARMACIA}`, azienda:`🏢 ${ME_AZIENDA}`, cardiologo:`🫀 ${meCardiologo}`, admin:"⚙️ Admin" };
+  return (
+    <div style={{ minHeight:"100vh", background:C.bg, color:C.text, fontFamily:SANS }}>
+      <div style={{ height:64, background:C.white, borderBottom:`1px solid ${C.border}`, display:"flex", alignItems:"center", padding:"0 28px", gap:16, position:"sticky", top:0, zIndex:100, boxShadow:"0 1px 12px rgba(0,0,0,0.06)" }}>
+        <Logo size={32} />
+        <div style={{ flex:1 }} />
+        <span style={{ color:C.muted, fontSize:13, fontWeight:500 }}>{labels[role]}</span>
+        <button onClick={onLogout} style={{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:8, padding:"7px 16px", color:C.muted, cursor:"pointer", fontWeight:500, fontSize:13 }}>← Esci</button>
+      </div>
+      <div>{children}</div>
+    </div>
+  );
+};
+
+// ── APP ───────────────────────────────────────────────────────────────────
+export default function App() {
+  const [role, setRole] = useState(null);
+  const [meCardiologo, setMeCardiologo] = useState(ME_CARDIOLOGO_DEFAULT);
+  const [ecgs, setEcgs] = useState(INIT_ECGS);
+
+  useEffect(() => {
+    const s = document.createElement("style");
+    s.textContent = `@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap'); *{box-sizing:border-box;margin:0;padding:0} body{background:#f4f7fb;font-family:'DM Sans',sans-serif} select,input,textarea{color-scheme:light} ::-webkit-scrollbar{width:5px} ::-webkit-scrollbar-track{background:#f0f4fa} ::-webkit-scrollbar-thumb{background:#c8d6e8;border-radius:4px}`;
+    document.head.appendChild(s);
+  }, []);
+
+  if (!role) return <Login onLogin={setRole} onSelectCardiologo={setMeCardiologo} />;
+
+  return (
+    <Shell role={role} onLogout={()=>setRole(null)} meCardiologo={meCardiologo}>
+      {role==="pubblico"   && <PubblicoView setEcgs={setEcgs} />}
+      {role==="farmacia"   && <FarmaciaView ecgs={ecgs} setEcgs={setEcgs} />}
+      {role==="azienda"    && <AziendaView  ecgs={ecgs} setEcgs={setEcgs} />}
+      {role==="cardiologo" && <CardiologoView ecgs={ecgs} setEcgs={setEcgs} meCardiologo={meCardiologo} />}
+      {role==="admin"      && <AdminView    ecgs={ecgs} setEcgs={setEcgs} />}
+    </Shell>
+  );
+}
