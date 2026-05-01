@@ -192,7 +192,7 @@ const Login = ({ onLogin, onSelectCardiologo }) => {
       <div style={{ position:"fixed", top:-100, right:-100, width:400, height:400, borderRadius:"50%", background:"radial-gradient(circle,#2e7cf618,transparent 70%)", pointerEvents:"none" }} />
       <div style={{ position:"fixed", bottom:-80, left:-80, width:300, height:300, borderRadius:"50%", background:"radial-gradient(circle,#1aaa6e12,transparent 70%)", pointerEvents:"none" }} />
       <div style={{ position:"relative", zIndex:1, textAlign:"center", maxWidth:440, width:"100%" }}>
-        <img src="/logo-squared.png" alt="logo" style={{ width:220, height:220, objectFit:"contain", margin:"0 auto 16px", display:"block" }} />
+        <img src="/logo-squared.png" alt="logo" style={{ width:220, height:220, objectFit:"contain", margin:"0 auto 16px", display:"block", mixBlendMode:"multiply" }} />
         <h1 style={{ color:C.text, fontSize:36, fontWeight:700, margin:"0 0 4px", letterSpacing:-1 }}>Ambulatorio Millefonti</h1>
         <p style={{ color:C.muted, fontFamily:MONO, fontSize:11, letterSpacing:3, marginBottom:8, textTransform:"uppercase" }}>ECG · Refertazione</p>
         <p style={{ color:C.textSoft, fontSize:14, marginBottom:36 }}>Cardiologia accessibile per cittadini, farmacie, aziende</p>
@@ -1080,7 +1080,7 @@ const LoginReale = ({ onLogin }) => {
   return (
     <div style={{ minHeight:"100vh", background:"linear-gradient(135deg, #e8f2ff, #f4f7fb, #e8f9f4)", display:"flex", alignItems:"center", justifyContent:"center", padding:24, fontFamily:SANS }}>
       <div style={{ maxWidth:400, width:"100%", textAlign:"center" }}>
-        <img src="/logo-squared.png" alt="logo" style={{ width:220, height:220, objectFit:"contain", margin:"0 auto 16px", display:"block" }} />
+        <img src="/logo-squared.png" alt="logo" style={{ width:220, height:220, objectFit:"contain", margin:"0 auto 16px", display:"block", mixBlendMode:"multiply" }} />
         <h1 style={{ color:"#1a2640", fontSize:36, fontWeight:700, marginBottom:4, letterSpacing:-1 }}>Ambulatorio Millefonti</h1>
         <p style={{ color:"#8098b8", fontSize:13, marginBottom:36 }}>Accedi al tuo account</p>
         <div style={{ background:"white", border:"1px solid #dde5f0", borderRadius:18, padding:28, boxShadow:"0 2px 12px rgba(46,124,246,0.08)", textAlign:"left" }}>
