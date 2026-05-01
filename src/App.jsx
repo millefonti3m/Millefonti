@@ -1,3 +1,4 @@
+import { supabase } from "./supabase.js";
 import { useState, useEffect, useRef } from "react";
 
 const C = {
@@ -1059,22 +1060,139 @@ const Shell = ({ role, onLogout, children, meCardiologo }) => {
   );
 };
 
+
+// ── LOGIN REALE (Supabase Auth) ───────────────────────────────────────────
+const LoginReale = ({ onLogin }) => {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [errore, setErrore] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!email || !password) return;
+    setLoading(true);
+    setErrore(null);
+    const err = await onLogin(email, password);
+    if (err) setErrore(err);
+    setLoading(false);
+  };
+
+  return (
+    <div style={{ minHeight:"100vh", background:"linear-gradient(135deg, #e8f2ff, #f4f7fb, #e8f9f4)", display:"flex", alignItems:"center", justifyContent:"center", padding:24, fontFamily:SANS }}>
+      <div style={{ maxWidth:400, width:"100%", textAlign:"center" }}>
+        <div style={{ width:72, height:72, background:"linear-gradient(135deg, #2e7cf6, #0ea5a0)", borderRadius:22, display:"flex", alignItems:"center", justifyContent:"center", fontSize:32, color:"white", fontWeight:700, margin:"0 auto 22px", boxShadow:"0 8px 28px rgba(46,124,246,0.3)" }}>M</div>
+        <h1 style={{ color:"#1a2640", fontSize:36, fontWeight:700, marginBottom:4, letterSpacing:-1 }}>Millefonti</h1>
+        <p style={{ color:"#8098b8", fontSize:13, marginBottom:36 }}>Accedi al tuo account</p>
+        <div style={{ background:"white", border:"1px solid #dde5f0", borderRadius:18, padding:28, boxShadow:"0 2px 12px rgba(46,124,246,0.08)", textAlign:"left" }}>
+          <div style={{ marginBottom:16 }}>
+            <label style={{ color:"#3d5270", fontSize:12, fontWeight:600, display:"block", marginBottom:7 }}>Email</label>
+            <input value={email} onChange={e=>setEmail(e.target.value)} type="email" placeholder="nome@esempio.it"
+              style={{ background:"#f4f7fb", border:"1px solid #dde5f0", borderRadius:10, padding:"11px 14px", color:"#1a2640", fontSize:14, width:"100%", outline:"none" }} />
+          </div>
+          <div style={{ marginBottom:24 }}>
+            <label style={{ color:"#3d5270", fontSize:12, fontWeight:600, display:"block", marginBottom:7 }}>Password</label>
+            <input value={password} onChange={e=>setPassword(e.target.value)} type="password" placeholder="••••••••"
+              style={{ background:"#f4f7fb", border:"1px solid #dde5f0", borderRadius:10, padding:"11px 14px", color:"#1a2640", fontSize:14, width:"100%", outline:"none" }}
+              onKeyDown={e=>e.key==="Enter"&&handleSubmit()} />
+          </div>
+          {errore && (
+            <div style={{ background:"#fdedf0", border:"1px solid #e03e5a33", borderRadius:10, padding:"10px 14px", color:"#e03e5a", fontSize:13, marginBottom:16 }}>
+              {errore}
+            </div>
+          )}
+          <button onClick={handleSubmit} disabled={loading || !email || !password}
+            style={{ background: (loading||!email||!password) ? "#dde5f0" : "#2e7cf6", color: (loading||!email||!password) ? "#8098b8" : "white", border:"none", borderRadius:10, padding:"13px 0", cursor: (loading||!email||!password) ? "not-allowed" : "pointer", fontWeight:700, fontSize:15, width:"100%", boxShadow: (!loading&&email&&password) ? "0 4px 16px rgba(46,124,246,0.3)" : "none" }}>
+            {loading ? "Accesso in corso..." : "Accedi →"}
+          </button>
+        </div>
+        <div style={{ color:"#b0c2d8", fontFamily:"'DM Mono', monospace", fontSize:10, marginTop:20, letterSpacing:2 }}>MILLEFONTI · ACCESSO SICURO</div>
+      </div>
+    </div>
+  );
+};
+
 // ── APP ───────────────────────────────────────────────────────────────────
 export default function App() {
   const [role, setRole] = useState(null);
   const [meCardiologo, setMeCardiologo] = useState(ME_CARDIOLOGO_DEFAULT);
   const [ecgs, setEcgs] = useState(INIT_ECGS);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const s = document.createElement("style");
     s.textContent = `@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap'); *{box-sizing:border-box;margin:0;padding:0} body{background:#f4f7fb;font-family:'DM Sans',sans-serif} select,input,textarea{color-scheme:light} ::-webkit-scrollbar{width:5px} ::-webkit-scrollbar-track{background:#f0f4fa} ::-webkit-scrollbar-thumb{background:#c8d6e8;border-radius:4px}`;
     document.head.appendChild(s);
+
+    // Controlla sessione attiva
+    import('@supabase/supabase-js').then(() => {
+      const { supabase } = require('./supabase.js');
+    }).catch(() => {});
+
+    supabaseAuth();
   }, []);
 
-  if (!role) return <Login onLogin={setRole} onSelectCardiologo={setMeCardiologo} />;
+  const supabaseAuth = async () => {
+    try {
+      const { supabase } = await import('./supabase.js');
+
+      // Sessione esistente?
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        await caricaRuolo(supabase, session.user.id);
+      } else {
+        setLoading(false);
+      }
+
+      // Ascolta login/logout
+      supabase.auth.onAuthStateChange(async (_event, session) => {
+        if (session) {
+          await caricaRuolo(supabase, session.user.id);
+        } else {
+          setRole(null);
+          setLoading(false);
+        }
+      });
+    } catch(e) {
+      setLoading(false);
+    }
+  };
+
+  const caricaRuolo = async (supabase, userId) => {
+    const { data } = await supabase
+      .from('user_profiles')
+      .select('ruolo')
+      .eq('id', userId)
+      .single();
+    if (data?.ruolo) setRole(data.ruolo);
+    setLoading(false);
+  };
+
+  const handleLogin = async (email, password) => {
+    const { supabase } = await import('./supabase.js');
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) return error.message;
+    return null;
+  };
+
+  const handleLogout = async () => {
+    const { supabase } = await import('./supabase.js');
+    await supabase.auth.signOut();
+    setRole(null);
+  };
+
+  if (loading) return (
+    <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:"#f4f7fb", fontFamily:SANS }}>
+      <div style={{ textAlign:"center" }}>
+        <div style={{ width:56, height:56, background:"linear-gradient(135deg, #2e7cf6, #0ea5a0)", borderRadius:16, display:"flex", alignItems:"center", justifyContent:"center", fontSize:24, color:"white", fontWeight:700, margin:"0 auto 16px" }}>M</div>
+        <div style={{ color:"#8098b8", fontSize:14 }}>Caricamento...</div>
+      </div>
+    </div>
+  );
+
+  if (!role) return <LoginReale onLogin={handleLogin} />;
 
   return (
-    <Shell role={role} onLogout={()=>setRole(null)} meCardiologo={meCardiologo}>
+    <Shell role={role} onLogout={handleLogout} meCardiologo={meCardiologo}>
       {role==="pubblico"   && <PubblicoView setEcgs={setEcgs} />}
       {role==="farmacia"   && <FarmaciaView ecgs={ecgs} setEcgs={setEcgs} />}
       {role==="azienda"    && <AziendaView  ecgs={ecgs} setEcgs={setEcgs} />}
