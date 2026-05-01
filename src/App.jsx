@@ -145,9 +145,9 @@ const btnPrimary = (active) => ({ background:active?C.accent:C.border, color:act
 
 const Logo = ({ size=34 }) => (
   <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-    <div style={{ width:size, height:size, background:"linear-gradient(135deg,#2e7cf6,#0ea5a0)", borderRadius:size/3, display:"flex", alignItems:"center", justifyContent:"center", fontSize:size*0.5, color:"white", fontWeight:700, fontFamily:SANS, boxShadow:"0 2px 8px rgba(46,124,246,0.25)" }}>M</div>
+    <img src="/logo-squared.png" alt="logo" style={{ width:size*1.8, height:size*1.8, borderRadius:size/3, objectFit:"cover" }} />
     <div style={{ display:"flex", flexDirection:"column", lineHeight:1 }}>
-      <span style={{ fontFamily:SANS, fontWeight:700, fontSize:size*0.55, color:C.text, letterSpacing:-0.3 }}>Millefonti</span>
+      <span style={{ fontFamily:SANS, fontWeight:700, fontSize:size*0.5, color:C.text, letterSpacing:-0.3 }}>Ambulatorio Millefonti</span>
       <span style={{ fontFamily:MONO, fontSize:size*0.28, color:C.muted, letterSpacing:2, marginTop:2 }}>ECG · REFERTAZIONE</span>
     </div>
   </div>
@@ -192,8 +192,8 @@ const Login = ({ onLogin, onSelectCardiologo }) => {
       <div style={{ position:"fixed", top:-100, right:-100, width:400, height:400, borderRadius:"50%", background:"radial-gradient(circle,#2e7cf618,transparent 70%)", pointerEvents:"none" }} />
       <div style={{ position:"fixed", bottom:-80, left:-80, width:300, height:300, borderRadius:"50%", background:"radial-gradient(circle,#1aaa6e12,transparent 70%)", pointerEvents:"none" }} />
       <div style={{ position:"relative", zIndex:1, textAlign:"center", maxWidth:440, width:"100%" }}>
-        <div style={{ width:72, height:72, background:"linear-gradient(135deg,#2e7cf6,#0ea5a0)", borderRadius:22, display:"flex", alignItems:"center", justifyContent:"center", fontSize:32, color:"white", fontWeight:700, margin:"0 auto 22px", boxShadow:"0 8px 28px rgba(46,124,246,0.3)" }}>M</div>
-        <h1 style={{ color:C.text, fontSize:42, fontWeight:700, margin:"0 0 4px", letterSpacing:-1.2 }}>Millefonti</h1>
+        <img src="/logo-squared.png" alt="logo" style={{ width:220, height:220, objectFit:"contain", margin:"0 auto 16px", display:"block" }} />
+        <h1 style={{ color:C.text, fontSize:36, fontWeight:700, margin:"0 0 4px", letterSpacing:-1 }}>Ambulatorio Millefonti</h1>
         <p style={{ color:C.muted, fontFamily:MONO, fontSize:11, letterSpacing:3, marginBottom:8, textTransform:"uppercase" }}>ECG · Refertazione</p>
         <p style={{ color:C.textSoft, fontSize:14, marginBottom:36 }}>Cardiologia accessibile per cittadini, farmacie, aziende</p>
         <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
@@ -1080,8 +1080,8 @@ const LoginReale = ({ onLogin }) => {
   return (
     <div style={{ minHeight:"100vh", background:"linear-gradient(135deg, #e8f2ff, #f4f7fb, #e8f9f4)", display:"flex", alignItems:"center", justifyContent:"center", padding:24, fontFamily:SANS }}>
       <div style={{ maxWidth:400, width:"100%", textAlign:"center" }}>
-        <div style={{ width:72, height:72, background:"linear-gradient(135deg, #2e7cf6, #0ea5a0)", borderRadius:22, display:"flex", alignItems:"center", justifyContent:"center", fontSize:32, color:"white", fontWeight:700, margin:"0 auto 22px", boxShadow:"0 8px 28px rgba(46,124,246,0.3)" }}>M</div>
-        <h1 style={{ color:"#1a2640", fontSize:36, fontWeight:700, marginBottom:4, letterSpacing:-1 }}>Millefonti</h1>
+        <img src="/logo-squared.png" alt="logo" style={{ width:220, height:220, objectFit:"contain", margin:"0 auto 16px", display:"block" }} />
+        <h1 style={{ color:"#1a2640", fontSize:36, fontWeight:700, marginBottom:4, letterSpacing:-1 }}>Ambulatorio Millefonti</h1>
         <p style={{ color:"#8098b8", fontSize:13, marginBottom:36 }}>Accedi al tuo account</p>
         <div style={{ background:"white", border:"1px solid #dde5f0", borderRadius:18, padding:28, boxShadow:"0 2px 12px rgba(46,124,246,0.08)", textAlign:"left" }}>
           <div style={{ marginBottom:16 }}>
@@ -1183,7 +1183,7 @@ export default function App() {
   if (loading) return (
     <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:"#f4f7fb", fontFamily:SANS }}>
       <div style={{ textAlign:"center" }}>
-        <div style={{ width:56, height:56, background:"linear-gradient(135deg, #2e7cf6, #0ea5a0)", borderRadius:16, display:"flex", alignItems:"center", justifyContent:"center", fontSize:24, color:"white", fontWeight:700, margin:"0 auto 16px" }}>M</div>
+        <img src="/logo-squared.png" alt="logo" style={{ width:56, height:56, borderRadius:14, objectFit:"cover", margin:"0 auto 16px", display:"block" }} />
         <div style={{ color:"#8098b8", fontSize:14 }}>Caricamento...</div>
       </div>
     </div>
