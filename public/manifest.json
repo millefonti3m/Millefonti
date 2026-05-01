@@ -1,0 +1,22 @@
+{
+  "name": "Ambulatorio Millefonti",
+  "short_name": "Millefonti",
+  "description": "Piattaforma di refertazione cardiologica ECG",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f7fb",
+  "theme_color": "#2e7cf6",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/logo-squared.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/logo-squared.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
