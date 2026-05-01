@@ -390,10 +390,17 @@ const FarmaciaView = ({ ecgs, setEcgs }) => {
   const [sent, setSent] = useState(false);
   const miei = ecgs.filter(e=>e.origine==="farmacia"&&e.farmacia===ME_FARMACIA);
 
-  const invia = () => {
+  const invia = async () => {
     if (!file||!form.paziente) return;
-    setEcgs(prev=>[...prev,{ id:`ECG-F${Date.now().toString().slice(-4)}`, origine:"farmacia", farmacia:ME_FARMACIA, paziente:`${form.paziente}, ${form.eta}a, ${form.sesso}`, ts:Date.now(), stato:"in_attesa", urgenza:form.urgenza, note:form.note||"—", cardiologo:null, chat:[] }]);
+    const nuovoEcg = { id:`ECG-F${Date.now().toString().slice(-4)}`, origine:"farmacia", farmacia:ME_FARMACIA, paziente:`${form.paziente}, ${form.eta}a, ${form.sesso}`, ts:Date.now(), stato:"in_attesa", urgenza:form.urgenza, note:form.note||"—", cardiologo:null, chat:[] };
+    setEcgs(prev=>[...prev, nuovoEcg]);
     setSent(true);
+    // Notifica email
+    fetch('/api/notify', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ paziente:nuovoEcg.paziente, origine:"farmacia", urgenza:form.urgenza, note:form.note })
+    }).catch(()=>{});
   };
 
   const tabBtn = (id,label) => (
@@ -485,11 +492,17 @@ const AziendaView = ({ ecgs, setEcgs }) => {
     <button onClick={()=>setTab(id)} style={{ background:tab===id?C.white:"transparent", border:tab===id?`1px solid ${C.border}`:"1px solid transparent", borderRadius:10, padding:"8px 20px", cursor:"pointer", fontFamily:SANS, fontWeight:600, fontSize:13, color:tab===id?C.purple:C.muted, boxShadow:tab===id?C.shadow:"none" }}>{label}</button>
   );
 
-  const inviaLotto = () => {
+  const inviaLotto = async () => {
     if (!batchNome||lavoratori.some(l=>!l.paziente)) return;
     const nuovi = lavoratori.map((l,i)=>({ id:`ECG-A${Date.now().toString().slice(-4)}-${i}`, origine:"azienda", azienda:ME_AZIENDA, batch:batchNome, paziente:`${l.paziente}, ${l.eta}a, ${l.sesso}`, ts:Date.now(), stato:"in_attesa", urgenza:"normale", note:l.mansione?`Mansione: ${l.mansione}. ${l.note}`:(l.note||"Idoneità annuale"), cardiologo:null, chat:[] }));
     setEcgs(prev=>[...prev,...nuovi]);
     setSent(true);
+    // Notifica email per ogni ECG del lotto
+    fetch('/api/notify', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ paziente:`Lotto ${batchNome} — ${nuovi.length} ECG`, origine:"azienda", urgenza:"normale", note:`Azienda: ${ME_AZIENDA}. ${nuovi.length} tracciati caricati.` })
+    }).catch(()=>{});
   };
 
   return (
