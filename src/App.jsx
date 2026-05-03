@@ -1075,10 +1075,6 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo }) => {
 
   return (
     <div style={{ display:"flex", height:"calc(100vh - 64px)", flexDirection:"column" }}>
-      {/* DEBUG BANNER - rimuovere in produzione */}
-      <div style={{ background:"#fff3cd", padding:"8px 16px", fontSize:12, borderBottom:"1px solid #ffc107" }}>
-        🔍 DEBUG: meCardiologo="{meCardiologo}" | ECG totali={ecgs.length} | miei={mieiEcgs.length} | inAttesa={inAttesa.length}
-      </div>
       <div style={{ display:"flex", flex:1, overflow:"hidden" }}>
       {/* Sidebar */}
       <div style={{ width:320, borderRight:`1px solid ${C.border}`, display:"flex", flexDirection:"column", background:C.white, overflow:"hidden" }}>
