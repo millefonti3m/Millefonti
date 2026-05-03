@@ -1,5 +1,5 @@
 import { supabase } from "./supabase.js";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 const C = {
   bg:"#f4f7fb", surface:"#ffffff", card:"#ffffff", cardAlt:"#f0f5ff",
@@ -27,8 +27,8 @@ const INIT_ECGS = [
   { id:"ECG-F01", origine:"farmacia", farmacia:"Farmacia Centrale Roma",   paziente:"M.R., 58a, M", ts:now-5400000,  stato:"in_attesa", urgenza:"urgente", note:"Palpitazioni episodiche",    cardiologo:null, chat:[] },
   { id:"ECG-F02", origine:"farmacia", farmacia:"Farmacia Salute Milano",   paziente:"A.G., 72a, F", ts:now-2700000,  stato:"in_attesa", urgenza:"normale", note:"Dolore toracico da sforzo",  cardiologo:null, chat:[] },
   { id:"ECG-F03", origine:"farmacia", farmacia:"Farmacia Verde Napoli",    paziente:"L.P., 45a, M", ts:now-18000000, stato:"refertato",  urgenza:"normale", note:"Check-up annuale",           cardiologo:"Dr. Rossi", chat:[] },
-  { id:"ECG-A01", origine:"azienda",  azienda:"Med Lavoro Torino",  batch:"FCA-Mirafiori-2024-04", paziente:"R.B., 42a, M", ts:now-3600000,  stato:"in_attesa", urgenza:"normale", note:"Idoneità annuale", cardiologo:null, chat:[] },
-  { id:"ECG-A02", origine:"azienda",  azienda:"Med Lavoro Torino",  batch:"FCA-Mirafiori-2024-04", paziente:"D.F., 51a, M", ts:now-3600000,  stato:"in_attesa", urgenza:"normale", note:"Idoneità annuale", cardiologo:null, chat:[] },
+  { id:"ECG-A01", origine:"azienda",  azienda:"Med Lavoro Torino",  batch:"FCA-Mirafiori-2024-04", paziente:"R.B., 42a, M", ts:now-3600000,  stato:"in_attesa", urgenza:"normale", note:"Idoneità annuale", cardiologo:"Dr. Rossi", chat:[] },
+  { id:"ECG-A02", origine:"azienda",  azienda:"Med Lavoro Torino",  batch:"FCA-Mirafiori-2024-04", paziente:"D.F., 51a, M", ts:now-3600000,  stato:"in_attesa", urgenza:"normale", note:"Idoneità annuale", cardiologo:"Dr. Rossi", chat:[] },
   { id:"ECG-A03", origine:"azienda",  azienda:"Med Lavoro Torino",  batch:"Iveco-Torino-2024-04",  paziente:"P.L., 38a, F", ts:now-7200000,  stato:"refertato",  urgenza:"normale", note:"Idoneità annuale", cardiologo:"Dr. Conti", chat:[] },
   { id:"ECG-P01", origine:"pubblico", paziente:"M.B., 62a, M", servizio:"ecg",   ts:now-7200000,  stato:"refertato",  urgenza:"normale", note:"Check-up annuale",              cardiologo:"Dr. Rossi", chat:[], appuntamento:"2024-04-15 09:00" },
   { id:"ECG-P02", origine:"pubblico", paziente:"L.S., 54a, F", servizio:"score2",ts:now-1800000,  stato:"in_attesa",  urgenza:"normale", note:"Prelievo + PAO + SCORE2",       cardiologo:null, chat:[], appuntamento:"2024-04-22 11:30", risultati:{ colTot:235, hdl:48, pas:142, fumatore:false } },
@@ -390,17 +390,10 @@ const FarmaciaView = ({ ecgs, setEcgs }) => {
   const [sent, setSent] = useState(false);
   const miei = ecgs.filter(e=>e.origine==="farmacia"&&e.farmacia===ME_FARMACIA);
 
-  const invia = async () => {
+  const invia = () => {
     if (!file||!form.paziente) return;
-    const nuovoEcg = { id:`ECG-F${Date.now().toString().slice(-4)}`, origine:"farmacia", farmacia:ME_FARMACIA, paziente:`${form.paziente}, ${form.eta}a, ${form.sesso}`, ts:Date.now(), stato:"in_attesa", urgenza:form.urgenza, note:form.note||"—", cardiologo:null, chat:[] };
-    setEcgs(prev=>[...prev, nuovoEcg]);
+    setEcgs(prev=>[...prev,{ id:`ECG-F${Date.now().toString().slice(-4)}`, origine:"farmacia", farmacia:ME_FARMACIA, paziente:`${form.paziente}, ${form.eta}a, ${form.sesso}`, ts:Date.now(), stato:"in_attesa", urgenza:form.urgenza, note:form.note||"—", cardiologo:null, chat:[] }]);
     setSent(true);
-    // Notifica email
-    fetch('/api/notify', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ paziente:nuovoEcg.paziente, origine:"farmacia", urgenza:form.urgenza, note:form.note })
-    }).catch(()=>{});
   };
 
   const tabBtn = (id,label) => (
@@ -492,17 +485,11 @@ const AziendaView = ({ ecgs, setEcgs }) => {
     <button onClick={()=>setTab(id)} style={{ background:tab===id?C.white:"transparent", border:tab===id?`1px solid ${C.border}`:"1px solid transparent", borderRadius:10, padding:"8px 20px", cursor:"pointer", fontFamily:SANS, fontWeight:600, fontSize:13, color:tab===id?C.purple:C.muted, boxShadow:tab===id?C.shadow:"none" }}>{label}</button>
   );
 
-  const inviaLotto = async () => {
+  const inviaLotto = () => {
     if (!batchNome||lavoratori.some(l=>!l.paziente)) return;
     const nuovi = lavoratori.map((l,i)=>({ id:`ECG-A${Date.now().toString().slice(-4)}-${i}`, origine:"azienda", azienda:ME_AZIENDA, batch:batchNome, paziente:`${l.paziente}, ${l.eta}a, ${l.sesso}`, ts:Date.now(), stato:"in_attesa", urgenza:"normale", note:l.mansione?`Mansione: ${l.mansione}. ${l.note}`:(l.note||"Idoneità annuale"), cardiologo:null, chat:[] }));
     setEcgs(prev=>[...prev,...nuovi]);
     setSent(true);
-    // Notifica email per ogni ECG del lotto
-    fetch('/api/notify', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ paziente:`Lotto ${batchNome} — ${nuovi.length} ECG`, origine:"azienda", urgenza:"normale", note:`Azienda: ${ME_AZIENDA}. ${nuovi.length} tracciati caricati.` })
-    }).catch(()=>{});
   };
 
   return (
@@ -622,6 +609,452 @@ const AziendaView = ({ ecgs, setEcgs }) => {
 
 // ── CARDIOLOGO ────────────────────────────────────────────────────────────
 // Vede SOLO gli ECG che l'admin gli ha assegnato esplicitamente.
+
+// ── REFERTAZIONE INLINE ───────────────────────────────────────────────────
+const RefertazioneInline = ({ ecg, meCardiologo, onRefertato }) => {
+  const [ecgFile, setEcgFile] = useState(null);
+  const [ecgUrl, setEcgUrl] = useState(null);
+  const [ecgType, setEcgType] = useState(null);
+  const [crocette, setCrocette] = useState({ limiti:false, correlare:false, approfondire:false, visita:false, urgente:false });
+  const [commento, setCommento] = useState("");
+  const [posizione, setPosizione] = useState("top-right");
+  const [generating, setGenerating] = useState(false);
+  const [generato, setGenerato] = useState(false);
+  const canvasRef = useRef(null);
+  const fileId = useRef("rf-"+Math.random().toString(36).slice(2,7)).current;
+
+  const handleFile = (f) => {
+    setEcgFile(f);
+    const url = URL.createObjectURL(f);
+    setEcgUrl(url);
+    setEcgType(f.type === "application/pdf" ? "pdf" : "image");
+    setGenerato(false);
+  };
+
+  const almenoCrocetta = crocette.limiti || crocette.correlare || crocette.approfondire || crocette.visita || crocette.urgente;
+
+  const disegnaOverlay = useCallback((ctx, W, H) => {
+    // Riquadro posizionato tra anamnesi e tracciato ECG
+    // Lascia visibili in alto: nome, sesso, altezza, peso, farmaci, anamnesi
+    const rX = Math.round(W * 0.21);
+    const rY = Math.round(H * 0.085);
+    const rW = Math.round(W * 0.78);
+    const rH = Math.round(H * 0.215);
+
+    // Sfondo bianco
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(rX, rY, rW, rH);
+
+    // Bordo esterno marcato
+    ctx.strokeStyle = "#1a2640";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(rX, rY, rW, rH);
+
+    // Layout: 3 zone verticali
+    // - Header (10% altezza): titolo
+    // - Crocette (50% altezza): 5 crocette in 3+2 colonne
+    // - Commento + Firma + Logo (40% altezza)
+
+    const headerH = Math.round(rH * 0.18);
+    const crocetteH = Math.round(rH * 0.40);
+    const bottomH = rH - headerH - crocetteH;
+
+    const pad = Math.round(rH * 0.06);
+    const fsTitle = Math.round(rH * 0.13);
+    const fsCr = Math.round(rH * 0.072);
+    const boxSz = Math.round(fsCr * 1.1);
+    const fsCommento = Math.round(rH * 0.095);
+
+    // ── HEADER ──
+    ctx.fillStyle = "#1a2640";
+    ctx.font = `bold ${fsTitle}px Arial`;
+    ctx.fillText("REFERTO CARDIOLOGICO", rX + pad, rY + headerH * 0.78);
+
+    // Linea sotto titolo
+    ctx.strokeStyle = "#1a2640";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(rX + pad, rY + headerH);
+    ctx.lineTo(rX + rW - pad, rY + headerH);
+    ctx.stroke();
+
+    // ── CROCETTE ──
+    const voci = [
+      [crocette.limiti,       "ECG nei limiti della norma"],
+      [crocette.correlare,    "ECG da correlare con la clinica"],
+      [crocette.approfondire, "ECG da approfondire con medico curante"],
+      [crocette.visita,       "ECG da approfondire con visita cardiologica"],
+      [crocette.urgente,      "Se nuova sintomatologia: visita cardiologica urgente / accesso in PS"],
+    ];
+
+    const crocetteY = rY + headerH;
+    const colW = (rW - pad * 2) / 2;
+    const rowH = Math.round(crocetteH / 3);
+
+    voci.forEach(([checked, label], i) => {
+      const col = i % 2;
+      const row = Math.floor(i / 2);
+      const cx = rX + pad + col * colW;
+      const cy = crocetteY + row * rowH + rowH * 0.65;
+
+      // Box
+      ctx.strokeStyle = "#1a2640";
+      ctx.lineWidth = 1.2;
+      ctx.strokeRect(cx, cy - boxSz + 2, boxSz, boxSz);
+      if (checked) {
+        ctx.fillStyle = "#1aaa6e";
+        ctx.font = `bold ${Math.round(boxSz * 1.05)}px Arial`;
+        ctx.fillText("✓", cx + 1, cy + 1);
+      }
+      // Label - può andare a capo se troppo lunga
+      ctx.fillStyle = "#1a2640";
+      ctx.font = `${fsCr}px Arial`;
+      const maxLabelW = colW - boxSz - 12;
+      const words = label.split(" ");
+      let line = "";
+      let labelY = cy;
+      const lines = [];
+      words.forEach(word => {
+        const test = line + word + " ";
+        if (ctx.measureText(test).width > maxLabelW && line) {
+          lines.push(line.trim());
+          line = word + " ";
+        } else line = test;
+      });
+      if (line.trim()) lines.push(line.trim());
+      // Se più di una riga, sposta su per centrare
+      if (lines.length > 1) labelY -= (lines.length - 1) * fsCr * 0.6;
+      lines.forEach((ln, idx) => {
+        ctx.fillText(ln, cx + boxSz + 8, labelY + idx * fsCr * 1.15);
+      });
+    });
+
+    // ── BOTTOM: linea separatore ──
+    const sepY = crocetteY + crocetteH;
+    ctx.strokeStyle = "#cccccc";
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(rX + pad, sepY);
+    ctx.lineTo(rX + rW - pad, sepY);
+    ctx.stroke();
+
+    // Calcola spazio per logo a destra
+    const lSize = Math.round(bottomH * 0.85);
+    const logoX = rX + rW - lSize - pad;
+    const logoY = sepY + (bottomH - lSize) / 2;
+
+    // ── COMMENTO (a sinistra, sopra firma) ──
+    const commentoX = rX + pad;
+    const commentoMaxW = rW - pad * 2 - lSize - pad;
+    let commentoY = sepY + fsCr * 1.0;
+
+    if (commento.trim()) {
+      ctx.fillStyle = "#1a2640";
+      ctx.font = `${fsCommento}px Arial`;
+      const words = commento.split(" ");
+      let line = "";
+      const linesC = [];
+      words.forEach(word => {
+        const test = line + word + " ";
+        if (ctx.measureText(test).width > commentoMaxW && line) {
+          linesC.push(line.trim()); line = word + " ";
+        } else line = test;
+      });
+      if (line.trim()) linesC.push(line.trim());
+      // Massimo 2 righe per il commento
+      linesC.slice(0, 2).forEach((ln, idx) => {
+        ctx.fillText(ln, commentoX, commentoY + idx * fsCommento * 1.2);
+      });
+    }
+
+    // ── FIRMA (sotto il commento, a sinistra) ──
+    const nomeFirma = meCardiologo.replace(/^Dott\.\s*Dr\.?/i, "Dott.").replace(/^Dr\.?\s/i, "Dott. ");
+    const firmaY = sepY + bottomH - fsCr * 1.4;
+    ctx.fillStyle = "#1a2640";
+    ctx.font = `bold ${Math.round(fsCr * 1.0)}px Arial`;
+    ctx.fillText(nomeFirma, commentoX, firmaY);
+    ctx.font = `${Math.round(fsCr * 0.8)}px Arial`;
+    ctx.fillStyle = "#6b7d99";
+    ctx.fillText(new Date().toLocaleDateString("it-IT"), commentoX, firmaY + fsCr * 1.0);
+
+    // ── LOGO (basso destra) ──
+    // Usa l'immagine già pre-caricata dal cache del browser
+    if (window.__millefonti_logo && window.__millefonti_logo.complete) {
+      try { ctx.drawImage(window.__millefonti_logo, logoX, logoY, lSize, lSize); } catch(e) {}
+    } else {
+      const logoImg = new Image();
+      logoImg.src = "/logo-squared.png";
+      window.__millefonti_logo = logoImg;
+      try { ctx.drawImage(logoImg, logoX, logoY, lSize, lSize); } catch(e) {}
+    }
+
+  }, [crocette, commento, posizione, meCardiologo]);
+
+  const generaPDF = async () => {
+    if (!ecgFile || !almenoCrocetta) return;
+    setGenerating(true);
+    // Pre-carica il logo nel cache globale per essere sicuri che sia disponibile per il canvas
+    await new Promise((resolve) => {
+      if (window.__millefonti_logo && window.__millefonti_logo.complete) {
+        resolve();
+        return;
+      }
+      const preloadLogo = new Image();
+      preloadLogo.onload = () => {
+        window.__millefonti_logo = preloadLogo;
+        resolve();
+      };
+      preloadLogo.onerror = () => resolve();
+      preloadLogo.src = "/logo-squared.png";
+      setTimeout(resolve, 2000);
+    });
+    try {
+      const { jsPDF } = await import("jspdf");
+
+      // Helper: genera pagina referto
+      const aggiungiPaginaReferto = (pdf, W, H, isLandscape) => {
+        pdf.setFillColor(255,255,255);
+        pdf.rect(0,0,W,H,"F");
+        // Header blu
+        pdf.setFillColor(46,124,246);
+        pdf.rect(0,0,W,18,"F");
+        pdf.setFontSize(11);
+        pdf.setTextColor(255,255,255);
+        pdf.setFont("helvetica","bold");
+        pdf.text("AMBULATORIO MILLEFONTI — REFERTO CARDIOLOGICO", 10, 12);
+        // Dati paziente
+        pdf.setFontSize(10);
+        pdf.setTextColor(26,38,64);
+        pdf.setFont("helvetica","normal");
+        pdf.text(`Paziente: ${ecg.paziente}`, 10, 28);
+        pdf.text(`Data: ${new Date().toLocaleDateString("it-IT")}`, 10, 36);
+        pdf.text(`Cardiologo: Dott. ${meCardiologo}`, 10, 44);
+        // Linea separatore
+        pdf.setDrawColor(200,210,220);
+        pdf.setLineWidth(0.3);
+        pdf.line(10, 48, W-10, 48);
+        // Crocette
+        pdf.setFontSize(11);
+        pdf.setTextColor(26,38,64);
+        let yy = 58;
+        const voci = [
+          [crocette.limiti,       "ECG nei limiti della norma"],
+          [crocette.correlare,    "ECG da correlare con la clinica"],
+          [crocette.approfondire, "ECG da approfondire con medico curante"],
+          [crocette.visita,       "ECG da approfondire con visita cardiologica"],
+          [crocette.urgente,      "Se nuova sintomatologia: visita cardiologica urgente / accesso in PS"],
+        ];
+        voci.forEach(([checked, label]) => {
+          pdf.setDrawColor(26,38,64);
+          pdf.setLineWidth(0.5);
+          pdf.rect(10, yy-4, 5, 5);
+          if (checked) {
+            pdf.setFont("helvetica","bold");
+            pdf.setTextColor(26,124,110);
+            pdf.text("✓", 11, yy);
+            pdf.setTextColor(26,38,64);
+          }
+          pdf.setFont("helvetica","normal");
+          pdf.text(label, 19, yy);
+          yy += 11;
+        });
+        // Commento
+        if (commento.trim()) {
+          yy += 4;
+          pdf.setDrawColor(200,210,220);
+          pdf.line(10, yy-4, W-10, yy-4);
+          pdf.setFontSize(10);
+          pdf.setTextColor(60,80,100);
+          pdf.setFont("helvetica","italic");
+          const lines = pdf.splitTextToSize(commento, W-20);
+          pdf.text(lines, 10, yy+4);
+        }
+        // Footer con firma e logo
+        const footerY = H - 22;
+        pdf.setDrawColor(200,210,220);
+        pdf.setLineWidth(0.3);
+        pdf.line(10, footerY, W-10, footerY);
+        pdf.setFont("helvetica","bold");
+        pdf.setFontSize(10);
+        pdf.setTextColor(26,38,64);
+        pdf.text(`Dott. ${meCardiologo}`, 10, footerY+8);
+        pdf.setFont("helvetica","normal");
+        pdf.setFontSize(8);
+        pdf.setTextColor(100,120,140);
+        pdf.text(new Date().toLocaleDateString("it-IT"), 10, footerY+14);
+        return pdf;
+      };
+
+      if (ecgType === "image") {
+        // JPEG/PNG: sovrapponi riquadro sull'immagine originale
+        const img = new Image();
+        img.src = ecgUrl;
+        await new Promise(r => { img.onload = r; });
+        const W = img.naturalWidth;
+        const H = img.naturalHeight;
+        const isLandscape = W > H;
+
+        // Canvas per il tracciato con overlay
+        const canvas = document.createElement("canvas");
+        canvas.width = W; canvas.height = H;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0);
+
+        // Applica il riquadro di refertazione tramite disegnaOverlay
+        disegnaOverlay(ctx, W, H);
+
+        // Genera PDF con immagine modificata
+        const ratio = W / H;
+        const pdfW = isLandscape ? 297 : 210;
+        const pdfH = isLandscape ? pdfW / ratio : pdfW * ratio;
+        const pdf = new jsPDF({ orientation: isLandscape?"landscape":"portrait", unit:"mm", format:[pdfW, Math.min(pdfH, 420)] });
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+        pdf.addImage(dataUrl, "JPEG", 0, 0, pdfW, Math.min(pdfH, 420));
+        pdf.save(`Referto_${ecg.paziente.replace(/[^a-zA-Z]/g,"_")}_${new Date().toISOString().slice(0,10)}.pdf`);
+
+      } else {
+        // PDF: converti la prima pagina in immagine, applica overlay, salva come PDF singolo
+        const pdfjsLib = await import("pdfjs-dist");
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+        const arrayBuffer = await ecgFile.arrayBuffer();
+        const pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        const page = await pdfDoc.getPage(1);
+        const viewport = page.getViewport({ scale: 2.5 });
+        const cvs = document.createElement("canvas");
+        cvs.width = viewport.width; cvs.height = viewport.height;
+        const ctx = cvs.getContext("2d");
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, cvs.width, cvs.height);
+        await page.render({ canvasContext: ctx, viewport }).promise;
+        // Applica il riquadro di refertazione direttamente sul tracciato
+        disegnaOverlay(ctx, cvs.width, cvs.height);
+        // Salva come PDF
+        const ratio = cvs.width / cvs.height;
+        const isLandscape2 = ratio > 1;
+        const pdfW = isLandscape2 ? 297 : 210;
+        const pdfH = pdfW / ratio;
+        const finalPdf = new jsPDF({ orientation: isLandscape2?"landscape":"portrait", unit:"mm", format:[pdfW, pdfH] });
+        const imgData = cvs.toDataURL("image/jpeg", 0.95);
+        finalPdf.addImage(imgData, "JPEG", 0, 0, pdfW, pdfH);
+        finalPdf.save(`Referto_${ecg.paziente.replace(/[^a-zA-Z]/g,"_")}_${new Date().toISOString().slice(0,10)}.pdf`);
+      }
+      setGenerato(true);
+    } catch(e) { console.error(e); alert("Errore nella generazione del PDF: "+e.message); }
+    setGenerating(false);
+  };
+
+  const confermaSend = () => {
+    onRefertato();
+    setGenerato(false);
+    setEcgFile(null);
+    setEcgUrl(null);
+    setEcgType(null);
+    setCrocette({limiti:false,correlare:false,approfondire:false,visita:false,urgente:false});
+    setCommento("");
+  };
+
+  const CROCETTE_OPTS = [
+    {k:"limiti",      label:"ECG nei limiti della norma",                                          color:C.green},
+    {k:"correlare",   label:"ECG da correlare con la clinica",                                     color:C.orange},
+    {k:"approfondire",label:"ECG da approfondire con medico curante",                              color:C.red},
+    {k:"visita",      label:"ECG da approfondire con visita cardiologica",                         color:C.purple},
+    {k:"urgente",     label:"Se nuova sintomatologia: visita cardiologica urgente / accesso in PS", color:"#b91c1c"},
+  ];
+
+  return (
+    <div style={{display:"flex",gap:20,height:"100%"}}>
+      {/* Sinistra: carica ECG + anteprima */}
+      <div style={{flex:1,display:"flex",flexDirection:"column",gap:14}}>
+        <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,padding:18,boxShadow:C.shadow}}>
+          <div style={{color:C.muted,fontWeight:700,fontSize:11,letterSpacing:1.5,textTransform:"uppercase",marginBottom:12}}>1. Carica tracciato ECG</div>
+          <div onClick={()=>document.getElementById(fileId).click()}
+            style={{border:`2px dashed ${ecgFile?C.green:C.border}`,borderRadius:12,padding:"24px 16px",textAlign:"center",cursor:"pointer",background:ecgFile?C.greenLight:"#f8faff"}}>
+            <input id={fileId} type="file" accept=".pdf,.png,.jpg,.jpeg" style={{display:"none"}} onChange={e=>handleFile(e.target.files[0])} />
+            {ecgFile
+              ? <div style={{color:C.green,fontWeight:700,fontSize:14}}>✓ {ecgFile.name}</div>
+              : <><div style={{fontSize:24,marginBottom:6}}>📎</div><div style={{color:C.textSoft,fontSize:13,fontWeight:500}}>Clicca per caricare ECG</div><div style={{color:C.muted,fontSize:11,marginTop:3}}>PDF · JPEG · PNG</div></>
+            }
+          </div>
+        </div>
+        {/* Anteprima */}
+        {ecgUrl && (
+          <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,padding:16,flex:1,boxShadow:C.shadow,overflow:"hidden"}}>
+            <div style={{color:C.muted,fontWeight:700,fontSize:11,letterSpacing:1.5,textTransform:"uppercase",marginBottom:10}}>Anteprima tracciato</div>
+            {ecgType==="image"
+              ? <img src={ecgUrl} alt="ECG" style={{width:"100%",borderRadius:8,objectFit:"contain",maxHeight:320}} />
+              : <iframe src={ecgUrl} style={{width:"100%",height:320,border:"none",borderRadius:8}} title="ECG PDF" />
+            }
+          </div>
+        )}
+      </div>
+
+      {/* Destra: pannello refertazione */}
+      <div style={{width:320,display:"flex",flexDirection:"column",gap:14}}>
+        <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,padding:20,boxShadow:C.shadow}}>
+          <div style={{color:C.muted,fontWeight:700,fontSize:11,letterSpacing:1.5,textTransform:"uppercase",marginBottom:14}}>2. Refertazione</div>
+
+          {/* Crocette */}
+          <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:18}}>
+            {CROCETTE_OPTS.map(({k,label,color})=>(
+              <div key={k} onClick={()=>setCrocette(p=>({...p,[k]:!p[k]}))}
+                style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:12,cursor:"pointer",border:`2px solid ${crocette[k]?color:C.border}`,background:crocette[k]?color+"18":C.bg,transition:"all 0.15s"}}>
+                <div style={{width:22,height:22,borderRadius:6,border:`2px solid ${crocette[k]?color:C.border}`,background:crocette[k]?color:"white",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                  {crocette[k] && <span style={{color:"white",fontWeight:700,fontSize:14}}>✓</span>}
+                </div>
+                <span style={{fontSize:13,color:crocette[k]?color:C.textSoft,fontWeight:crocette[k]?700:400,lineHeight:1.3}}>{label}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Commento */}
+          <div style={{marginBottom:16}}>
+            <label style={{color:C.textSoft,fontSize:12,fontWeight:600,display:"block",marginBottom:7}}>Commento (opzionale)</label>
+            <textarea value={commento} onChange={e=>setCommento(e.target.value)}
+              placeholder="Note aggiuntive del cardiologo..."
+              rows={3}
+              style={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:10,padding:"10px 12px",color:C.text,fontSize:13,width:"100%",outline:"none",resize:"vertical",fontFamily:SANS}} />
+          </div>
+
+          {/* Posizione overlay */}
+          {ecgType==="image" && (
+            <div style={{marginBottom:16}}>
+              <label style={{color:C.textSoft,fontSize:12,fontWeight:600,display:"block",marginBottom:7}}>Posizione riquadro</label>
+              <div style={{display:"flex",gap:8}}>
+                {[["top-right","↗ Alto dx"],["bottom-right","↘ Basso dx"]].map(([v,l])=>(
+                  <button key={v} onClick={()=>setPosizione(v)}
+                    style={{flex:1,padding:"8px 0",borderRadius:8,cursor:"pointer",fontWeight:600,fontSize:12,border:`2px solid ${posizione===v?C.accent:C.border}`,background:posizione===v?C.accentLight:C.bg,color:posizione===v?C.accent:C.muted}}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Bottone genera */}
+          <button onClick={generaPDF} disabled={!ecgFile||!almenoCrocetta||generating}
+            style={{background:(!ecgFile||!almenoCrocetta||generating)?C.border:"linear-gradient(135deg,#2e7cf6,#0ea5a0)",color:(!ecgFile||!almenoCrocetta||generating)?C.muted:"white",border:"none",borderRadius:12,padding:"13px 0",cursor:(!ecgFile||!almenoCrocetta||generating)?"not-allowed":"pointer",fontWeight:700,fontSize:14,width:"100%",boxShadow:(!ecgFile||!almenoCrocetta||generating)?"none":"0 4px 16px rgba(46,124,246,0.3)"}}>
+            {generating?"⏳ Generazione...":"📄 Genera referto PDF"}
+          </button>
+
+          {!almenoCrocetta && <div style={{color:C.muted,fontSize:11,textAlign:"center",marginTop:8}}>Seleziona almeno una crocetta</div>}
+        </div>
+
+        {/* Bottone conferma dopo generazione */}
+        {generato && (
+          <div style={{background:C.greenLight,border:`1px solid ${C.green}33`,borderRadius:16,padding:18,boxShadow:C.shadow}}>
+            <div style={{color:C.green,fontWeight:700,fontSize:14,marginBottom:6}}>✅ PDF generato e scaricato!</div>
+            <div style={{color:C.textSoft,fontSize:12,marginBottom:14}}>Clicca per segnare questo ECG come refertato.</div>
+            <button onClick={confermaSend}
+              style={{background:C.green,color:"white",border:"none",borderRadius:10,padding:"12px 0",cursor:"pointer",fontWeight:700,fontSize:14,width:"100%",boxShadow:`0 4px 16px ${C.green}44`}}>
+              Conferma refertazione +{ecg.origine==="azienda"?10:15}€
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const CardiologoView = ({ ecgs, setEcgs, meCardiologo }) => {
   const [selected, setSelected] = useState(null);
   const [done, setDone] = useState(false);
@@ -641,7 +1074,12 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo }) => {
   };
 
   return (
-    <div style={{ display:"flex", height:"calc(100vh - 64px)" }}>
+    <div style={{ display:"flex", height:"calc(100vh - 64px)", flexDirection:"column" }}>
+      {/* DEBUG BANNER - rimuovere in produzione */}
+      <div style={{ background:"#fff3cd", padding:"8px 16px", fontSize:12, borderBottom:"1px solid #ffc107" }}>
+        🔍 DEBUG: meCardiologo="{meCardiologo}" | ECG totali={ecgs.length} | miei={mieiEcgs.length} | inAttesa={inAttesa.length}
+      </div>
+      <div style={{ display:"flex", flex:1, overflow:"hidden" }}>
       {/* Sidebar */}
       <div style={{ width:320, borderRight:`1px solid ${C.border}`, display:"flex", flexDirection:"column", background:C.white, overflow:"hidden" }}>
         <div style={{ padding:"20px 20px 16px", background:"linear-gradient(135deg,#e8f4ff,#e6f9f4)", borderBottom:`1px solid ${C.border}` }}>
@@ -738,21 +1176,21 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo }) => {
               <div style={{ color:C.muted, fontWeight:600, fontSize:12, marginBottom:8 }}>NOTE CLINICHE</div>
               <div style={{ color:C.text, fontSize:14 }}>{selected.note||"—"}</div>
             </div>
-            <div style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:16, padding:20, marginBottom:16, boxShadow:C.shadow }}>
-              <div style={{ color:C.muted, fontWeight:600, fontSize:12, marginBottom:12 }}>TRACCIATO ECG</div>
-              <div style={{ background:"#f0f9f6", borderRadius:10, padding:"16px 12px" }}>
-                <svg width="100%" height="70" viewBox="0 0 480 70" preserveAspectRatio="none">
-                  <polyline points="0,35 20,35 30,8 42,64 52,35 82,35 92,29 102,35 132,35 142,7 154,65 164,35 194,35 204,29 214,35 244,35 254,7 266,65 276,35 306,35 316,29 326,35 356,35 366,7 378,65 388,35 420,35 430,29 440,35 480,35" fill="none" stroke={C.teal} strokeWidth="2.2" />
-                </svg>
-              </div>
+            <div style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:16, padding:20, marginBottom:0, boxShadow:C.shadow }}>
+              <div style={{ color:C.muted, fontWeight:600, fontSize:12, marginBottom:16 }}>STRUMENTO DI REFERTAZIONE</div>
+              <RefertazioneInline
+                ecg={selected}
+                meCardiologo={meCardiologo}
+                onRefertato={()=>{
+                  setEcgs(prev=>prev.map(e=>e.id===selected.id?{...e,stato:"refertato"}:e));
+                  setDone(true);
+                }}
+              />
             </div>
-            <div style={{ marginBottom:18 }}><UploadZone onFile={setFile} /></div>
-            <button onClick={handleReferti} style={btnPrimary(!!file)}>
-              {file?`Invia referto (+${selected.origine==="azienda"?10:15}€) →`:"Carica un PDF per continuare"}
-            </button>
           </div>
         )}
       </div>
+    </div>
     </div>
   );
 };
@@ -1074,6 +1512,188 @@ const Shell = ({ role, onLogout, children, meCardiologo }) => {
 };
 
 
+
+// ── UPLOAD GENERICO (pagina pubblica /carica) ─────────────────────────────
+const UploadGenerico = () => {
+  const [step, setStep] = useState(0);
+  const [file, setFile] = useState(null);
+  const [inviato, setInviato] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [form, setForm] = useState({
+    societa:"", nome:"", cognome:"", eta:"", sesso:"M",
+    mansione:"", tipoVisita:"idoneita", urgenza:"normale",
+    email:"", telefono:"", note:""
+  });
+  const fileId = useRef("ug-"+Math.random().toString(36).slice(2,7)).current;
+
+  const set = (k,v) => setForm(f=>({...f,[k]:v}));
+
+  const handleInvia = async () => {
+    setLoading(true);
+    try {
+      await fetch('/api/notify', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          paziente:`${form.nome} ${form.cognome}, ${form.eta}a, ${form.sesso}`,
+          origine:"azienda",
+          urgenza:form.urgenza,
+          note:`Società: ${form.societa} | Mansione: ${form.mansione} | Tipo: ${form.tipoVisita} | Email cliente: ${form.email} | Tel: ${form.telefono} | Note: ${form.note}`
+        })
+      });
+    } catch(e){}
+    setLoading(false);
+    setInviato(true);
+  };
+
+  const inp = (label, key, opts={}) => (
+    <div style={{marginBottom:14}}>
+      <label style={{color:"#3d5270",fontSize:12,fontWeight:600,display:"block",marginBottom:7}}>{label}{opts.required&&<span style={{color:"#e03e5a"}}> *</span>}</label>
+      {opts.type==="select" ? (
+        <select value={form[key]} onChange={e=>set(key,e.target.value)} style={{background:"#f4f7fb",border:"1px solid #dde5f0",borderRadius:10,padding:"11px 14px",color:"#1a2640",fontSize:14,width:"100%",outline:"none"}}>
+          {opts.options.map(([v,l])=><option key={v} value={v}>{l}</option>)}
+        </select>
+      ) : opts.type==="textarea" ? (
+        <textarea value={form[key]} onChange={e=>set(key,e.target.value)} placeholder={opts.placeholder||""} rows={3} style={{background:"#f4f7fb",border:"1px solid #dde5f0",borderRadius:10,padding:"11px 14px",color:"#1a2640",fontSize:14,width:"100%",outline:"none",resize:"vertical"}} />
+      ) : (
+        <input value={form[key]} onChange={e=>set(key,e.target.value)} type={opts.type||"text"} placeholder={opts.placeholder||""} style={{background:"#f4f7fb",border:"1px solid #dde5f0",borderRadius:10,padding:"11px 14px",color:"#1a2640",fontSize:14,width:"100%",outline:"none"}} />
+      )}
+    </div>
+  );
+
+  if (inviato) return (
+    <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#e8f2ff,#f4f7fb,#e8f9f4)",display:"flex",alignItems:"center",justifyContent:"center",padding:24,fontFamily:SANS}}>
+      <div style={{maxWidth:480,width:"100%",textAlign:"center"}}>
+        <div style={{width:80,height:80,background:"#e6f9f1",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:36,margin:"0 auto 20px"}}>✅</div>
+        <h2 style={{color:"#1aaa6e",fontWeight:700,fontSize:24,marginBottom:8}}>Richiesta inviata!</h2>
+        <p style={{color:"#4a5b7a",fontSize:15,marginBottom:8}}>Abbiamo ricevuto il tracciato ECG di <strong>{form.nome} {form.cognome}</strong>.</p>
+        <p style={{color:"#6b7d99",fontSize:14,marginBottom:28}}>Il referto verrà inviato a <strong>{form.email}</strong> non appena disponibile.</p>
+        <div style={{background:"#f4f7fb",border:"1px solid #dde5f0",borderRadius:14,padding:"16px 20px",marginBottom:24,textAlign:"left"}}>
+          <div style={{color:"#6b7d99",fontSize:11,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:10}}>Riepilogo richiesta</div>
+          {[["Società",form.societa],["Paziente",`${form.nome} ${form.cognome}`],["Tipo visita",form.tipoVisita==="idoneita"?"Idoneità lavorativa":"Check-up / Altro"],["Urgenza",form.urgenza==="urgente"?"🔴 Urgente":"🟢 Normale"],["Referto a",form.email]].map(([k,v])=>(
+            <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid #eaf0f8",fontSize:13}}>
+              <span style={{color:"#8098b8"}}>{k}</span>
+              <span style={{color:"#1a2640",fontWeight:600}}>{v}</span>
+            </div>
+          ))}
+        </div>
+        <p style={{color:"#8098b8",fontSize:12}}>Per informazioni: <strong>ecg.millefonti@gmail.com</strong></p>
+      </div>
+    </div>
+  );
+
+  const steps = ["Società e paziente","Visita e file","Contatti e invio"];
+
+  return (
+    <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#e8f2ff,#f4f7fb,#e8f9f4)",fontFamily:SANS}}>
+      {/* Header */}
+      <div style={{background:"white",borderBottom:"1px solid #dde5f0",padding:"16px 24px",display:"flex",alignItems:"center",gap:12,boxShadow:"0 1px 12px rgba(0,0,0,0.06)"}}>
+        <img src="/logo-squared.png" alt="logo" style={{width:40,height:40,borderRadius:10,objectFit:"contain"}} />
+        <div>
+          <div style={{fontWeight:700,fontSize:15,color:"#1a2640"}}>Ambulatorio Millefonti</div>
+          <div style={{fontSize:11,color:"#8098b8",fontFamily:"'DM Mono',monospace",letterSpacing:1}}>CARICAMENTO ECG</div>
+        </div>
+      </div>
+
+      <div style={{maxWidth:580,margin:"0 auto",padding:"32px 24px"}}>
+        {/* Steps indicator */}
+        <div style={{display:"flex",gap:8,marginBottom:28}}>
+          {steps.map((s,i)=>(
+            <div key={s} style={{display:"flex",alignItems:"center",gap:6}}>
+              {i>0&&<div style={{width:24,height:2,background:i<=step?"#2e7cf6":"#dde5f0"}} />}
+              <div style={{background:i<=step?"#2e7cf6":"#dde5f0",color:i<=step?"white":"#8098b8",borderRadius:20,padding:"4px 14px",fontSize:12,fontWeight:600,whiteSpace:"nowrap"}}>{s}</div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{background:"white",border:"1px solid #dde5f0",borderRadius:18,padding:28,boxShadow:"0 2px 12px rgba(46,124,246,0.08)"}}>
+
+          {/* STEP 0 — Società e paziente */}
+          {step===0 && (
+            <>
+              <h3 style={{color:"#1a2640",fontWeight:700,fontSize:18,marginBottom:20}}>Dati società e paziente</h3>
+              {inp("Nome società / studio medico","societa",{required:true,placeholder:"Es. Salute Lavoro 3M"})}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+                <div>{inp("Nome paziente","nome",{required:true,placeholder:"Mario"})}</div>
+                <div>{inp("Cognome","cognome",{required:true,placeholder:"Rossi"})}</div>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+                <div>{inp("Età","eta",{required:true,placeholder:"45"})}</div>
+                <div>{inp("Sesso","sesso",{type:"select",options:[["M","Maschile"],["F","Femminile"]]})}</div>
+              </div>
+              {inp("Mansione lavorativa","mansione",{placeholder:"Es. Carrellista, Operatore, Impiegato..."})}
+              <button onClick={()=>setStep(1)} disabled={!form.societa||!form.nome||!form.cognome||!form.eta}
+                style={{background:(!form.societa||!form.nome||!form.cognome||!form.eta)?"#dde5f0":"#2e7cf6",color:(!form.societa||!form.nome||!form.cognome||!form.eta)?"#8098b8":"white",border:"none",borderRadius:10,padding:"13px 0",cursor:(!form.societa||!form.nome||!form.cognome||!form.eta)?"not-allowed":"pointer",fontWeight:700,fontSize:15,width:"100%",marginTop:8}}>
+                Continua →
+              </button>
+            </>
+          )}
+
+          {/* STEP 1 — Visita e file */}
+          {step===1 && (
+            <>
+              <h3 style={{color:"#1a2640",fontWeight:700,fontSize:18,marginBottom:20}}>Tipo visita e tracciato</h3>
+              {inp("Tipo di visita","tipoVisita",{type:"select",options:[["idoneita","Idoneità lavorativa"],["checkup","Check-up / Sorveglianza"],["altro","Altro"]]})}
+              <div style={{marginBottom:14}}>
+                <label style={{color:"#3d5270",fontSize:12,fontWeight:600,display:"block",marginBottom:7}}>Urgenza</label>
+                <div style={{display:"flex",gap:8}}>
+                  {[["normale","🟢 Normale"],["urgente","🔴 Urgente"]].map(([v,l])=>(
+                    <button key={v} onClick={()=>set("urgenza",v)} style={{flex:1,padding:"11px 0",borderRadius:10,cursor:"pointer",fontWeight:600,fontSize:13,border:`2px solid ${form.urgenza===v?(v==="urgente"?"#e03e5a":"#2e7cf6"):"#dde5f0"}`,background:form.urgenza===v?(v==="urgente"?"#fdedf0":"#e8f0fe"):"#f4f7fb",color:form.urgenza===v?(v==="urgente"?"#e03e5a":"#2e7cf6"):"#8098b8"}}>{l}</button>
+                  ))}
+                </div>
+              </div>
+              {inp("Note cliniche / sintomi","note",{type:"textarea",placeholder:"Eventuali note sul paziente, sintomi, terapie in corso..."})}
+              <div style={{marginBottom:18}}>
+                <label style={{color:"#3d5270",fontSize:12,fontWeight:600,display:"block",marginBottom:7}}>File ECG <span style={{color:"#e03e5a"}}>*</span></label>
+                <div onClick={()=>document.getElementById(fileId).click()}
+                  style={{border:`2px dashed ${file?"#1aaa6e":"#dde5f0"}`,borderRadius:14,padding:"28px 20px",textAlign:"center",cursor:"pointer",background:file?"#e6f9f1":"#f8faff"}}>
+                  <input id={fileId} type="file" accept=".pdf,.png,.jpg,.jpeg" style={{display:"none"}} onChange={e=>setFile(e.target.files[0])} />
+                  {file ? <div style={{color:"#1aaa6e",fontWeight:600,fontSize:14}}>✓ {file.name}</div>
+                        : <><div style={{fontSize:28,marginBottom:8}}>📎</div><div style={{color:"#4a5b7a",fontSize:14,fontWeight:500}}>Clicca per caricare il tracciato ECG</div><div style={{color:"#8098b8",fontSize:12,marginTop:4}}>PDF · PNG · JPG</div></>}
+                </div>
+              </div>
+              <div style={{display:"flex",gap:10}}>
+                <button onClick={()=>setStep(0)} style={{background:"#f4f7fb",border:"1px solid #dde5f0",borderRadius:10,padding:"13px 0",cursor:"pointer",fontWeight:600,fontSize:14,flex:1,color:"#6b7d99"}}>← Indietro</button>
+                <button onClick={()=>setStep(2)} disabled={!file}
+                  style={{background:!file?"#dde5f0":"#2e7cf6",color:!file?"#8098b8":"white",border:"none",borderRadius:10,padding:"13px 0",cursor:!file?"not-allowed":"pointer",fontWeight:700,fontSize:15,flex:2}}>
+                  Continua →
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* STEP 2 — Contatti e invio */}
+          {step===2 && (
+            <>
+              <h3 style={{color:"#1a2640",fontWeight:700,fontSize:18,marginBottom:8}}>Dove inviare il referto</h3>
+              <p style={{color:"#6b7d99",fontSize:13,marginBottom:20}}>Il referto firmato verrà inviato all'email indicata non appena disponibile.</p>
+              {inp("Email per ricevere il referto","email",{required:true,type:"email",placeholder:"medico@societa.it"})}
+              {inp("Telefono (opzionale)","telefono",{placeholder:"+39 333 000 0000"})}
+              <div style={{background:"#f4f7fb",border:"1px solid #dde5f0",borderRadius:12,padding:"14px 18px",marginBottom:20}}>
+                <div style={{color:"#6b7d99",fontSize:11,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:10}}>Riepilogo</div>
+                {[["Società",form.societa],["Paziente",`${form.nome} ${form.cognome}, ${form.eta}a`],["Tipo",form.tipoVisita==="idoneita"?"Idoneità lavorativa":"Check-up"],["Urgenza",form.urgenza==="urgente"?"🔴 Urgente":"🟢 Normale"],["File",file?.name||"—"]].map(([k,v])=>(
+                  <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #eaf0f8",fontSize:12}}>
+                    <span style={{color:"#8098b8"}}>{k}</span>
+                    <span style={{color:"#1a2640",fontWeight:600,maxWidth:"60%",textAlign:"right",wordBreak:"break-all"}}>{v}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{display:"flex",gap:10}}>
+                <button onClick={()=>setStep(1)} style={{background:"#f4f7fb",border:"1px solid #dde5f0",borderRadius:10,padding:"13px 0",cursor:"pointer",fontWeight:600,fontSize:14,flex:1,color:"#6b7d99"}}>← Indietro</button>
+                <button onClick={handleInvia} disabled={!form.email||loading}
+                  style={{background:(!form.email||loading)?"#dde5f0":"#1aaa6e",color:(!form.email||loading)?"#8098b8":"white",border:"none",borderRadius:10,padding:"13px 0",cursor:(!form.email||loading)?"not-allowed":"pointer",fontWeight:700,fontSize:15,flex:2,boxShadow:(!form.email||loading)?"none":"0 4px 16px rgba(26,170,110,0.3)"}}>
+                  {loading?"Invio in corso...":"Invia richiesta →"}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+        <p style={{textAlign:"center",color:"#b0c2d8",fontSize:11,marginTop:20,fontFamily:"'DM Mono',monospace",letterSpacing:1}}>AMBULATORIO MILLEFONTI · ACCESSO SICURO · GDPR</p>
+      </div>
+    </div>
+  );
+};
+
 // ── LOGIN REALE (Supabase Auth) ───────────────────────────────────────────
 const LoginReale = ({ onLogin }) => {
   const [email, setEmail] = useState("");
@@ -1173,10 +1793,13 @@ export default function App() {
   const caricaRuolo = async (supabase, userId) => {
     const { data } = await supabase
       .from('user_profiles')
-      .select('ruolo')
+      .select('ruolo, nome, cognome')
       .eq('id', userId)
       .single();
     if (data?.ruolo) setRole(data.ruolo);
+    if (data?.nome || data?.cognome) {
+      setMeCardiologo(`${data.nome||''} ${data.cognome||''}`.trim());
+    }
     setLoading(false);
   };
 
@@ -1201,6 +1824,9 @@ export default function App() {
       </div>
     </div>
   );
+
+  // Route /carica — pagina pubblica senza login
+  if (window.location.pathname === '/carica') return <UploadGenerico />;
 
   if (!role) return <LoginReale onLogin={handleLogin} />;
 
