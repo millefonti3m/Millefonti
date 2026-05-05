@@ -390,10 +390,24 @@ const FarmaciaView = ({ ecgs, setEcgs }) => {
   const [sent, setSent] = useState(false);
   const miei = ecgs.filter(e=>e.origine==="farmacia"&&e.farmacia===ME_FARMACIA);
 
-  const invia = () => {
+  const invia = async () => {
     if (!file||!form.paziente) return;
-    setEcgs(prev=>[...prev,{ id:`ECG-F${Date.now().toString().slice(-4)}`, origine:"farmacia", farmacia:ME_FARMACIA, paziente:`${form.paziente}, ${form.eta}a, ${form.sesso}`, ts:Date.now(), stato:"in_attesa", urgenza:form.urgenza, note:form.note||"—", cardiologo:null, chat:[] }]);
+    const nuovoEcg = {
+      origine: "farmacia",
+      paziente_nome: form.paziente,
+      paziente_eta: parseInt(form.eta)||0,
+      paziente_sesso: form.sesso,
+      note: form.note||"—",
+      urgenza: form.urgenza,
+      stato: "in_attesa",
+      origine_dettaglio: ME_FARMACIA,
+    };
+    const { data, error } = await supabase.from('ecgs').insert(nuovoEcg).select().single();
+    if (!error && data) {
+      setEcgs(prev=>[...prev,{ ...data, paziente:`${form.paziente}, ${form.eta}a, ${form.sesso}`, farmacia:ME_FARMACIA, ts:new Date(data.created_at).getTime(), cardiologo:data.cardiologo_nome||null, chat:[] }]);
+    }
     setSent(true);
+    fetch('/api/notify', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ paziente:`${form.paziente}, ${form.eta}a, ${form.sesso}`, origine:"farmacia", urgenza:form.urgenza, note:form.note }) }).catch(()=>{});
   };
 
   const tabBtn = (id,label) => (
@@ -637,9 +651,9 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato }) => {
     // Riquadro posizionato tra anamnesi e tracciato ECG
     // Lascia visibili in alto: nome, sesso, altezza, peso, farmaci, anamnesi
     const rX = Math.round(W * 0.21);
-    const rY = Math.round(H * 0.085);
+    const rY = Math.round(H * 0.105);
     const rW = Math.round(W * 0.78);
-    const rH = Math.round(H * 0.215);
+    const rH = Math.round(H * 0.195);
 
     // Sfondo bianco
     ctx.fillStyle = "#ffffff";
@@ -660,10 +674,11 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato }) => {
     const bottomH = rH - headerH - crocetteH;
 
     const pad = Math.round(rH * 0.06);
-    const fsTitle = Math.round(rH * 0.13);
-    const fsCr = Math.round(rH * 0.072);
+    const fsTitle = Math.round(rH * 0.14);
+    const fsCr = Math.round(rH * 0.063);
     const boxSz = Math.round(fsCr * 1.1);
-    const fsCommento = Math.round(rH * 0.095);
+    const fsCommento = Math.round(rH * 0.092);
+    const fsFirma = Math.round(rH * 0.105);
 
     // ── HEADER ──
     ctx.fillStyle = "#1a2640";
@@ -739,13 +754,13 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato }) => {
     ctx.stroke();
 
     // Calcola spazio per logo a destra
-    const lSize = Math.round(bottomH * 0.85);
+    const lSize = Math.round(bottomH * 1.05);
     const logoX = rX + rW - lSize - pad;
     const logoY = sepY + (bottomH - lSize) / 2;
 
     // ── COMMENTO (a sinistra, sopra firma) ──
     const commentoX = rX + pad;
-    const commentoMaxW = rW - pad * 2 - lSize - pad;
+    const commentoMaxW = Math.round(rW * 0.42);
     let commentoY = sepY + fsCr * 1.0;
 
     if (commento.trim()) {
@@ -767,15 +782,29 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato }) => {
       });
     }
 
-    // ── FIRMA (sotto il commento, a sinistra) ──
+    // ── FIRMA (centrale, con spazio per firma scannerizzata sopra il nome) ──
     const nomeFirma = meCardiologo.replace(/^Dott\.\s*Dr\.?/i, "Dott.").replace(/^Dr\.?\s/i, "Dott. ");
-    const firmaY = sepY + bottomH - fsCr * 1.4;
+    const firmaSectionX = rX + Math.round(rW * 0.45);
+    const firmaSectionW = Math.round(rW * 0.30);
+    const firmaY = sepY + bottomH - fsFirma * 1.3;
+    
+    // Spazio per firma scannerizzata (vuoto per ora, da popolare in futuro)
+    // const signatureImg = ... (da caricare dal profilo cardiologo)
+    
+    // Linea sopra al nome (dove andrà la firma scannerizzata)
+    ctx.strokeStyle = "#cccccc";
+    ctx.lineWidth = 0.6;
+    ctx.beginPath();
+    ctx.moveTo(firmaSectionX, firmaY - fsFirma * 0.4);
+    ctx.lineTo(firmaSectionX + firmaSectionW * 0.85, firmaY - fsFirma * 0.4);
+    ctx.stroke();
+    
     ctx.fillStyle = "#1a2640";
-    ctx.font = `bold ${Math.round(fsCr * 1.0)}px Arial`;
-    ctx.fillText(nomeFirma, commentoX, firmaY);
-    ctx.font = `${Math.round(fsCr * 0.8)}px Arial`;
+    ctx.font = `bold ${fsFirma}px Arial`;
+    ctx.fillText(nomeFirma, firmaSectionX, firmaY);
+    ctx.font = `${Math.round(fsFirma * 0.75)}px Arial`;
     ctx.fillStyle = "#6b7d99";
-    ctx.fillText(new Date().toLocaleDateString("it-IT"), commentoX, firmaY + fsCr * 1.0);
+    ctx.fillText(new Date().toLocaleDateString("it-IT"), firmaSectionX, firmaY + fsFirma * 1.05);
 
     // ── LOGO (basso destra) ──
     // Usa l'immagine già pre-caricata dal cache del browser
@@ -1075,6 +1104,10 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo }) => {
 
   return (
     <div style={{ display:"flex", height:"calc(100vh - 64px)", flexDirection:"column" }}>
+      {/* DEBUG BANNER - rimuovere in produzione */}
+      <div style={{ background:"#fff3cd", padding:"8px 16px", fontSize:12, borderBottom:"1px solid #ffc107" }}>
+        🔍 DEBUG: meCardiologo="{meCardiologo}" | ECG totali={ecgs.length} | miei={mieiEcgs.length} | inAttesa={inAttesa.length}
+      </div>
       <div style={{ display:"flex", flex:1, overflow:"hidden" }}>
       {/* Sidebar */}
       <div style={{ width:320, borderRight:`1px solid ${C.border}`, display:"flex", flexDirection:"column", background:C.white, overflow:"hidden" }}>
@@ -1206,11 +1239,17 @@ const AdminView = ({ ecgs, setEcgs }) => {
   const prenotazioni = ecgs.filter(e=>e.stato==="prenotato");
   const urgenti = inAttesa.filter(e=>e.urgenza==="urgente");
 
-  const assegna = (ecgId) => {
+const assegna = async (ecgId) => {
     const dest = assegnazioneTemp[ecgId];
     if (!dest) return;
-    setEcgs(prev=>prev.map(e=>e.id===ecgId?{...e,cardiologo:dest}:e));
-    setAssegnazioneTemp(p=>({...p,[ecgId]:undefined}));
+    const { error } = await supabase
+      .from('ecgs')
+      .update({ cardiologo_nome: dest, stato: 'in_attesa' })
+      .eq('id', ecgId);
+    if (!error) {
+      setEcgs(prev=>prev.map(e=>e.id===ecgId?{...e,cardiologo:dest}:e));
+      setAssegnazioneTemp(p=>({...p,[ecgId]:undefined}));
+    }
   };
 
   const riassegna = (ecgId, nuovoCardiologo) => {
@@ -1744,7 +1783,27 @@ const LoginReale = ({ onLogin }) => {
 export default function App() {
   const [role, setRole] = useState(null);
   const [meCardiologo, setMeCardiologo] = useState(ME_CARDIOLOGO_DEFAULT);
-  const [ecgs, setEcgs] = useState(INIT_ECGS);
+  const [ecgs, setEcgs] = useState([]);
+
+  useEffect(() => {
+    const caricaEcgs = async () => {
+      const { data, error } = await supabase.from('ecgs').select('*').order('created_at', { ascending: false });
+      if (!error && data) {
+        const mapped = data.map(e => ({
+          ...e,
+          paziente: `${e.paziente_nome||'?'}, ${e.paziente_eta||'?'}a, ${e.paziente_sesso||'?'}`,
+          farmacia: e.origine_dettaglio,
+          azienda: e.origine_dettaglio,
+          batch: e.batch_id,
+          ts: new Date(e.created_at).getTime(),
+          cardiologo: e.cardiologo_nome||null,
+          chat: [],
+        }));
+        setEcgs(mapped);
+      }
+    };
+    caricaEcgs();
+  }, []);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
