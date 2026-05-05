@@ -392,6 +392,12 @@ const FarmaciaView = ({ ecgs, setEcgs }) => {
 
   const invia = async () => {
     if (!file||!form.paziente) return;
+    // 1. Carica file su Supabase Storage
+    const fileExt = file.name.split('.').pop();
+    const fileName = `farmacia-${Date.now()}.${fileExt}`;
+    const { error: uploadError } = await supabase.storage.from('ecg-files').upload(fileName, file);
+    const fileUrl = uploadError ? null : fileName;
+    // 2. Salva ECG nel database
     const nuovoEcg = {
       origine: "farmacia",
       paziente_nome: form.paziente,
@@ -401,6 +407,7 @@ const FarmaciaView = ({ ecgs, setEcgs }) => {
       urgenza: form.urgenza,
       stato: "in_attesa",
       origine_dettaglio: ME_FARMACIA,
+      file_ecg_url: fileUrl,
     };
     const { data, error } = await supabase.from('ecgs').insert(nuovoEcg).select().single();
     if (!error && data) {
@@ -644,6 +651,23 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato }) => {
     setEcgType(f.type === "application/pdf" ? "pdf" : "image");
     setGenerato(false);
   };
+
+  // Carica automaticamente il file da Supabase Storage se disponibile
+  useEffect(() => {
+    const caricaDaStorage = async () => {
+      if (!ecg?.file_ecg_url) return;
+      try {
+        const { data, error } = await supabase.storage.from('ecg-files').download(ecg.file_ecg_url);
+        if (error || !data) return;
+        const ext = ecg.file_ecg_url.split('.').pop().toLowerCase();
+        const mimeType = ext === 'pdf' ? 'application/pdf' : `image/${ext}`;
+        setEcgFile(new File([data], ecg.file_ecg_url, { type: mimeType }));
+        setEcgUrl(URL.createObjectURL(data));
+        setEcgType(mimeType === 'application/pdf' ? 'pdf' : 'image');
+      } catch(e) { console.error('Errore caricamento ECG:', e); }
+    };
+    caricaDaStorage();
+  }, [ecg?.file_ecg_url]);
 
   const almenoCrocetta = crocette.limiti || crocette.correlare || crocette.approfondire || crocette.visita || crocette.urgente;
 
@@ -1239,21 +1263,21 @@ const AdminView = ({ ecgs, setEcgs }) => {
   const prenotazioni = ecgs.filter(e=>e.stato==="prenotato");
   const urgenti = inAttesa.filter(e=>e.urgenza==="urgente");
 
-const assegna = async (ecgId) => {
+  const assegna = async (ecgId) => {
     const dest = assegnazioneTemp[ecgId];
     if (!dest) return;
-    const { error } = await supabase
-      .from('ecgs')
-      .update({ cardiologo_nome: dest, stato: 'in_attesa' })
-      .eq('id', ecgId);
+    const { error } = await supabase.from('ecgs').update({ cardiologo_nome: dest }).eq('id', ecgId);
     if (!error) {
-      setEcgs(prev=>prev.map(e=>e.id===ecgId?{...e,cardiologo:dest}:e));
+      setEcgs(prev=>prev.map(e=>e.id===ecgId?{...e,cardiologo:dest,cardiologo_nome:dest}:e));
       setAssegnazioneTemp(p=>({...p,[ecgId]:undefined}));
+    } else {
+      console.error('Errore assegnazione:', error);
     }
   };
 
-  const riassegna = (ecgId, nuovoCardiologo) => {
-    setEcgs(prev=>prev.map(e=>e.id===ecgId?{...e,cardiologo:nuovoCardiologo}:e));
+  const riassegna = async (ecgId, nuovoCardiologo) => {
+    await supabase.from('ecgs').update({ cardiologo_nome: nuovoCardiologo }).eq('id', ecgId);
+    setEcgs(prev=>prev.map(e=>e.id===ecgId?{...e,cardiologo:nuovoCardiologo,cardiologo_nome:nuovoCardiologo}:e));
   };
 
   const tabBtn = (id,label,badge) => (
@@ -1803,7 +1827,7 @@ export default function App() {
       }
     };
     caricaEcgs();
-  }, []);
+  }, [role]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
