@@ -16,7 +16,7 @@ export default async function handler(req, res) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'Millefonti <onboarding@resend.dev>',
+        from: 'Ambulatorio Millefonti <noreply@ambulatoriomillefonti.it>',
         to: 'ecg.millefonti@gmail.com',
         subject: `${urgenzaLabel} — Nuovo ECG da refertare`,
         html: `
