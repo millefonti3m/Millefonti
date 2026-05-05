@@ -497,7 +497,9 @@ const FarmaciaView = ({ ecgs, setEcgs }) => {
 const AziendaView = ({ ecgs, setEcgs }) => {
   const [tab, setTab] = useState("dashboard");
   const [batchNome, setBatchNome] = useState("");
-  const [lavoratori, setLavoratori] = useState([{ paziente:"", eta:"", sesso:"M", mansione:"", note:"" }]);
+  const [emailLotto, setEmailLotto] = useState("");
+  const [noteGenerali, setNoteGenerali] = useState("");
+  const [filesLotto, setFilesLotto] = useState([]);
   const [sent, setSent] = useState(false);
   const piano = { piano:"Aziende Plus", limite:150, usati:42, canoneMensile:1500, prezzoUnit:10 };
   const miei = ecgs.filter(e=>e.origine==="azienda"&&e.azienda===ME_AZIENDA);
@@ -506,11 +508,37 @@ const AziendaView = ({ ecgs, setEcgs }) => {
     <button onClick={()=>setTab(id)} style={{ background:tab===id?C.white:"transparent", border:tab===id?`1px solid ${C.border}`:"1px solid transparent", borderRadius:10, padding:"8px 20px", cursor:"pointer", fontFamily:SANS, fontWeight:600, fontSize:13, color:tab===id?C.purple:C.muted, boxShadow:tab===id?C.shadow:"none" }}>{label}</button>
   );
 
-  const inviaLotto = () => {
-    if (!batchNome||lavoratori.some(l=>!l.paziente)) return;
-    const nuovi = lavoratori.map((l,i)=>({ id:`ECG-A${Date.now().toString().slice(-4)}-${i}`, origine:"azienda", azienda:ME_AZIENDA, batch:batchNome, paziente:`${l.paziente}, ${l.eta}a, ${l.sesso}`, ts:Date.now(), stato:"in_attesa", urgenza:"normale", note:l.mansione?`Mansione: ${l.mansione}. ${l.note}`:(l.note||"Idoneità annuale"), cardiologo:null, chat:[] }));
-    setEcgs(prev=>[...prev,...nuovi]);
+  const inviaLotto = async () => {
+    if (!batchNome||!emailLotto||filesLotto.length===0) return;
+    const batchId = `BATCH-${Date.now()}`;
+    const nuovi = await Promise.all(Array.from(filesLotto).map(async (file, i) => {
+      // Nome paziente = nome file senza estensione
+      const nomePaziente = file.name.replace(/\.[^.]+$/, '');
+      // Carica file su Storage mantenendo nome originale
+      const storageFileName = `${batchId}/${file.name}`;
+      const { error: uploadError } = await supabase.storage.from('ecg-files').upload(storageFileName, file);
+      const fileUrl = uploadError ? null : storageFileName;
+      return {
+        origine: "azienda",
+        paziente_nome: nomePaziente,
+        paziente_eta: 0,
+        paziente_sesso: "M",
+        note: noteGenerali || "Idoneità lavorativa",
+        urgenza: "normale",
+        stato: "in_attesa",
+        origine_dettaglio: ME_AZIENDA,
+        batch_id: batchId,
+        file_ecg_url: fileUrl,
+        email_destinatario: emailLotto,
+      };
+    }));
+    const { data, error } = await supabase.from('ecgs').insert(nuovi).select();
+    if (!error && data) {
+      const mapped = data.map(e=>({ ...e, paziente:e.paziente_nome, azienda:ME_AZIENDA, batch:batchNome, ts:new Date(e.created_at).getTime(), cardiologo:e.cardiologo_nome||null, chat:[] }));
+      setEcgs(prev=>[...prev,...mapped]);
+    }
     setSent(true);
+    fetch('/api/notify', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ paziente:`Lotto ${batchNome} — ${filesLotto.length} ECG`, origine:"azienda", urgenza:"normale", note:`Azienda: ${ME_AZIENDA} | Email referto: ${emailLotto}` }) }).catch(()=>{});
   };
 
   return (
@@ -570,36 +598,31 @@ const AziendaView = ({ ecgs, setEcgs }) => {
           <div style={{ background:C.white, border:`2px solid ${C.green}33`, borderRadius:20, padding:40, textAlign:"center", boxShadow:C.shadow }}>
             <div style={{ fontSize:48, marginBottom:16 }}>✅</div>
             <h3 style={{ color:C.green, fontSize:22, fontWeight:700, marginBottom:6 }}>Lotto inviato!</h3>
-            <p style={{ color:C.muted, fontSize:14, marginBottom:20 }}>{lavoratori.length} ECG del lotto <strong>{batchNome}</strong> ricevuti. Refertazione entro 24 ore.</p>
-            <button onClick={()=>{setSent(false);setBatchNome("");setLavoratori([{ paziente:"", eta:"", sesso:"M", mansione:"", note:"" }])}} style={{ background:C.purple, color:C.white, border:"none", borderRadius:10, padding:"12px 28px", cursor:"pointer", fontWeight:700, fontSize:14 }}>Carica un altro lotto →</button>
+            <p style={{ color:C.muted, fontSize:14, marginBottom:20 }}>{filesLotto.length} ECG del lotto <strong>{batchNome}</strong> ricevuti. Refertazione entro 24 ore.</p>
+            <button onClick={()=>{setSent(false);setBatchNome("");setLavoratori([{ paziente:"", eta:"", sesso:"M", mansione:"", note:"", file:null }])}} style={{ background:C.purple, color:C.white, border:"none", borderRadius:10, padding:"12px 28px", cursor:"pointer", fontWeight:700, fontSize:14 }}>Carica un altro lotto →</button>
           </div>
         ) : (
           <div style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:20, padding:28, boxShadow:C.shadow }}>
             <h3 style={{ color:C.text, fontSize:17, fontWeight:700, marginBottom:6 }}>Nuovo lotto ECG</h3>
-            <p style={{ color:C.muted, fontSize:13, marginBottom:20 }}>Inserisci un nome per il lotto (es. "FCA-Mirafiori-Mag2025") e i lavoratori.</p>
-            <div style={{ marginBottom:20 }}>
-              <label style={labelStyle}>NOME LOTTO</label>
-              <input style={inputStyle} value={batchNome} onChange={e=>setBatchNome(e.target.value)} placeholder="es. FCA-Mirafiori-Mag2025" />
+            <p style={{ color:C.muted, fontSize:13, marginBottom:20 }}>Carica tutti i PDF del lotto in una volta. Il nome del file diventa il nome del paziente.</p>
+            <div style={{ color:C.textSoft, fontWeight:600, fontSize:13, marginBottom:6 }}>Nome lotto <span style={{color:C.red}}>*</span></div>
+            <input style={{...inputStyle, marginBottom:14}} value={batchNome} onChange={e=>setBatchNome(e.target.value)} placeholder='es. SL3M-Maggio2025' />
+            <div style={{ color:C.textSoft, fontWeight:600, fontSize:13, marginBottom:6 }}>Email per ricevere i referti <span style={{color:C.red}}>*</span></div>
+            <input style={{...inputStyle, marginBottom:14}} type="email" value={emailLotto} onChange={e=>setEmailLotto(e.target.value)} placeholder="medico@azienda.it" />
+            <div style={{ color:C.textSoft, fontWeight:600, fontSize:13, marginBottom:6 }}>Carica ECG (selezione multipla) <span style={{color:C.red}}>*</span></div>
+            <div onClick={()=>document.getElementById('batch-files').click()}
+              style={{border:`2px dashed ${filesLotto.length>0?C.green:C.border}`,borderRadius:12,padding:"28px 20px",textAlign:"center",cursor:"pointer",background:filesLotto.length>0?C.greenLight:"#f8faff",marginBottom:14}}>
+              <input id="batch-files" type="file" accept=".pdf,.png,.jpg,.jpeg" multiple style={{display:"none"}}
+                onChange={e=>setFilesLotto(e.target.files)} />
+              {filesLotto.length>0
+                ? <div style={{color:C.green,fontWeight:700}}>{filesLotto.length} file selezionati ✓<br/><span style={{fontSize:12,fontWeight:400,color:C.muted}}>{Array.from(filesLotto).map(f=>f.name).join(', ')}</span></div>
+                : <><div style={{fontSize:28,marginBottom:8}}>📁</div><div style={{color:C.textSoft,fontSize:14,fontWeight:500}}>Clicca per selezionare tutti i PDF del lotto</div><div style={{color:C.muted,fontSize:12,marginTop:4}}>Selezione multipla • PDF · PNG · JPG</div></>}
             </div>
-            <div style={{ color:C.textSoft, fontWeight:700, fontSize:13, marginBottom:10 }}>Lavoratori ({lavoratori.length})</div>
-            <div style={{ display:"flex", flexDirection:"column", gap:10, marginBottom:16 }}>
-              {lavoratori.map((l,i)=>(
-                <div key={i} style={{ background:C.bg, borderRadius:14, padding:16, border:`1px solid ${C.border}` }}>
-                  <div style={{ color:C.muted, fontFamily:MONO, fontSize:11, marginBottom:10 }}>LAVORATORE {i+1}</div>
-                  <div style={{ display:"grid", gridTemplateColumns:"1fr auto auto", gap:10, marginBottom:10 }}>
-                    <input style={inputStyle} placeholder="Cognome Nome" value={l.paziente} onChange={e=>setLavoratori(prev=>prev.map((p,j)=>j===i?{...p,paziente:e.target.value}:p))} />
-                    <input style={{...inputStyle, width:70}} type="number" placeholder="Età" value={l.eta} onChange={e=>setLavoratori(prev=>prev.map((p,j)=>j===i?{...p,eta:e.target.value}:p))} />
-                    <select style={{...inputStyle, width:90}} value={l.sesso} onChange={e=>setLavoratori(prev=>prev.map((p,j)=>j===i?{...p,sesso:e.target.value}:p))}>
-                      <option value="M">M</option><option value="F">F</option>
-                    </select>
-                  </div>
-                  <input style={inputStyle} placeholder="Mansione (es. operaio, turnista)" value={l.mansione} onChange={e=>setLavoratori(prev=>prev.map((p,j)=>j===i?{...p,mansione:e.target.value}:p))} />
-                </div>
-              ))}
-            </div>
-            <button onClick={()=>setLavoratori(p=>[...p,{ paziente:"", eta:"", sesso:"M", mansione:"", note:"" }])} style={{ background:C.purpleLight, color:C.purple, border:`1px solid ${C.purple}33`, borderRadius:10, padding:"10px 0", cursor:"pointer", width:"100%", fontWeight:700, marginBottom:16 }}>+ Aggiungi lavoratore</button>
-            <UploadZone onFile={()=>{}} />
-            <div style={{ marginTop:14 }}><button onClick={inviaLotto} style={btnPrimary(!!(batchNome&&lavoratori.every(l=>l.paziente&&l.eta)))}>Invia lotto ({lavoratori.length} ECG) →</button></div>
+            <div style={{ color:C.textSoft, fontWeight:600, fontSize:13, marginBottom:6 }}>Note (opzionale)</div>
+            <textarea style={{...inputStyle, resize:"vertical", marginBottom:14}} rows={2} value={noteGenerali} onChange={e=>setNoteGenerali(e.target.value)} placeholder="Es. idoneità annuale, visita periodica..." />
+            <button onClick={inviaLotto} style={btnPrimary(!!(batchNome&&emailLotto&&filesLotto.length>0))}>
+              Invia lotto ({filesLotto.length} ECG) →
+            </button>
           </div>
         )
       )}
