@@ -528,6 +528,7 @@ const AziendaView = ({ ecgs, setEcgs }) => {
         stato: "in_attesa",
         origine_dettaglio: ME_AZIENDA,
         batch_id: batchId,
+        batch_nome: batchNome,
         file_ecg_url: fileUrl,
         email_destinatario: emailLotto,
       };
@@ -664,6 +665,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato }) => {
   const [posizione, setPosizione] = useState("top-right");
   const [generating, setGenerating] = useState(false);
   const [generato, setGenerato] = useState(false);
+  const [pdfBlob, setPdfBlob] = useState(null);
   const canvasRef = useRef(null);
   const fileId = useRef("rf-"+Math.random().toString(36).slice(2,7)).current;
 
@@ -678,19 +680,30 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato }) => {
   // Carica automaticamente il file da Supabase Storage se disponibile
   useEffect(() => {
     const caricaDaStorage = async () => {
-      if (!ecg?.file_ecg_url) return;
+      if (!ecg?.file_ecg_url) {
+        console.log('[Storage] Nessun file_ecg_url per ECG', ecg?.id);
+        return;
+      }
+      console.log('[Storage] Caricando:', ecg.file_ecg_url);
       try {
         const { data, error } = await supabase.storage.from('ecg-files').download(ecg.file_ecg_url);
-        if (error || !data) return;
+        if (error) { console.error('[Storage] Errore download:', error); alert('Errore caricamento ECG: ' + error.message); return; }
+        if (!data) { console.error('[Storage] Nessun dato'); return; }
         const ext = ecg.file_ecg_url.split('.').pop().toLowerCase();
         const mimeType = ext === 'pdf' ? 'application/pdf' : `image/${ext}`;
-        setEcgFile(new File([data], ecg.file_ecg_url, { type: mimeType }));
-        setEcgUrl(URL.createObjectURL(data));
+        const file = new File([data], ecg.file_ecg_url, { type: mimeType });
+        const url = URL.createObjectURL(data);
+        console.log('[Storage] File caricato:', file.name, file.size, 'bytes');
+        setEcgFile(file);
+        setEcgUrl(url);
         setEcgType(mimeType === 'application/pdf' ? 'pdf' : 'image');
-      } catch(e) { console.error('Errore caricamento ECG:', e); }
+      } catch(e) { 
+        console.error('[Storage] Errore caricamento ECG:', e);
+        alert('Errore: ' + e.message);
+      }
     };
     caricaDaStorage();
-  }, [ecg?.file_ecg_url]);
+  }, [ecg?.id, ecg?.file_ecg_url]);
 
   const almenoCrocetta = crocette.limiti || crocette.correlare || crocette.approfondire || crocette.visita || crocette.urgente;
 
@@ -986,7 +999,11 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato }) => {
         const pdf = new jsPDF({ orientation: isLandscape?"landscape":"portrait", unit:"mm", format:[pdfW, Math.min(pdfH, 420)] });
         const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
         pdf.addImage(dataUrl, "JPEG", 0, 0, pdfW, Math.min(pdfH, 420));
-        pdf.save(`Referto_${ecg.paziente.replace(/[^a-zA-Z]/g,"_")}_${new Date().toISOString().slice(0,10)}.pdf`);
+        if (ecg.batch_id) {
+          setPdfBlob(pdf.output("blob"));
+        } else {
+          pdf.save(`Referto_${ecg.paziente.replace(/[^a-zA-Z]/g,"_")}_${new Date().toISOString().slice(0,10)}.pdf`);
+        }
 
       } else {
         // PDF: converti la prima pagina in immagine, applica overlay, salva come PDF singolo
@@ -1012,7 +1029,11 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato }) => {
         const finalPdf = new jsPDF({ orientation: isLandscape2?"landscape":"portrait", unit:"mm", format:[pdfW, pdfH] });
         const imgData = cvs.toDataURL("image/jpeg", 0.95);
         finalPdf.addImage(imgData, "JPEG", 0, 0, pdfW, pdfH);
-        finalPdf.save(`Referto_${ecg.paziente.replace(/[^a-zA-Z]/g,"_")}_${new Date().toISOString().slice(0,10)}.pdf`);
+        if (ecg.batch_id) {
+          setPdfBlob(finalPdf.output("blob"));
+        } else {
+          finalPdf.save(`Referto_${ecg.paziente.replace(/[^a-zA-Z]/g,"_")}_${new Date().toISOString().slice(0,10)}.pdf`);
+        }
       }
       setGenerato(true);
     } catch(e) { console.error(e); alert("Errore nella generazione del PDF: "+e.message); }
@@ -1021,33 +1042,14 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato }) => {
 
   const confermaSend = async () => {
     try {
-      // 1. Genera il PDF come blob
-      const { jsPDF } = await import("jspdf");
-      const pdfjsLib = await import("pdfjs-dist");
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
-      const arrayBuffer = await ecgFile.arrayBuffer();
-      const pdfDocLoad = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      const page = await pdfDocLoad.getPage(1);
-      const viewport = page.getViewport({ scale: 2.5 });
-      const cvs = document.createElement("canvas");
-      cvs.width = viewport.width; cvs.height = viewport.height;
-      const ctx = cvs.getContext("2d");
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, cvs.width, cvs.height);
-      await page.render({ canvasContext: ctx, viewport }).promise;
-      disegnaOverlay(ctx, cvs.width, cvs.height);
-      const ratio = cvs.width / cvs.height;
-      const isLandscape = ratio > 1;
-      const pdfW = isLandscape ? 297 : 210;
-      const pdfH = pdfW / ratio;
-      const finalPdf = new jsPDF({ orientation: isLandscape?"landscape":"portrait", unit:"mm", format:[pdfW, pdfH] });
-      finalPdf.addImage(cvs.toDataURL("image/jpeg", 0.95), "JPEG", 0, 0, pdfW, pdfH);
-      const pdfBlob = finalPdf.output("blob");
+      // Usa il blob già generato
+      const blobDaUsare = pdfBlob;
+      if (!blobDaUsare) { alert("Genera prima il referto PDF!"); return; }
 
       // 2. Salva referto su Storage
       const nomePaziente = (ecg.paziente_nome || ecg.paziente || "paziente").replace(/[^a-zA-Z0-9]/g, "_");
       const refertoFileName = `referti/${ecg.id}_${nomePaziente}_refertato.pdf`;
-      await supabase.storage.from('ecg-files').upload(refertoFileName, pdfBlob, { contentType: 'application/pdf', upsert: true });
+      await supabase.storage.from('ecg-files').upload(refertoFileName, blobDaUsare, { contentType: 'application/pdf', upsert: true });
 
       // 3. Genera link pubblico temporaneo (7 giorni)
       const { data: urlData } = await supabase.storage.from('ecg-files').createSignedUrl(refertoFileName, 60 * 60 * 24 * 7);
@@ -1081,6 +1083,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato }) => {
     setEcgType(null);
     setCrocette({limiti:false,correlare:false,approfondire:false,visita:false,urgente:false});
     setCommento("");
+    setPdfBlob(null);
   };
 
   const CROCETTE_OPTS = [
@@ -1109,9 +1112,12 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato }) => {
         {/* Anteprima */}
         {ecgUrl && (
           <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,padding:16,flex:1,boxShadow:C.shadow,overflow:"hidden"}}>
-            <div style={{color:C.muted,fontWeight:700,fontSize:11,letterSpacing:1.5,textTransform:"uppercase",marginBottom:10}}>Anteprima tracciato</div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+              <div style={{color:C.muted,fontWeight:700,fontSize:11,letterSpacing:1.5,textTransform:"uppercase"}}>Anteprima tracciato</div>
+              <a href={ecgUrl} target="_blank" rel="noreferrer" style={{color:C.accent,fontSize:12,fontWeight:600,textDecoration:"none"}}>🔍 Apri in grande →</a>
+            </div>
             {ecgType==="image"
-              ? <img src={ecgUrl} alt="ECG" style={{width:"100%",borderRadius:8,objectFit:"contain",maxHeight:320}} />
+              ? <img src={ecgUrl} alt="ECG" style={{width:"100%",borderRadius:8,objectFit:"contain",maxHeight:320,cursor:"pointer"}} onClick={()=>window.open(ecgUrl,'_blank')} />
               : <iframe src={ecgUrl} style={{width:"100%",height:320,border:"none",borderRadius:8}} title="ECG PDF" />
             }
           </div>
@@ -1185,7 +1191,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato }) => {
   );
 };
 
-const CardiologoView = ({ ecgs, setEcgs, meCardiologo }) => {
+const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs }) => {
   const [selected, setSelected] = useState(null);
   const [done, setDone] = useState(false);
   const [file, setFile] = useState(null);
@@ -1194,6 +1200,8 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo }) => {
   const mieiEcgs = ecgs.filter(e => e.cardiologo === meCardiologo);
   const inAttesa = mieiEcgs.filter(e => e.stato === "in_attesa");
   const refertatiMiei = mieiEcgs.filter(e => e.stato === "refertato");
+  // Mostra sempre tutti gli ECG assegnati (in attesa + refertati)
+  const ecgDaVisualizzare = mieiEcgs;
   const me = { referti: 0, guadagno: 0, rating: 4.9, ...Object.values(CARDIOLOGI_DATA).find((_,i)=>Object.keys(CARDIOLOGI_DATA)[i]===meCardiologo)||{} };
   const guadagnoTot = (me.guadagno || 0) + refertatiMiei.reduce((s,e)=>s+(e.origine==="azienda"?10:15),0);
 
@@ -1225,13 +1233,14 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo }) => {
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
             <span style={{ color:C.textSoft, fontWeight:700, fontSize:13 }}>Da refertare</span>
             <span style={{ background:C.accentLight, color:C.accent, borderRadius:20, padding:"2px 12px", fontSize:12, fontWeight:700 }}>{inAttesa.length}</span>
+            
           </div>
         </div>
 
         <div style={{ overflowY:"auto", flex:1 }}>
-          {inAttesa.map(ecg=>(
+          {ecgDaVisualizzare.map(ecg=>(
             <div key={ecg.id} onClick={()=>{setSelected(ecg);setDone(false);setFile(null)}}
-              style={{ padding:"12px 18px", borderBottom:`1px solid ${C.borderLight}`, cursor:"pointer", background:selected?.id===ecg.id?C.accentLight:"transparent", borderLeft:`4px solid ${selected?.id===ecg.id?C.accent:"transparent"}` }}>
+              style={{ padding:"12px 18px", borderBottom:`1px solid ${C.borderLight}`, cursor:"pointer", background:selected?.id===ecg.id?C.accentLight:ecg.stato==="refertato"?"#f0fdf4":"transparent", borderLeft:`4px solid ${selected?.id===ecg.id?C.accent:ecg.stato==="refertato"?C.green:"transparent"}` }}>
               <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4, gap:6 }}>
                 <span style={{ fontFamily:MONO, color:C.muted, fontSize:11 }}>{ecg.id}</span>
                 <Badge stato={ecg.stato} urgenza={ecg.urgenza} />
@@ -1309,11 +1318,29 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo }) => {
             <div style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:16, padding:20, marginBottom:0, boxShadow:C.shadow }}>
               <div style={{ color:C.muted, fontWeight:600, fontSize:12, marginBottom:16 }}>STRUMENTO DI REFERTAZIONE</div>
               <RefertazioneInline
+                key={selected?.id}
                 ecg={selected}
                 meCardiologo={meCardiologo}
                 onRefertato={()=>{
-                  setEcgs(prev=>prev.map(e=>e.id===selected.id?{...e,stato:"refertato"}:e));
-                  setDone(true);
+                  const selectedId = selected.id;
+                  const selectedBatchId = selected?.batch_id;
+                  // Aggiorna immediatamente lo stato locale
+                  setEcgs(prev => {
+                    const updated = prev.map(e => e.id===selectedId ? {...e,stato:"refertato"} : e);
+                    if (selectedBatchId) {
+                      const prossimo = updated.find(e => e.batch_id===selectedBatchId && e.stato==="in_attesa" && e.id!==selectedId);
+                      if (prossimo) {
+                        setTimeout(() => { setSelected(prossimo); setDone(false); }, 100);
+                      } else {
+                        setTimeout(() => setDone(true), 100);
+                      }
+                    } else {
+                      setTimeout(() => setDone(true), 100);
+                    }
+                    return updated;
+                  });
+                  // Ricarica anche da DB per sincronizzare
+                  if (caricaEcgs) setTimeout(caricaEcgs, 500);
                 }}
               />
             </div>
@@ -1328,6 +1355,26 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo }) => {
 // ── ADMIN ─────────────────────────────────────────────────────────────────
 const AdminView = ({ ecgs, setEcgs }) => {
   const [tab, setTab] = useState("assegnazioni");
+  const [refreshing, setRefreshing] = useState(false);
+  const ricarica = async () => {
+    setRefreshing(true);
+    const { data, error } = await supabase.from('ecgs').select('*').order('created_at', { ascending: false });
+    if (!error && data) {
+      const mapped = data.map(e => ({
+        ...e,
+        paziente: `${e.paziente_nome||'?'}, ${e.paziente_eta||'?'}a, ${e.paziente_sesso||'?'}`,
+        farmacia: e.origine_dettaglio,
+        azienda: e.origine_dettaglio,
+        batch: e.batch_nome || e.batch_id,
+        batch_nome: e.batch_nome,
+        ts: new Date(e.created_at).getTime(),
+        cardiologo: e.cardiologo_nome||null,
+        chat: [],
+      }));
+      setEcgs(mapped);
+    }
+    setRefreshing(false);
+  };
   const [filtroStato, setFiltroStato] = useState("tutti");
   const [filtroOrigine, setFiltroOrigine] = useState("tutti");
   const [assegnazioneTemp, setAssegnazioneTemp] = useState({}); // ecgId -> cardiologo selezionato
@@ -1339,6 +1386,17 @@ const AdminView = ({ ecgs, setEcgs }) => {
   const assegnati = inAttesa.filter(e=>!!e.cardiologo);
   const prenotazioni = ecgs.filter(e=>e.stato==="prenotato");
   const urgenti = inAttesa.filter(e=>e.urgenza==="urgente");
+
+  const assegnaBatch = async (batchId, cardiologo) => {
+    if (!batchId || !cardiologo) return;
+    const { error } = await supabase.from('ecgs')
+      .update({ cardiologo_nome: cardiologo })
+      .eq('batch_id', batchId)
+      .is('cardiologo_nome', null);
+    if (!error) {
+      setEcgs(prev => prev.map(e => e.batch_id === batchId && !e.cardiologo ? {...e, cardiologo, cardiologo_nome: cardiologo} : e));
+    }
+  };
 
   const assegna = async (ecgId) => {
     const dest = assegnazioneTemp[ecgId];
@@ -1394,20 +1452,69 @@ const AdminView = ({ ecgs, setEcgs }) => {
         {tabBtn("prenotazioni","Prenotazioni",prenotazioni.length)}
         {tabBtn("storico","Storico ECG",0)}
         {tabBtn("team","Team",0)}
+        <button onClick={ricarica} style={{marginLeft:"auto",background:C.bg,border:`1px solid ${C.border}`,borderRadius:10,padding:"6px 14px",cursor:"pointer",color:C.muted,fontSize:13,fontWeight:600}}>
+          {refreshing?"⏳":"🔄"} Aggiorna
+        </button>
       </div>
 
       {/* ── TAB: ASSEGNAZIONI ── */}
       {tab==="assegnazioni" && (
         <div>
-          {/* Non assegnati */}
-          {nonAssegnati.length>0 && (
+          {/* Lotti da assegnare */}
+          {(() => {
+            const batches = {};
+            ecgs.filter(e=>e.batch_id && !e.cardiologo && e.stato==="in_attesa").forEach(e => {
+              if (!batches[e.batch_id]) batches[e.batch_id] = { ecgs:[], azienda:e.azienda||e.origine_dettaglio||e.origine_dettaglio, batch:e.batch_nome||e.batch||e.batch_id, email:e.email_destinatario };
+              batches[e.batch_id].ecgs.push(e);
+            });
+            const batchList = Object.entries(batches);
+            if (batchList.length === 0) return null;
+            return (
+              <div style={{ marginBottom:24 }}>
+                <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
+                  <div style={{ background:C.purpleLight, color:C.purple, borderRadius:10, padding:"4px 14px", fontWeight:700, fontSize:13 }}>📦 Lotti da assegnare — {batchList.length}</div>
+                  <div style={{ color:C.muted, fontSize:12 }}>Assegna un intero lotto con un click</div>
+                </div>
+                <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                  {batchList.map(([batchId, batch]) => (
+                    <div key={batchId} style={{ background:C.white, border:`2px solid ${C.purple}44`, borderRadius:16, padding:"18px 22px", boxShadow:C.shadow }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:14, flexWrap:"wrap" }}>
+                        <div style={{ flex:1 }}>
+                          <div style={{ fontWeight:700, fontSize:15, color:C.text, marginBottom:4 }}>📦 {batch.batch}</div>
+                          <div style={{ color:C.muted, fontSize:12 }}>{batch.azienda} · {batch.ecgs.length} ECG · referto → {batch.email||"—"}</div>
+                        </div>
+                        <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                          <select
+                            value={assegnazioneTemp[batchId]||""}
+                            onChange={e=>setAssegnazioneTemp(p=>({...p,[batchId]:e.target.value}))}
+                            style={{ background:C.bg, border:`1.5px solid ${C.purple}`, borderRadius:10, padding:"9px 14px", color:C.text, fontFamily:SANS, fontSize:13, outline:"none", minWidth:160 }}>
+                            <option value="">Scegli cardiologo...</option>
+                            {nomi.map(n=>(<option key={n} value={n}>{n}</option>))}
+                          </select>
+                          <button
+                            onClick={()=>assegnaBatch(batchId, assegnazioneTemp[batchId])}
+                            disabled={!assegnazioneTemp[batchId]}
+                            style={{ background:assegnazioneTemp[batchId]?C.purple:C.border, color:assegnazioneTemp[batchId]?C.white:C.muted, border:"none", borderRadius:10, padding:"10px 18px", cursor:assegnazioneTemp[batchId]?"pointer":"not-allowed", fontWeight:700, fontSize:13, whiteSpace:"nowrap" }}>
+                            Assegna lotto →
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Non assegnati singoli */}
+          {nonAssegnati.filter(e=>!e.batch_id).length>0 && (
             <div style={{ marginBottom:32 }}>
               <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
-                <div style={{ background:C.orangeLight, color:C.orange, borderRadius:10, padding:"4px 14px", fontWeight:700, fontSize:13 }}>📥 Da assegnare — {nonAssegnati.length} ECG</div>
+                <div style={{ background:C.orangeLight, color:C.orange, borderRadius:10, padding:"4px 14px", fontWeight:700, fontSize:13 }}>📥 ECG singoli da assegnare — {nonAssegnati.filter(e=>!e.batch_id).length}</div>
                 <div style={{ color:C.muted, fontSize:12 }}>Questi ECG non sono ancora visibili a nessun cardiologo</div>
               </div>
               <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-                {nonAssegnati.map(ecg=>(
+                {nonAssegnati.filter(e=>!e.batch_id).map(ecg=>(
                   <div key={ecg.id} style={{ background:C.white, border:`2px solid ${C.orange}44`, borderRadius:16, padding:"18px 22px", boxShadow:C.shadow }}>
                     <div style={{ display:"flex", alignItems:"flex-start", gap:14, flexWrap:"wrap" }}>
                       <div style={{ flex:1, minWidth:200 }}>
@@ -1886,25 +1993,24 @@ export default function App() {
   const [meCardiologo, setMeCardiologo] = useState(ME_CARDIOLOGO_DEFAULT);
   const [ecgs, setEcgs] = useState([]);
 
-  useEffect(() => {
-    const caricaEcgs = async () => {
-      const { data, error } = await supabase.from('ecgs').select('*').order('created_at', { ascending: false });
-      if (!error && data) {
-        const mapped = data.map(e => ({
-          ...e,
-          paziente: `${e.paziente_nome||'?'}, ${e.paziente_eta||'?'}a, ${e.paziente_sesso||'?'}`,
-          farmacia: e.origine_dettaglio,
-          azienda: e.origine_dettaglio,
-          batch: e.batch_id,
-          ts: new Date(e.created_at).getTime(),
-          cardiologo: e.cardiologo_nome||null,
-          chat: [],
-        }));
-        setEcgs(mapped);
-      }
-    };
-    caricaEcgs();
-  }, [role]);
+  const caricaEcgs = async () => {
+    const { data, error } = await supabase.from('ecgs').select('*').order('created_at', { ascending: false });
+    if (!error && data) {
+      const mapped = data.map(e => ({
+        ...e,
+        paziente: `${e.paziente_nome||'?'}, ${e.paziente_eta||'?'}a, ${e.paziente_sesso||'?'}`,
+        farmacia: e.origine_dettaglio,
+        azienda: e.origine_dettaglio,
+        batch: e.batch_nome || e.batch_id,
+        batch_nome: e.batch_nome,
+        ts: new Date(e.created_at).getTime(),
+        cardiologo: e.cardiologo_nome||null,
+        chat: [],
+      }));
+      setEcgs(mapped);
+    }
+  };
+  useEffect(() => { caricaEcgs(); }, [role]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -1991,7 +2097,7 @@ export default function App() {
       {role==="pubblico"   && <PubblicoView setEcgs={setEcgs} />}
       {role==="farmacia"   && <FarmaciaView ecgs={ecgs} setEcgs={setEcgs} />}
       {role==="azienda"    && <AziendaView  ecgs={ecgs} setEcgs={setEcgs} />}
-      {role==="cardiologo" && <CardiologoView ecgs={ecgs} setEcgs={setEcgs} meCardiologo={meCardiologo} />}
+      {role==="cardiologo" && <CardiologoView ecgs={ecgs} setEcgs={setEcgs} meCardiologo={meCardiologo} caricaEcgs={caricaEcgs} />}
       {role==="admin"      && <AdminView    ecgs={ecgs} setEcgs={setEcgs} />}
     </Shell>
   );
