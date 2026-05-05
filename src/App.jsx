@@ -1019,7 +1019,61 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato }) => {
     setGenerating(false);
   };
 
-  const confermaSend = () => {
+  const confermaSend = async () => {
+    try {
+      // 1. Genera il PDF come blob
+      const { jsPDF } = await import("jspdf");
+      const pdfjsLib = await import("pdfjs-dist");
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+      const arrayBuffer = await ecgFile.arrayBuffer();
+      const pdfDocLoad = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      const page = await pdfDocLoad.getPage(1);
+      const viewport = page.getViewport({ scale: 2.5 });
+      const cvs = document.createElement("canvas");
+      cvs.width = viewport.width; cvs.height = viewport.height;
+      const ctx = cvs.getContext("2d");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, cvs.width, cvs.height);
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      disegnaOverlay(ctx, cvs.width, cvs.height);
+      const ratio = cvs.width / cvs.height;
+      const isLandscape = ratio > 1;
+      const pdfW = isLandscape ? 297 : 210;
+      const pdfH = pdfW / ratio;
+      const finalPdf = new jsPDF({ orientation: isLandscape?"landscape":"portrait", unit:"mm", format:[pdfW, pdfH] });
+      finalPdf.addImage(cvs.toDataURL("image/jpeg", 0.95), "JPEG", 0, 0, pdfW, pdfH);
+      const pdfBlob = finalPdf.output("blob");
+
+      // 2. Salva referto su Storage
+      const nomePaziente = (ecg.paziente_nome || ecg.paziente || "paziente").replace(/[^a-zA-Z0-9]/g, "_");
+      const refertoFileName = `referti/${ecg.id}_${nomePaziente}_refertato.pdf`;
+      await supabase.storage.from('ecg-files').upload(refertoFileName, pdfBlob, { contentType: 'application/pdf', upsert: true });
+
+      // 3. Genera link pubblico temporaneo (7 giorni)
+      const { data: urlData } = await supabase.storage.from('ecg-files').createSignedUrl(refertoFileName, 60 * 60 * 24 * 7);
+      const downloadUrl = urlData?.signedUrl || "";
+
+      // 4. Aggiorna stato ECG su DB
+      await supabase.from('ecgs').update({ stato: 'refertato', file_referto_url: refertoFileName }).eq('id', ecg.id);
+
+      // 5. Manda email al destinatario
+      if (ecg.email_destinatario && downloadUrl) {
+        await fetch('/api/notify-referto', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: ecg.email_destinatario,
+            paziente: ecg.paziente_nome || ecg.paziente,
+            cardiologo: meCardiologo,
+            downloadUrl,
+            batch: ecg.batch_id || null,
+          })
+        }).catch(() => {});
+      }
+    } catch(e) {
+      console.error('Errore conferma:', e);
+    }
+
     onRefertato();
     setGenerato(false);
     setEcgFile(null);
