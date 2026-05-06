@@ -1977,7 +1977,7 @@ const Shell = ({ role, onLogout, children, meCardiologo }) => {
         <Logo size={32} />
         <div style={{ flex:1 }} />
         <span style={{ color:C.muted, fontSize:13, fontWeight:500 }}>{labels[role]}</span>
-        <button onClick={onLogout} style={{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:8, padding:"7px 16px", color:C.muted, cursor:"pointer", fontWeight:500, fontSize:13 }}>← Esci</button>
+        <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onLogout(); }} style={{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:8, padding:"7px 16px", color:C.muted, cursor:"pointer", fontWeight:500, fontSize:13 }}>← Esci</button>
       </div>
       <div>{children}</div>
     </div>
@@ -2319,13 +2319,12 @@ export default function App() {
     return null;
   };
 
-  const handleLogout = async () => {
-    // Pulisce tutto lo stato prima del logout
+  const handleLogout = () => {
     setEcgs([]);
     setMeCardiologo(ME_CARDIOLOGO_DEFAULT);
     setCardiologiDB([]);
-    await supabase.auth.signOut();
     setRole(null);
+    supabase.auth.signOut();
   };
 
   if (loading) return (
