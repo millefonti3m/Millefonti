@@ -693,7 +693,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
         const ab = await f.arrayBuffer();
         const pdfDoc = await pdfjsLib.getDocument({ data: ab }).promise;
         const page = await pdfDoc.getPage(1);
-        const vp = page.getViewport({ scale: 1.5 });
+        const vp = page.getViewport({ scale: 1.2 });
         const cv = document.createElement('canvas');
         cv.width = vp.width; cv.height = vp.height;
         const ctx2 = cv.getContext('2d');
@@ -746,7 +746,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
               const ab = await data.arrayBuffer();
               const pdfDoc = await pdfjsLib.getDocument({ data: ab }).promise;
               const page = await pdfDoc.getPage(1);
-              const vp = page.getViewport({ scale: 1.5 });
+              const vp = page.getViewport({ scale: 1.2 });
               const cv = document.createElement('canvas');
               cv.width = vp.width; cv.height = vp.height;
               const ctx2 = cv.getContext('2d');
@@ -1097,7 +1097,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
         const arrayBuffer = await ecgFile.arrayBuffer();
         const pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
         const page = await pdfDoc.getPage(1);
-        const viewport = page.getViewport({ scale: 2.5 });
+        const viewport = page.getViewport({ scale: 2.0 });
         const cvs = document.createElement("canvas");
         cvs.width = viewport.width; cvs.height = viewport.height;
         const ctx = cvs.getContext("2d");
@@ -1112,7 +1112,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
         const pdfW = isLandscape2 ? 297 : 210;
         const pdfH = pdfW / ratio;
         const finalPdf = new jsPDF({ orientation: isLandscape2?"landscape":"portrait", unit:"mm", format:[pdfW, pdfH] });
-        const imgData = cvs.toDataURL("image/jpeg", 0.95);
+        const imgData = cvs.toDataURL("image/jpeg", 0.78);
         finalPdf.addImage(imgData, "JPEG", 0, 0, pdfW, pdfH);
         if (ecg.batch_id) {
           setPdfBlob(finalPdf.output("blob"));
