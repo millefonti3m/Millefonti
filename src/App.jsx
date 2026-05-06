@@ -1304,6 +1304,31 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs }) => {
     caricaFirma();
   }, []);
 
+  const scaricaBatch = async (batchId) => {
+    const ecgsBatch = mieiEcgs.filter(e => e.batch_id === batchId && e.stato === "refertato" && e.file_referto_url);
+    if (ecgsBatch.length === 0) { alert("Nessun referto disponibile"); return; }
+    
+    // Scarica tutti i PDF e crea uno ZIP
+    const JSZip = (await import('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js')).default;
+    const zip = new JSZip();
+    
+    await Promise.all(ecgsBatch.map(async (e) => {
+      const { data } = await supabase.storage.from('ecg-files').download(e.file_referto_url);
+      if (data) {
+        const fileName = e.file_referto_url.split('/').pop();
+        zip.file(fileName, data);
+      }
+    }));
+    
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${ecgsBatch[0]?.batch_nome || batchId}_referti.zip`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const chiudiBatch = async (batchId) => {
     setChiudendoBatch(batchId);
     const ecgsBatch = mieiEcgs.filter(e => e.batch_id === batchId && e.stato === "refertato");
@@ -1427,10 +1452,16 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs }) => {
                         <span style={{ background:tuttiRefertati?C.green:C.purple, color:"white", borderRadius:20, padding:"2px 8px", fontSize:11, fontWeight:700 }}>{refertati}/{totale}</span>
                       </div>
                       {tuttiRefertati && (
-                        <button onClick={()=>chiudiBatch(batchId)} disabled={chiudendoBatch===batchId}
-                          style={{ marginTop:8, width:"100%", background:C.green, color:"white", border:"none", borderRadius:8, padding:"7px 0", cursor:"pointer", fontWeight:700, fontSize:12 }}>
-                          {chiudendoBatch===batchId ? "⏳ Invio..." : "✉️ Chiudi lotto e invia email"}
-                        </button>
+                        <div style={{ marginTop:8, display:"flex", gap:6 }}>
+                          <button onClick={()=>chiudiBatch(batchId)} disabled={chiudendoBatch===batchId}
+                            style={{ flex:1, background:C.green, color:"white", border:"none", borderRadius:8, padding:"7px 0", cursor:"pointer", fontWeight:700, fontSize:12 }}>
+                            {chiudendoBatch===batchId ? "⏳ Invio..." : "✉️ Invia email"}
+                          </button>
+                          <button onClick={()=>scaricaBatch(batchId)}
+                            style={{ flex:1, background:C.accent, color:"white", border:"none", borderRadius:8, padding:"7px 0", cursor:"pointer", fontWeight:700, fontSize:12 }}>
+                            ⬇️ Scarica ZIP
+                          </button>
+                        </div>
                       )}
                     </div>
                     {/* ECG del lotto */}
