@@ -1,5 +1,6 @@
 import { supabase } from "./supabase.js";
 import { useState, useEffect, useRef, useCallback } from "react";
+import { jsPDF } from "jspdf";
 
 const C = {
   bg:"#f4f7fb", surface:"#ffffff", card:"#ffffff", cardAlt:"#f0f5ff",
