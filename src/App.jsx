@@ -501,7 +501,14 @@ const AziendaView = ({ ecgs, setEcgs }) => {
   const [noteGenerali, setNoteGenerali] = useState("");
   const [filesLotto, setFilesLotto] = useState([]);
   const [sent, setSent] = useState(false);
-  const piano = { piano:"Aziende Plus", limite:150, usati:42, canoneMensile:1500, prezzoUnit:10 };
+  // Conteggio ECG del mese corrente
+  const meseCorrente = new Date().getMonth();
+  const annoCorrente = new Date().getFullYear();
+  const ecgMese = miei.filter(e => {
+    const d = new Date(e.created_at || e.ts);
+    return d.getMonth() === meseCorrente && d.getFullYear() === annoCorrente;
+  });
+  const ecgRefertatiMese = ecgMese.filter(e => e.stato === "refertato");
   const miei = ecgs.filter(e=>e.origine==="azienda"&&e.azienda===ME_AZIENDA);
 
   const tabBtn = (id,label) => (
@@ -546,10 +553,10 @@ const AziendaView = ({ ecgs, setEcgs }) => {
     <div style={{ padding:32, maxWidth:800, margin:"0 auto" }}>
       <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:28 }}>
         <div style={{ width:52, height:52, background:"linear-gradient(135deg,#f3edff,#f4f7fb)", borderRadius:16, display:"flex", alignItems:"center", justifyContent:"center", fontSize:26 }}>🏢</div>
-        <div><h2 style={{ color:C.text, fontSize:24, fontWeight:700 }}>{ME_AZIENDA}</h2><div style={{ color:C.muted, fontSize:13, marginTop:2 }}>Piano {piano.piano} · {piano.usati}/{piano.limite} ECG usati</div></div>
+        <div><h2 style={{ color:C.text, fontSize:24, fontWeight:700 }}>{ME_AZIENDA}</h2><div style={{ color:C.muted, fontSize:13, marginTop:2 }}>{ecgRefertatiMese.length} ECG refertati questo mese</div></div>
         <div style={{ marginLeft:"auto", background:`linear-gradient(135deg,${C.purpleLight},#eaf2ff)`, borderRadius:14, padding:"10px 18px", textAlign:"right" }}>
-          <div style={{ color:C.purple, fontFamily:MONO, fontSize:22, fontWeight:"bold" }}>{piano.canoneMensile}€</div>
-          <div style={{ color:C.muted, fontSize:11 }}>canone mensile</div>
+          <div style={{ color:C.purple, fontFamily:MONO, fontSize:22, fontWeight:"bold" }}>{ecgMese.length}</div>
+          <div style={{ color:C.muted, fontSize:11 }}>ECG caricati</div>
         </div>
       </div>
       <div style={{ display:"flex", gap:6, marginBottom:24, background:C.bg, borderRadius:12, padding:4, width:"fit-content" }}>
@@ -561,18 +568,18 @@ const AziendaView = ({ ecgs, setEcgs }) => {
       {tab==="dashboard" && (
         <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
           <div style={{ display:"flex", gap:14, flexWrap:"wrap" }}>
-            <StatCard label="ECG nel mese" value={piano.usati} color={C.purple} sub={`su ${piano.limite} inclusi`} icon="📋" />
-            <StatCard label="Ancora disponibili" value={piano.limite-piano.usati} color={C.green} sub="nel piano mensile" icon="✅" />
+            <StatCard label="ECG nel mese" value={ecgMese.length} color={C.purple} sub="caricati" icon="📋" />
+            <StatCard label="Referti completati" value={ecgRefertatiMese.length} color={C.green} sub="questo mese" icon="✅" />
             <StatCard label="Referti completati" value={miei.filter(e=>e.stato==="refertato").length} color={C.accent} sub="questo mese" icon="📄" />
             <StatCard label="In attesa" value={miei.filter(e=>e.stato==="in_attesa").length} color={C.orange} icon="⏳" />
           </div>
           <div style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:16, padding:20, boxShadow:C.shadow }}>
             <div style={{ color:C.muted, fontSize:12, fontWeight:700, letterSpacing:1, textTransform:"uppercase", marginBottom:12 }}>Utilizzo mensile</div>
             <div style={{ background:C.bg, borderRadius:8, height:12, overflow:"hidden" }}>
-              <div style={{ height:"100%", background:`linear-gradient(90deg,${C.purple},${C.accent})`, width:`${(piano.usati/piano.limite)*100}%`, borderRadius:8, transition:"width 0.5s" }} />
+              <div style={{ height:"100%", background:`linear-gradient(90deg,${C.purple},${C.accent})`, width:`${ecgMese.length>0?(ecgRefertatiMese.length/ecgMese.length)*100:0}%`, borderRadius:8, transition:"width 0.5s" }} />
             </div>
             <div style={{ display:"flex", justifyContent:"space-between", marginTop:8, fontSize:12, color:C.muted }}>
-              <span>{piano.usati} usati</span><span>{piano.limite-piano.usati} rimasti · extracosto {piano.prezzoUnit}€/cad</span>
+              <span>{ecgRefertatiMese.length} refertati</span><span>{ecgMese.length - ecgRefertatiMese.length} in attesa</span>
             </div>
           </div>
           <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
@@ -586,7 +593,7 @@ const AziendaView = ({ ecgs, setEcgs }) => {
                     <div style={{ color:C.text, fontWeight:700, fontSize:14 }}>{b}</div>
                     <div style={{ color:C.muted, fontSize:12, marginTop:2 }}>{nel.length} ECG · {nel.filter(e=>e.stato==="refertato").length} refertati · {nel.filter(e=>e.stato==="in_attesa").length} in attesa</div>
                   </div>
-                  <span style={{ color:C.purple, fontFamily:MONO, fontWeight:700 }}>{nel.length * piano.prezzoUnit}€</span>
+                  <span style={{ color:C.purple, fontFamily:MONO, fontWeight:700 }}>{nel.length} ECG</span>
                 </div>
               );
             })}
