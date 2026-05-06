@@ -802,7 +802,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
     // ── HEADER ──
     ctx.fillStyle = "#1a2640";
     ctx.font = `bold ${fsTitle}px Arial`;
-    ctx.fillText("REFERTO CARDIOLOGICO", rX + pad, rY + headerH * 0.78);
+    ctx.fillText("REFERTO ECG", rX + pad, rY + headerH * 0.78);
 
     // Linea sotto titolo
     ctx.strokeStyle = "#1a2640";
