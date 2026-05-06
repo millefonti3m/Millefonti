@@ -816,7 +816,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
     const voci = [
       [crocette.limiti,       "ECG nei limiti della norma"],
       [crocette.correlare,    "ECG da correlare con la clinica"],
-      [crocette.approfondire, "ECG da approfondire con medico curante"],
+      [crocette.approfondire, "ECG da approfondire con medico Curante"],
       [crocette.visita,       "ECG da approfondire con visita cardiologica"],
       [crocette.urgente,      "Se nuova sintomatologia: visita cardiologica urgente / accesso in PS"],
     ];
@@ -937,12 +937,12 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
     // ── LOGO (basso destra) ──
     // Usa l'immagine già pre-caricata dal cache del browser
     if (window.__millefonti_logo && window.__millefonti_logo.complete) {
-      try { ctx.drawImage(window.__millefonti_logo, logoX, logoY, lSize, lSize); } catch(e) {}
+      // logo rimosso
     } else {
       const logoImg = new Image();
       logoImg.src = "/logo-squared.png";
       window.__millefonti_logo = logoImg;
-      try { ctx.drawImage(logoImg, logoX, logoY, lSize, lSize); } catch(e) {}
+      // logo rimosso
     }
 
   }, [crocette, commento, posizione, meCardiologo]);
@@ -1014,7 +1014,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
         const voci = [
           [crocette.limiti,       "ECG nei limiti della norma"],
           [crocette.correlare,    "ECG da correlare con la clinica"],
-          [crocette.approfondire, "ECG da approfondire con medico curante"],
+          [crocette.approfondire, "ECG da approfondire con medico Curante"],
           [crocette.visita,       "ECG da approfondire con visita cardiologica"],
           [crocette.urgente,      "Se nuova sintomatologia: visita cardiologica urgente / accesso in PS"],
         ];
@@ -1180,7 +1180,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
   const CROCETTE_OPTS = [
     {k:"limiti",      label:"ECG nei limiti della norma",                                          color:C.green},
     {k:"correlare",   label:"ECG da correlare con la clinica",                                     color:C.orange},
-    {k:"approfondire",label:"ECG da approfondire con medico curante",                              color:C.red},
+    {k:"approfondire",label:"ECG da approfondire con medico Curante",                              color:C.red},
     {k:"visita",      label:"ECG da approfondire con visita cardiologica",                         color:C.purple},
     {k:"urgente",     label:"Se nuova sintomatologia: visita cardiologica urgente / accesso in PS", color:"#b91c1c"},
   ];
