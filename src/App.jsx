@@ -2224,24 +2224,40 @@ export default function App() {
   const [ecgs, setEcgs] = useState([]);
   const [cardiologiDB, setCardiologiDB] = useState([]);
 
+  const mapEcg = (e) => ({
+    ...e,
+    paziente: `${e.paziente_nome||'?'}, ${e.paziente_eta||'?'}a, ${e.paziente_sesso||'?'}`,
+    farmacia: e.origine_dettaglio,
+    azienda: e.origine_dettaglio,
+    batch: e.batch_nome || e.batch_id,
+    batch_nome: e.batch_nome,
+    ts: new Date(e.created_at).getTime(),
+    cardiologo: e.cardiologo_nome||null,
+    chat: [],
+  });
+
   const caricaEcgs = async () => {
     const { data, error } = await supabase.from('ecgs').select('*').order('created_at', { ascending: false });
-    if (!error && data) {
-      const mapped = data.map(e => ({
-        ...e,
-        paziente: `${e.paziente_nome||'?'}, ${e.paziente_eta||'?'}a, ${e.paziente_sesso||'?'}`,
-        farmacia: e.origine_dettaglio,
-        azienda: e.origine_dettaglio,
-        batch: e.batch_nome || e.batch_id,
-        batch_nome: e.batch_nome,
-        ts: new Date(e.created_at).getTime(),
-        cardiologo: e.cardiologo_nome||null,
-        chat: [],
-      }));
-      setEcgs(mapped);
-    }
+    if (!error && data) setEcgs(data.map(mapEcg));
   };
-  useEffect(() => { caricaEcgs(); }, [role]);
+
+  useEffect(() => {
+    if (!role) return;
+    caricaEcgs();
+    // Realtime: aggiorna automaticamente quando cambia il DB
+    const channel = supabase.channel('ecgs-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ecgs' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          setEcgs(prev => [mapEcg(payload.new), ...prev]);
+        } else if (payload.eventType === 'UPDATE') {
+          setEcgs(prev => prev.map(e => e.id === payload.new.id ? mapEcg(payload.new) : e));
+        } else if (payload.eventType === 'DELETE') {
+          setEcgs(prev => prev.filter(e => e.id !== payload.old.id));
+        }
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [role]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -2304,7 +2320,10 @@ export default function App() {
   };
 
   const handleLogout = async () => {
-    const { supabase } = await import('./supabase.js');
+    // Pulisce tutto lo stato prima del logout
+    setEcgs([]);
+    setMeCardiologo(ME_CARDIOLOGO_DEFAULT);
+    setCardiologiDB([]);
     await supabase.auth.signOut();
     setRole(null);
   };
