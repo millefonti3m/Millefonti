@@ -1290,6 +1290,8 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs }) => {
   const [firmaUrl, setFirmaUrl] = useState(null);
   const [uploadingFirma, setUploadingFirma] = useState(false);
   const [showProfilo, setShowProfilo] = useState(false);
+  const [pdfBlobsMap, setPdfBlobsMap] = useState({}); // {ecgId: blob} per batch
+  const [chiudendoBatch, setChiudendoBatch] = useState(null);
 
   // Carica firma esistente all'avvio
   useEffect(() => {
@@ -1301,6 +1303,31 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs }) => {
     };
     caricaFirma();
   }, []);
+
+  const chiudiBatch = async (batchId) => {
+    setChiudendoBatch(batchId);
+    const ecgsBatch = mieiEcgs.filter(e => e.batch_id === batchId && e.stato === "refertato");
+    // Genera signed URLs per tutti i referti del batch
+    const links = await Promise.all(ecgsBatch.map(async (e) => {
+      if (!e.file_referto_url) return null;
+      const { data } = await supabase.storage.from('ecg-files').createSignedUrl(e.file_referto_url, 60 * 60 * 24 * 7);
+      return { paziente: e.paziente_nome || e.paziente, url: data?.signedUrl };
+    }));
+    const validLinks = links.filter(Boolean);
+    // Email unica con tutti i link
+    const email = ecgsBatch[0]?.email_destinatario;
+    const batchNome = ecgsBatch[0]?.batch_nome || batchId;
+    if (email && validLinks.length > 0) {
+      const linksHtml = validLinks.map(l => `<li><a href="${l.url}" style="color:#2e7cf6;font-weight:bold;">${l.paziente}</a></li>`).join('');
+      await fetch('/api/notify-batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, batchNome, cardiologo: meCardiologo, linksHtml, count: validLinks.length })
+      }).catch(() => {});
+    }
+    setChiudendoBatch(null);
+    alert(`Lotto "${batchNome}" chiuso! Email inviata a ${email}`);
+  };
 
   const caricaFirma = async (file) => {
     if (!file) return;
@@ -1372,39 +1399,85 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs }) => {
         </div>
 
         <div style={{ overflowY:"auto", flex:1 }}>
-          {ecgDaVisualizzare.map(ecg=>(
-            <div key={ecg.id} onClick={()=>{setSelected(ecg);setDone(false);setFile(null)}}
-              style={{ padding:"12px 18px", borderBottom:`1px solid ${C.borderLight}`, cursor:"pointer", background:selected?.id===ecg.id?C.accentLight:ecg.stato==="refertato"?"#f0fdf4":"transparent", borderLeft:`4px solid ${selected?.id===ecg.id?C.accent:ecg.stato==="refertato"?C.green:"transparent"}` }}>
-              <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4, gap:6 }}>
-                <span style={{ fontFamily:MONO, color:C.muted, fontSize:11 }}>{ecg.id}</span>
-                <Badge stato={ecg.stato} urgenza={ecg.urgenza} />
-              </div>
-              <div style={{ marginBottom:3 }}><OrigineTag ecg={ecg} /></div>
-              <div style={{ color:C.text, fontSize:14, fontWeight:600 }}>{ecg.paziente}</div>
-              <div style={{ color:C.muted, fontSize:12, marginTop:2 }}>{ecg.origine==="azienda"?ecg.batch:ecg.origine==="farmacia"?ecg.farmacia:"Prenotazione online"}</div>
-              <div style={{ marginTop:6 }}><SLATimer ecg={ecg} compact /></div>
-            </div>
-          ))}
-          {inAttesa.length===0 && (
-            <div style={{ padding:40, textAlign:"center" }}>
-              <div style={{ fontSize:36, marginBottom:8 }}>🎉</div>
-              <div style={{ color:C.green, fontWeight:600, fontSize:14 }}>Coda vuota!</div>
-              <div style={{ color:C.mutedLight, fontSize:12, marginTop:6 }}>Nessun ECG assegnato in attesa</div>
-            </div>
-          )}
-        </div>
+          {(() => {
+            // Raggruppa per batch
+            const batches = {};
+            const singoli = [];
+            mieiEcgs.forEach(e => {
+              if (e.batch_id) {
+                if (!batches[e.batch_id]) batches[e.batch_id] = { nome: e.batch_nome||e.batch_id, ecgs: [], email: e.email_destinatario };
+                batches[e.batch_id].ecgs.push(e);
+              } else {
+                singoli.push(e);
+              }
+            });
 
-        {/* Referti completati */}
-        {refertatiMiei.length>0 && (
-          <div style={{ borderTop:`1px solid ${C.border}`, padding:"12px 18px 6px" }}>
-            <div style={{ color:C.green, fontWeight:700, fontSize:12, marginBottom:8 }}>✓ Completati ({refertatiMiei.length})</div>
-            {refertatiMiei.slice(-3).map(e=>(
-              <div key={e.id} style={{ color:C.muted, fontSize:12, padding:"5px 0", borderBottom:`1px solid ${C.borderLight}` }}>
-                <span style={{ fontFamily:MONO }}>{e.id}</span> — {e.paziente}
-              </div>
-            ))}
-          </div>
-        )}
+            return <>
+              {/* Lotti */}
+              {Object.entries(batches).map(([batchId, batch]) => {
+                const refertati = batch.ecgs.filter(e=>e.stato==="refertato").length;
+                const totale = batch.ecgs.length;
+                const tuttiRefertati = refertati === totale;
+                return (
+                  <div key={batchId} style={{ borderBottom:`2px solid ${C.border}`, marginBottom:4 }}>
+                    {/* Header lotto */}
+                    <div style={{ padding:"10px 14px", background: tuttiRefertati ? "#f0fdf4" : C.accentLight, borderBottom:`1px solid ${C.borderLight}` }}>
+                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                        <div style={{ fontWeight:700, fontSize:13, color:C.text }}>📦 {batch.nome}</div>
+                        <span style={{ background:tuttiRefertati?C.green:C.purple, color:"white", borderRadius:20, padding:"2px 8px", fontSize:11, fontWeight:700 }}>{refertati}/{totale}</span>
+                      </div>
+                      {tuttiRefertati && (
+                        <button onClick={()=>chiudiBatch(batchId)} disabled={chiudendoBatch===batchId}
+                          style={{ marginTop:8, width:"100%", background:C.green, color:"white", border:"none", borderRadius:8, padding:"7px 0", cursor:"pointer", fontWeight:700, fontSize:12 }}>
+                          {chiudendoBatch===batchId ? "⏳ Invio..." : "✉️ Chiudi lotto e invia email"}
+                        </button>
+                      )}
+                    </div>
+                    {/* ECG del lotto */}
+                    {batch.ecgs.map(ecg=>(
+                      <div key={ecg.id} onClick={()=>{setSelected(ecg);setDone(false);}}
+                        style={{ padding:"10px 14px 10px 20px", borderBottom:`1px solid ${C.borderLight}`, cursor:"pointer",
+                          background:selected?.id===ecg.id?C.accentLight:ecg.stato==="refertato"?"#f0fdf4":"transparent",
+                          borderLeft:`4px solid ${selected?.id===ecg.id?C.accent:ecg.stato==="refertato"?C.green:"transparent"}` }}>
+                        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                          <div style={{ color:C.text, fontSize:13, fontWeight:600 }}>{ecg.paziente_nome || ecg.paziente}</div>
+                          <Badge stato={ecg.stato} urgenza={ecg.urgenza} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+
+              {/* ECG Singoli */}
+              {singoli.length > 0 && (
+                <div>
+                  <div style={{ padding:"8px 14px", background:C.bg, fontSize:11, fontWeight:700, color:C.muted, textTransform:"uppercase", letterSpacing:1 }}>💊 ECG Singoli</div>
+                  {singoli.map(ecg=>(
+                    <div key={ecg.id} onClick={()=>{setSelected(ecg);setDone(false);}}
+                      style={{ padding:"12px 14px", borderBottom:`1px solid ${C.borderLight}`, cursor:"pointer",
+                        background:selected?.id===ecg.id?C.accentLight:ecg.stato==="refertato"?"#f0fdf4":"transparent",
+                        borderLeft:`4px solid ${selected?.id===ecg.id?C.accent:ecg.stato==="refertato"?C.green:"transparent"}` }}>
+                      <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+                        <div style={{ color:C.text, fontSize:13, fontWeight:600 }}>{ecg.paziente}</div>
+                        <Badge stato={ecg.stato} urgenza={ecg.urgenza} />
+                      </div>
+                      <div style={{ color:C.muted, fontSize:11 }}>{ecg.farmacia || ecg.origine_dettaglio}</div>
+                      <div style={{ marginTop:4 }}><SLATimer ecg={ecg} compact /></div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {mieiEcgs.length === 0 && (
+                <div style={{ padding:40, textAlign:"center" }}>
+                  <div style={{ fontSize:36, marginBottom:8 }}>🫀</div>
+                  <div style={{ color:C.muted, fontSize:14 }}>Nessun ECG assegnato</div>
+                </div>
+              )}
+            </>;
+          })()}
+        </div>
       </div>
 
       {/* Detail */}
