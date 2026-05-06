@@ -501,6 +501,7 @@ const AziendaView = ({ ecgs, setEcgs }) => {
   const [noteGenerali, setNoteGenerali] = useState("");
   const [filesLotto, setFilesLotto] = useState([]);
   const [sent, setSent] = useState(false);
+  const miei = ecgs.filter(e=>e.origine==="azienda"&&e.azienda===ME_AZIENDA);
   // Conteggio ECG del mese corrente
   const meseCorrente = new Date().getMonth();
   const annoCorrente = new Date().getFullYear();
@@ -509,7 +510,6 @@ const AziendaView = ({ ecgs, setEcgs }) => {
     return d.getMonth() === meseCorrente && d.getFullYear() === annoCorrente;
   });
   const ecgRefertatiMese = ecgMese.filter(e => e.stato === "refertato");
-  const miei = ecgs.filter(e=>e.origine==="azienda"&&e.azienda===ME_AZIENDA);
 
   const tabBtn = (id,label) => (
     <button onClick={()=>setTab(id)} style={{ background:tab===id?C.white:"transparent", border:tab===id?`1px solid ${C.border}`:"1px solid transparent", borderRadius:10, padding:"8px 20px", cursor:"pointer", fontFamily:SANS, fontWeight:600, fontSize:13, color:tab===id?C.purple:C.muted, boxShadow:tab===id?C.shadow:"none" }}>{label}</button>
@@ -1494,6 +1494,22 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs }) => {
 const AdminView = ({ ecgs, setEcgs }) => {
   const [tab, setTab] = useState("assegnazioni");
   const [refreshing, setRefreshing] = useState(false);
+  const [regole, setRegole] = useState({ modalita:'manuale', cardiologo_unico:'', lunedi:'', martedi:'', mercoledi:'', giovedi:'', venerdi:'', sabato:'', domenica:'' });
+  const [salvandoRegole, setSalvandoRegole] = useState(false);
+
+  // Carica regole assegnazione
+  useEffect(() => {
+    supabase.from('regole_assegnazione').select('*').single()
+      .then(({ data }) => { if (data) setRegole(data); });
+  }, []);
+
+  const salvaRegole = async () => {
+    setSalvandoRegole(true);
+    await supabase.from('regole_assegnazione').update(regole).eq('id', regole.id);
+    setSalvandoRegole(false);
+    alert('Regole salvate!');
+  };
+
   const ricarica = async () => {
     setRefreshing(true);
     const { data, error } = await supabase.from('ecgs').select('*').order('created_at', { ascending: false });
@@ -1524,6 +1540,24 @@ const AdminView = ({ ecgs, setEcgs }) => {
   const assegnati = inAttesa.filter(e=>!!e.cardiologo);
   const prenotazioni = ecgs.filter(e=>e.stato==="prenotato");
   const urgenti = inAttesa.filter(e=>e.urgenza==="urgente");
+
+  const applicaRegoleAutomatiche = async (ecgList) => {
+    if (regole.modalita === 'manuale') return;
+    const giorni = ['domenica','lunedi','martedi','mercoledi','giovedi','venerdi','sabato'];
+    for (const ecg of ecgList) {
+      if (ecg.cardiologo_nome) continue; // già assegnato
+      let dest = '';
+      if (regole.modalita === 'unico') {
+        dest = regole.cardiologo_unico;
+      } else if (regole.modalita === 'giorni') {
+        const giorno = giorni[new Date(ecg.created_at).getDay()];
+        dest = regole[giorno] || '';
+      }
+      if (dest) {
+        await supabase.from('ecgs').update({ cardiologo_nome: dest }).eq('id', ecg.id);
+      }
+    }
+  };
 
   const assegnaBatch = async (batchId, cardiologo) => {
     if (!batchId || !cardiologo) return;
@@ -1590,6 +1624,7 @@ const AdminView = ({ ecgs, setEcgs }) => {
         {tabBtn("prenotazioni","Prenotazioni",prenotazioni.length)}
         {tabBtn("storico","Storico ECG",0)}
         {tabBtn("team","Team",0)}
+        {tabBtn("regole","⚙️ Assegnazione",0)}
         <button onClick={ricarica} style={{marginLeft:"auto",background:C.bg,border:`1px solid ${C.border}`,borderRadius:10,padding:"6px 14px",cursor:"pointer",color:C.muted,fontSize:13,fontWeight:600}}>
           {refreshing?"⏳":"🔄"} Aggiorna
         </button>
@@ -1836,6 +1871,58 @@ const AdminView = ({ ecgs, setEcgs }) => {
       )}
 
       {/* ── TAB: TEAM ── */}
+      {tab==="regole" && (
+        <div>
+          <div style={{fontWeight:700,fontSize:17,color:C.text,marginBottom:20}}>⚙️ Regole assegnazione automatica</div>
+
+          {/* Modalità */}
+          <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,padding:20,marginBottom:16,boxShadow:C.shadow}}>
+            <div style={{fontWeight:700,fontSize:14,color:C.text,marginBottom:14}}>Modalità</div>
+            <div style={{display:"flex",gap:10,marginBottom:20}}>
+              {[["manuale","🖐 Manuale"],["unico","👤 Cardiologo unico"],["giorni","📅 Per giorni"]].map(([v,l])=>(
+                <button key={v} onClick={()=>setRegole(r=>({...r,modalita:v}))}
+                  style={{flex:1,padding:"10px",borderRadius:10,cursor:"pointer",fontWeight:600,fontSize:13,border:`2px solid ${regole.modalita===v?C.accent:C.border}`,background:regole.modalita===v?C.accentLight:C.bg,color:regole.modalita===v?C.accent:C.muted}}>
+                  {l}
+                </button>
+              ))}
+            </div>
+
+            {/* Cardiologo unico */}
+            {regole.modalita==="unico" && (
+              <div>
+                <div style={{color:C.textSoft,fontWeight:600,fontSize:13,marginBottom:8}}>Assegna sempre a:</div>
+                <select value={regole.cardiologo_unico||""} onChange={e=>setRegole(r=>({...r,cardiologo_unico:e.target.value}))}
+                  style={{background:C.bg,border:`1.5px solid ${C.border}`,borderRadius:10,padding:"10px 14px",color:C.text,fontFamily:SANS,fontSize:13,outline:"none",width:"100%"}}>
+                  <option value="">Scegli cardiologo...</option>
+                  {nomi.map(n=>(<option key={n} value={n}>{n}</option>))}
+                </select>
+              </div>
+            )}
+
+            {/* Per giorni */}
+            {regole.modalita==="giorni" && (
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                {[["lunedi","Lunedì"],["martedi","Martedì"],["mercoledi","Mercoledì"],["giovedi","Giovedì"],["venerdi","Venerdì"],["sabato","Sabato"],["domenica","Domenica"]].map(([k,label])=>(
+                  <div key={k} style={{display:"flex",alignItems:"center",gap:12}}>
+                    <div style={{width:100,fontWeight:600,fontSize:13,color:C.textSoft}}>{label}</div>
+                    <select value={regole[k]||""} onChange={e=>setRegole(r=>({...r,[k]:e.target.value}))}
+                      style={{flex:1,background:C.bg,border:`1.5px solid ${C.border}`,borderRadius:10,padding:"8px 12px",color:C.text,fontFamily:SANS,fontSize:13,outline:"none"}}>
+                      <option value="">Nessuno (manuale)</option>
+                      {nomi.map(n=>(<option key={n} value={n}>{n}</option>))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <button onClick={salvaRegole} disabled={salvandoRegole}
+            style={{background:C.accent,color:C.white,border:"none",borderRadius:12,padding:"13px 0",cursor:"pointer",fontWeight:700,fontSize:14,width:"100%",boxShadow:`0 4px 16px ${C.accent}44`}}>
+            {salvandoRegole?"⏳ Salvataggio...":"💾 Salva regole"}
+          </button>
+        </div>
+      )}
+
       {tab==="team" && (
         <div>
           <h3 style={{ color:C.text, fontWeight:700, fontSize:17, marginBottom:6 }}>Team cardiologi</h3>
