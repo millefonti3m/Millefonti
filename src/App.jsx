@@ -2247,9 +2247,24 @@ export default function App() {
     caricaEcgs();
     // Realtime: aggiorna automaticamente quando cambia il DB
     const channel = supabase.channel('ecgs-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'ecgs' }, (payload) => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ecgs' }, async (payload) => {
         if (payload.eventType === 'INSERT') {
-          setEcgs(prev => [mapEcg(payload.new), ...prev]);
+          const newEcg = payload.new;
+          // Applica regole automatiche se ECG non ha cardiologo
+          if (!newEcg.cardiologo_nome) {
+            const { data: regole } = await supabase.from('regole_assegnazione').select('*').single();
+            if (regole) {
+              const giorni = ['domenica','lunedi','martedi','mercoledi','giovedi','venerdi','sabato'];
+              let dest = '';
+              if (regole.modalita === 'unico') dest = regole.cardiologo_unico;
+              else if (regole.modalita === 'giorni') dest = regole[giorni[new Date(newEcg.created_at).getDay()]] || '';
+              if (dest) {
+                await supabase.from('ecgs').update({ cardiologo_nome: dest }).eq('id', newEcg.id);
+                newEcg.cardiologo_nome = dest;
+              }
+            }
+          }
+          setEcgs(prev => [mapEcg(newEcg), ...prev]);
         } else if (payload.eventType === 'UPDATE') {
           setEcgs(prev => prev.map(e => e.id === payload.new.id ? mapEcg(payload.new) : e));
         } else if (payload.eventType === 'DELETE') {
