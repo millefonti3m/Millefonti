@@ -656,7 +656,7 @@ const AziendaView = ({ ecgs, setEcgs }) => {
 // Vede SOLO gli ECG che l'admin gli ha assegnato esplicitamente.
 
 // ── REFERTAZIONE INLINE ───────────────────────────────────────────────────
-const RefertazioneInline = ({ ecg, meCardiologo, onRefertato }) => {
+const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
   const [ecgFile, setEcgFile] = useState(null);
   const [ecgUrl, setEcgUrl] = useState(null);
   const [ecgType, setEcgType] = useState(null);
@@ -667,6 +667,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato }) => {
   const [generato, setGenerato] = useState(false);
   const [pdfBlob, setPdfBlob] = useState(null);
   const [zoom, setZoom] = useState(1);
+  const [rotation, setRotation] = useState(0);
   const [confirming, setConfirming] = useState(false);
   const canvasRef = useRef(null);
   const previewCanvasRef = useRef(null);
@@ -709,6 +710,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato }) => {
     setEcgUrl(null);
     setEcgType(null);
     setPreviewDataUrl(null);
+    setRotation(0);
     setGenerato(false);
     setPdfBlob(null);
     setCrocette({ limiti:false, correlare:false, approfondire:false, visita:false, urgente:false });
@@ -900,16 +902,24 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato }) => {
     const firmaSectionW = Math.round(rW * 0.30);
     const firmaY = sepY + bottomH - fsFirma * 1.3;
     
-    // Spazio per firma scannerizzata (vuoto per ora, da popolare in futuro)
-    // const signatureImg = ... (da caricare dal profilo cardiologo)
-    
-    // Linea sopra al nome (dove andrà la firma scannerizzata)
-    ctx.strokeStyle = "#cccccc";
-    ctx.lineWidth = 0.6;
-    ctx.beginPath();
-    ctx.moveTo(firmaSectionX, firmaY - fsFirma * 0.4);
-    ctx.lineTo(firmaSectionX + firmaSectionW * 0.85, firmaY - fsFirma * 0.4);
-    ctx.stroke();
+    // Firma scannerizzata sopra il nome
+    if (window.__millefonti_firma) {
+      const img = window.__millefonti_firma;
+      const maxW = firmaSectionW * 0.85;
+      const maxH = fsFirma * 1.8;
+      const ratio = img.width / img.height;
+      const drawW = Math.min(maxW, maxH * ratio);
+      const drawH = drawW / ratio;
+      ctx.drawImage(img, firmaSectionX, firmaY - fsFirma * 0.5 - drawH, drawW, drawH);
+    } else {
+      // Linea placeholder se non c'è firma
+      ctx.strokeStyle = "#cccccc";
+      ctx.lineWidth = 0.6;
+      ctx.beginPath();
+      ctx.moveTo(firmaSectionX, firmaY - fsFirma * 0.4);
+      ctx.lineTo(firmaSectionX + firmaSectionW * 0.85, firmaY - fsFirma * 0.4);
+      ctx.stroke();
+    }
     
     ctx.fillStyle = "#1a2640";
     ctx.font = `bold ${fsFirma}px Arial`;
@@ -934,6 +944,23 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato }) => {
   const generaPDF = async () => {
     if (!ecgFile || !almenoCrocetta) return;
     setGenerating(true);
+    // Precarica firma se disponibile
+    if (firmaUrl) {
+      try {
+        const { data: firmaData } = await supabase.storage.from('ecg-files').createSignedUrl(firmaUrl, 3600);
+        if (firmaData?.signedUrl) {
+          await new Promise((res) => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => { window.__millefonti_firma = img; res(); };
+            img.onerror = () => res();
+            img.src = firmaData.signedUrl;
+          });
+        }
+      } catch(e) { window.__millefonti_firma = null; }
+    } else {
+      window.__millefonti_firma = null;
+    }
     // Pre-carica il logo nel cache globale per essere sicuri che sia disponibile per il canvas
     await new Promise((resolve) => {
       if (window.__millefonti_logo && window.__millefonti_logo.complete) {
@@ -1163,12 +1190,22 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato }) => {
                 <span style={{fontSize:12,color:C.muted,fontWeight:600,minWidth:40,textAlign:"center"}}>{Math.round(zoom*100)}%</span>
                 <button onClick={()=>setZoom(z=>Math.min(3,z+0.25))} style={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:8,padding:"4px 10px",cursor:"pointer",fontWeight:700,fontSize:14}}>+</button>
                 <button onClick={()=>setZoom(1)} style={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:8,padding:"4px 10px",cursor:"pointer",fontSize:11,color:C.muted}}>reset</button>
-                <a href={ecgUrl} target="_blank" rel="noreferrer" style={{color:C.accent,fontSize:12,fontWeight:600,textDecoration:"none",marginLeft:8}}>🔍 Tab</a>
+                <div style={{width:1,height:20,background:C.border,margin:"0 4px"}} />
+                <button onClick={()=>setRotation(r=>(r-90+360)%360)} style={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:8,padding:"4px 10px",cursor:"pointer",fontSize:14}} title="Ruota antiorario">↺</button>
+                <button onClick={()=>setRotation(r=>(r+90)%360)} style={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:8,padding:"4px 10px",cursor:"pointer",fontSize:14}} title="Ruota orario">↻</button>
+                <a href={ecgUrl} target="_blank" rel="noreferrer" style={{color:C.accent,fontSize:12,fontWeight:600,textDecoration:"none",marginLeft:4}}>🔍 Tab</a>
               </div>
             </div>
             <div style={{overflow:"auto",maxHeight:"40vh",borderRadius:8,background:"#f5f5f5",border:`1px solid ${C.borderLight}`}}>
               {previewDataUrl
-                ? <img src={previewDataUrl} alt="ECG" style={{width:`${zoom*100}%`,display:"block",cursor:zoom>1?"zoom-in":"default"}} />
+                ? <img src={previewDataUrl} alt="ECG" style={{
+                    width: rotation===90||rotation===270 ? `${zoom*60}%` : `${zoom*100}%`,
+                    display:"block",
+                    cursor:zoom>1?"zoom-in":"default",
+                    transform:`rotate(${rotation}deg)`,
+                    transformOrigin:"center center",
+                    margin: rotation===90||rotation===270 ? "10% auto" : "0"
+                  }} />
                 : <div style={{padding:40,textAlign:"center",color:C.muted}}>⏳ Caricamento...</div>
               }
             </div>
@@ -1226,10 +1263,47 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato }) => {
   );
 };
 
+const FirmaPreview = ({ firmaUrl }) => {
+  const [url, setUrl] = useState(null);
+  useEffect(() => {
+    supabase.storage.from('ecg-files').createSignedUrl(firmaUrl, 3600)
+      .then(({ data }) => { if (data?.signedUrl) setUrl(data.signedUrl); });
+  }, [firmaUrl]);
+  if (!url) return null;
+  return <img src={url} alt="Firma" style={{ maxHeight:60, maxWidth:200, objectFit:"contain" }} />;
+};
+
 const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs }) => {
   const [selected, setSelected] = useState(null);
   const [done, setDone] = useState(false);
   const [file, setFile] = useState(null);
+  const [firmaUrl, setFirmaUrl] = useState(null);
+  const [uploadingFirma, setUploadingFirma] = useState(false);
+  const [showProfilo, setShowProfilo] = useState(false);
+
+  // Carica firma esistente all'avvio
+  useEffect(() => {
+    const caricaFirma = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const { data } = await supabase.from('user_profiles').select('firma_url').eq('id', session.user.id).single();
+      if (data?.firma_url) setFirmaUrl(data.firma_url);
+    };
+    caricaFirma();
+  }, []);
+
+  const caricaFirma = async (file) => {
+    if (!file) return;
+    setUploadingFirma(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const fileName = `firme/${session.user.id}_firma.png`;
+      await supabase.storage.from('ecg-files').upload(fileName, file, { upsert: true });
+      await supabase.from('user_profiles').update({ firma_url: fileName }).eq('id', session.user.id);
+      setFirmaUrl(fileName);
+    } catch(e) { console.error('Errore upload firma:', e); }
+    setUploadingFirma(false);
+  };
 
   // Solo ECG assegnati a questo cardiologo
   const mieiEcgs = ecgs.filter(e => e.cardiologo === meCardiologo);
@@ -1259,7 +1333,10 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs }) => {
       {/* Sidebar */}
       <div style={{ width:320, borderRight:`1px solid ${C.border}`, display:"flex", flexDirection:"column", background:C.white, overflow:"hidden" }}>
         <div style={{ padding:"20px 20px 16px", background:"linear-gradient(135deg,#e8f4ff,#e6f9f4)", borderBottom:`1px solid ${C.border}` }}>
-          <div style={{ color:C.muted, fontSize:12, fontWeight:600, marginBottom:4 }}>Guadagni — mese corrente</div>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
+            <div style={{ color:C.muted, fontSize:12, fontWeight:600 }}>Guadagni — mese corrente</div>
+            <button onClick={()=>setShowProfilo(p=>!p)} style={{background:showProfilo?"rgba(46,124,246,0.1)":"rgba(255,255,255,0.6)",border:`1px solid ${showProfilo?C.accent:C.border}`,borderRadius:8,padding:"4px 12px",cursor:"pointer",fontSize:12,color:showProfilo?C.accent:C.muted,fontWeight:600}}>⚙️ {meCardiologo}</button>
+          </div>
           <div style={{ color:C.green, fontFamily:MONO, fontSize:30, fontWeight:"bold" }}>{guadagnoTot}€</div>
           <div style={{ display:"flex", gap:6, marginTop:10, flexWrap:"wrap" }}>
             <span style={{ background:C.white, color:C.accent, border:`1px solid ${C.border}`, borderRadius:20, padding:"3px 12px", fontWeight:600, fontSize:12 }}>{(me.referti||0)+refertatiMiei.length} referti</span>
@@ -1268,12 +1345,23 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs }) => {
         </div>
 
         <div style={{ padding:"14px 18px 6px", borderBottom:`1px solid ${C.borderLight}` }}>
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:6 }}>
             <span style={{ color:C.textSoft, fontWeight:700, fontSize:13 }}>Da refertare</span>
             <span style={{ background:C.accentLight, color:C.accent, borderRadius:20, padding:"2px 12px", fontSize:12, fontWeight:700 }}>{inAttesa.length}</span>
-            {batchCorrente && <span style={{background:C.purpleLight,color:C.purple,borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:700,marginLeft:6}}>📦 {batchRefertati}/{batchCorrente.length} ✓</span>}
-            
+            {batchCorrente && <span style={{background:C.purpleLight,color:C.purple,borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:700}}>📦 {batchRefertati}/{batchCorrente.length} ✓</span>}
+
           </div>
+          {showProfilo && (
+            <div style={{marginTop:12,padding:12,background:C.bg,borderRadius:12,border:`1px solid ${C.border}`}}>
+              <div style={{fontWeight:700,fontSize:13,color:C.text,marginBottom:8}}>Firma scannerizzata</div>
+              <div style={{color:C.muted,fontSize:11,marginBottom:10}}>Carica una foto della tua firma su sfondo bianco. Verrà applicata automaticamente ai referti.</div>
+              {firmaUrl && <div style={{color:C.green,fontSize:11,fontWeight:600,marginBottom:8}}>✓ Firma presente</div>}
+              <label style={{display:"block",border:`2px dashed ${C.border}`,borderRadius:10,padding:"10px",textAlign:"center",cursor:"pointer",background:C.white,fontSize:12}}>
+                <input type="file" accept="image/png,image/jpeg" style={{display:"none"}} onChange={e=>caricaFirma(e.target.files[0])} />
+                {uploadingFirma ? "⏳ Caricamento..." : firmaUrl ? "🔄 Aggiorna firma" : "📤 Carica firma (PNG/JPG)"}
+              </label>
+            </div>
+          )}
         </div>
 
         <div style={{ overflowY:"auto", flex:1 }}>
@@ -1360,6 +1448,7 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs }) => {
                 key={selected?.id}
                 ecg={selected}
                 meCardiologo={meCardiologo}
+                firmaUrl={firmaUrl}
                 onRefertato={()=>{
                   const selectedId = selected.id;
                   const selectedBatchId = selected?.batch_id;
