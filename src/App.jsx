@@ -513,8 +513,10 @@ const AziendaView = ({ ecgs, setEcgs }) => {
   );
 
   const inviaLotto = async () => {
-    if (!batchNome||!emailLotto||filesLotto.length===0) return;
+    if (!batchNome||filesLotto.length===0) return;
     const batchId = `BATCH-${Date.now()}`;
+    const { data: { session } } = await supabase.auth.getSession();
+    const emailAccount = session?.user?.email || '';
     const nuovi = await Promise.all(Array.from(filesLotto).map(async (file, i) => {
       // Nome paziente = nome file senza estensione
       const nomePaziente = file.name.replace(/\.[^.]+$/, '');
@@ -534,7 +536,7 @@ const AziendaView = ({ ecgs, setEcgs }) => {
         batch_id: batchId,
         batch_nome: batchNome,
         file_ecg_url: fileUrl,
-        email_destinatario: emailLotto,
+        email_destinatario: emailAccount,
       };
     }));
     const { data, error } = await supabase.from('ecgs').insert(nuovi).select();
@@ -612,8 +614,7 @@ const AziendaView = ({ ecgs, setEcgs }) => {
             <p style={{ color:C.muted, fontSize:13, marginBottom:20 }}>Carica tutti i PDF del lotto in una volta. Il nome del file diventa il nome del paziente.</p>
             <div style={{ color:C.textSoft, fontWeight:600, fontSize:13, marginBottom:6 }}>Nome lotto <span style={{color:C.red}}>*</span></div>
             <input style={{...inputStyle, marginBottom:14}} value={batchNome} onChange={e=>setBatchNome(e.target.value)} placeholder='es. SL3M-Maggio2025' />
-            <div style={{ color:C.textSoft, fontWeight:600, fontSize:13, marginBottom:6 }}>Email per ricevere i referti <span style={{color:C.red}}>*</span></div>
-            <input style={{...inputStyle, marginBottom:14}} type="email" value={emailLotto} onChange={e=>setEmailLotto(e.target.value)} placeholder="medico@azienda.it" />
+
             <div style={{ color:C.textSoft, fontWeight:600, fontSize:13, marginBottom:6 }}>Carica ECG (selezione multipla) <span style={{color:C.red}}>*</span></div>
             <div onClick={()=>document.getElementById('batch-files').click()}
               style={{border:`2px dashed ${filesLotto.length>0?C.green:C.border}`,borderRadius:12,padding:"28px 20px",textAlign:"center",cursor:"pointer",background:filesLotto.length>0?C.greenLight:"#f8faff",marginBottom:14}}>
@@ -625,7 +626,7 @@ const AziendaView = ({ ecgs, setEcgs }) => {
             </div>
             <div style={{ color:C.textSoft, fontWeight:600, fontSize:13, marginBottom:6 }}>Note (opzionale)</div>
             <textarea style={{...inputStyle, resize:"vertical", marginBottom:14}} rows={2} value={noteGenerali} onChange={e=>setNoteGenerali(e.target.value)} placeholder="Es. idoneità annuale, visita periodica..." />
-            <button onClick={inviaLotto} style={btnPrimary(!!(batchNome&&emailLotto&&filesLotto.length>0))}>
+            <button onClick={inviaLotto} style={btnPrimary(!!(batchNome&&filesLotto.length>0))}>
               Invia lotto ({filesLotto.length} ECG) →
             </button>
           </div>
