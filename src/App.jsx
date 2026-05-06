@@ -1486,9 +1486,19 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs }) => {
 };
 
 // ── ADMIN ─────────────────────────────────────────────────────────────────
-const AdminView = ({ ecgs, setEcgs, cardiologiDB = [] }) => {
+const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
   const [tab, setTab] = useState("assegnazioni");
   const [refreshing, setRefreshing] = useState(false);
+  const [cardiologiDB, setCardiologiDB] = useState(cardiologiProp);
+
+  // Carica cardiologi dal DB
+  useEffect(() => {
+    supabase.from('user_profiles').select('nome, cognome').eq('ruolo', 'cardiologo')
+      .then(({ data, error }) => {
+        console.log('Cardiologi DB:', data, error);
+        if (data) setCardiologiDB(data.map(c => (c.nome ? c.nome + ' ' + c.cognome : c.cognome).trim()));
+      });
+  }, []);
   const [regole, setRegole] = useState({ modalita:'manuale', cardiologo_unico:'', lunedi:'', martedi:'', mercoledi:'', giovedi:'', venerdi:'', sabato:'', domenica:'' });
   const [salvandoRegole, setSalvandoRegole] = useState(false);
 
