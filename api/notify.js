@@ -1,25 +1,20 @@
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   const { paziente, origine, urgenza, note } = req.body;
-
   const urgenzaLabel = urgenza === 'urgente' ? '🔴 URGENTE' : '🟢 Normale';
   const origineLabel = origine === 'farmacia' ? '💊 Farmacia' : origine === 'azienda' ? '🏢 Azienda' : '👤 Privato';
-
   try {
-    const response = await fetch('https://api.resend.com/emails', {
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+        'api-key': process.env.BREVO_API_KEY,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'Ambulatorio Millefonti <onboarding@resend.dev>',
-        to: 'ecg.millefonti@gmail.com',
+        sender: { name: 'Ambulatorio Millefonti', email: 'noreply@ambulatoriomillefonti.it' },
+        to: [{ email: 'ecg.millefonti@gmail.com' }],
         subject: `${urgenzaLabel} — Nuovo ECG da refertare`,
-        html: `
+        htmlContent: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <div style="background: linear-gradient(135deg, #2e7cf6, #0ea5a0); padding: 24px; border-radius: 12px 12px 0 0;">
               <h1 style="color: white; margin: 0; font-size: 24px;">Ambulatorio Millefonti</h1>
@@ -40,13 +35,9 @@ export default async function handler(req, res) {
         `,
       }),
     });
-
-    if (response.ok) {
-      return res.status(200).json({ success: true });
-    } else {
-      const error = await response.json();
-      return res.status(500).json({ error });
-    }
+    if (response.ok) return res.status(200).json({ success: true });
+    const error = await response.json();
+    return res.status(500).json({ error });
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
