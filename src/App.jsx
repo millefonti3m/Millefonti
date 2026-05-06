@@ -65,7 +65,7 @@ const useSLA = (ecg) => {
   const [left,setLeft] = useState(null);
   useEffect(()=>{
     if (ecg.stato!=="in_attesa") return;
-    const slaMs = ecg.urgenza==="urgente"?2*3600000:4*3600000;
+    const slaMs = ecg.urgenza==="urgente"?24*3600000:48*3600000;
     const tick = ()=>setLeft(ecg.ts+slaMs-Date.now());
     tick();
     const id = setInterval(tick,1000);
@@ -1138,6 +1138,10 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
       .upload(refertoFileName, pdfBlob, { contentType: 'application/pdf', upsert: true })
       .then(() => {
         supabase.from('ecgs').update({ stato: 'refertato', file_referto_url: refertoFileName }).eq('id', ecg.id);
+        // Elimina il file ECG originale per risparmiare spazio
+        if (ecg.file_ecg_url) {
+          supabase.storage.from('ecg-files').remove([ecg.file_ecg_url]).catch(() => {});
+        }
         if (ecg.email_destinatario) {
           supabase.storage.from('ecg-files').createSignedUrl(refertoFileName, 60 * 60 * 24 * 7).then(({ data }) => {
             if (data?.signedUrl) {
@@ -1331,10 +1335,7 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs }) => {
 
   return (
     <div style={{ display:"flex", height:"calc(100vh - 64px)", flexDirection:"column" }}>
-      {/* DEBUG BANNER - rimuovere in produzione */}
-      <div style={{ background:"#fff3cd", padding:"8px 16px", fontSize:12, borderBottom:"1px solid #ffc107" }}>
-        🔍 DEBUG: meCardiologo="{meCardiologo}" | ECG totali={ecgs.length} | miei={mieiEcgs.length} | inAttesa={inAttesa.length}
-      </div>
+
       <div style={{ display:"flex", flex:1, overflow:"hidden" }}>
       {/* Sidebar */}
       <div style={{ width:320, borderRight:`1px solid ${C.border}`, display:"flex", flexDirection:"column", background:C.white, overflow:"hidden" }}>
