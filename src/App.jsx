@@ -1,6 +1,7 @@
 import { supabase } from "./supabase.js";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { jsPDF } from "jspdf";
+import JSZip from "jszip";
 
 const C = {
   bg:"#f4f7fb", surface:"#ffffff", card:"#ffffff", cardAlt:"#f0f5ff",
@@ -1316,7 +1317,6 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs }) => {
     if (ecgsBatch.length === 0) { alert("Nessun referto disponibile"); return; }
     
     // Scarica tutti i PDF e crea uno ZIP
-    const JSZip = (await import('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js')).default;
     const zip = new JSZip();
     
     await Promise.all(ecgsBatch.map(async (e) => {
