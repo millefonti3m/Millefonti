@@ -770,9 +770,9 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
     // Riquadro posizionato tra anamnesi e tracciato ECG
     // Lascia visibili in alto: nome, sesso, altezza, peso, farmaci, anamnesi
     const rX = Math.round(W * 0.21);
-    const rY = Math.round(H * 0.105);
+    const rY = Math.round(H * 0.082);
     const rW = Math.round(W * 0.78);
-    const rH = Math.round(H * 0.195);
+    const rH = Math.round(H * 0.175);
 
     // Sfondo bianco
     ctx.fillStyle = "#ffffff";
