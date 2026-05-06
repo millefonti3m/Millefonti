@@ -2443,10 +2443,21 @@ export default function App() {
   };
 
   const handleLogin = async (email, password) => {
-    const { supabase } = await import('./supabase.js');
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return error.message;
-    return null;
+    // Retry fino a 2 volte in caso di errore di rete
+    for (let i = 0; i < 2; i++) {
+      try {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (!error) return null;
+        if (error.message.includes('Invalid login') || error.message.includes('Email not confirmed')) {
+          return error.message; // Errore credenziali - non riprovare
+        }
+        if (i === 0) await new Promise(r => setTimeout(r, 800)); // Attendi e riprova
+      } catch(e) {
+        if (i === 1) return 'Errore di connessione. Riprova.';
+        await new Promise(r => setTimeout(r, 800));
+      }
+    }
+    return 'Errore di connessione. Riprova.';
   };
 
   const handleLogout = () => {
