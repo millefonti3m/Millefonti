@@ -1124,8 +1124,11 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
     if (!pdfBlob) { alert("Genera prima il referto PDF!"); return; }
     setConfirming(true);
     
-    const nomePaziente = (ecg.paziente_nome || ecg.paziente || "paziente").replace(/[^a-zA-Z0-9]/g, "_");
-    const refertoFileName = `referti/${ecg.id}_${nomePaziente}_refertato.pdf`;
+    // Usa il nome del file originale se disponibile, altrimenti il nome paziente
+    const nomeFileOriginale = ecg.file_ecg_url 
+      ? ecg.file_ecg_url.split('/').pop().replace(/\.[^.]+$/, '') // rimuove estensione
+      : (ecg.paziente_nome || ecg.paziente || "paziente").replace(/[^a-zA-Z0-9]/g, "_");
+    const refertoFileName = `referti/${nomeFileOriginale}_refertato.pdf`;
     
     // Upload + DB update in background (non bloccare la UI!)
     supabase.storage.from('ecg-files')
