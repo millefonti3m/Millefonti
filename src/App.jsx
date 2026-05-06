@@ -772,7 +772,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
     const rX = Math.round(W * 0.21);
     const rY = Math.round(H * 0.082);
     const rW = Math.round(W * 0.78);
-    const rH = Math.round(H * 0.175);
+    const rH = Math.round(H * 0.162);
 
     // Sfondo bianco
     ctx.fillStyle = "#ffffff";
@@ -879,7 +879,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
 
     // ── COMMENTO (a sinistra, sopra firma) ──
     const commentoX = rX + pad;
-    const commentoMaxW = Math.round(rW * 0.42);
+    const commentoMaxW = Math.round(rW * 0.55);
     let commentoY = sepY + fsCr * 1.0;
 
     if (commento.trim()) {
@@ -896,7 +896,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
       });
       if (line.trim()) linesC.push(line.trim());
       // Massimo 2 righe per il commento
-      linesC.slice(0, 2).forEach((ln, idx) => {
+      linesC.slice(0, 3).forEach((ln, idx) => {
         ctx.fillText(ln, commentoX, commentoY + idx * fsCommento * 1.2);
       });
     }
