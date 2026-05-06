@@ -31,10 +31,12 @@ export default async function handler(req, res) {
         `,
       }),
     });
+    const responseText = await response.text();
+    console.log('Brevo status:', response.status, 'body:', responseText);
     if (response.ok) return res.status(200).json({ success: true });
-    const error = await response.json();
-    return res.status(500).json({ error });
+    return res.status(500).json({ error: responseText });
   } catch (error) {
+    console.error('Fetch error:', error.message);
     return res.status(500).json({ error: error.message });
   }
 }
