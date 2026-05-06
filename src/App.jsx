@@ -36,16 +36,11 @@ const INIT_ECGS = [
   { id:"ECG-F05", origine:"farmacia", farmacia:"Farmacia Centrale Roma",   paziente:"S.T., 48a, F", ts:now-900000,   stato:"in_attesa", urgenza:"urgente", note:"Sincope recente",            cardiologo:null, chat:[] },
 ];
 
-const CARDIOLOGI_DATA = {
-  "Dr. Rossi":  { referti:19, guadagno:285, rating:4.8 },
-  "Dr. Conti":  { referti:6,  guadagno:90,  rating:4.9 },
-  "Dr. Ferrari":{ referti:11, guadagno:165, rating:4.7 },
-  "Dr. Bianchi":{ referti:28, guadagno:420, rating:4.9 },
-};
+const CARDIOLOGI_DATA = {}; // caricato dinamicamente da Supabase
 
 const ME_FARMACIA = "Farmacia Centrale Roma";
 const ME_AZIENDA = "Med Lavoro Torino";
-const ME_CARDIOLOGO_DEFAULT = "Dr. Rossi";
+const ME_CARDIOLOGO_DEFAULT = "";
 
 const generaSlots = () => {
   const slots = [];
@@ -1491,7 +1486,7 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs }) => {
 };
 
 // ── ADMIN ─────────────────────────────────────────────────────────────────
-const AdminView = ({ ecgs, setEcgs }) => {
+const AdminView = ({ ecgs, setEcgs, cardiologiDB = [] }) => {
   const [tab, setTab] = useState("assegnazioni");
   const [refreshing, setRefreshing] = useState(false);
   const [regole, setRegole] = useState({ modalita:'manuale', cardiologo_unico:'', lunedi:'', martedi:'', mercoledi:'', giovedi:'', venerdi:'', sabato:'', domenica:'' });
@@ -1533,7 +1528,7 @@ const AdminView = ({ ecgs, setEcgs }) => {
   const [filtroOrigine, setFiltroOrigine] = useState("tutti");
   const [assegnazioneTemp, setAssegnazioneTemp] = useState({}); // ecgId -> cardiologo selezionato
 
-  const nomi = Object.keys(CARDIOLOGI_DATA);
+  const nomi = cardiologiDB.length > 0 ? cardiologiDB : Object.keys(CARDIOLOGI_DATA);
   const inAttesa = ecgs.filter(e=>e.stato==="in_attesa");
   const refertati = ecgs.filter(e=>e.stato==="refertato");
   const nonAssegnati = inAttesa.filter(e=>!e.cardiologo);
@@ -2217,6 +2212,7 @@ export default function App() {
   const [role, setRole] = useState(null);
   const [meCardiologo, setMeCardiologo] = useState(ME_CARDIOLOGO_DEFAULT);
   const [ecgs, setEcgs] = useState([]);
+  const [cardiologiDB, setCardiologiDB] = useState([]);
 
   const caricaEcgs = async () => {
     const { data, error } = await supabase.from('ecgs').select('*').order('created_at', { ascending: false });
@@ -2323,7 +2319,7 @@ export default function App() {
       {role==="farmacia"   && <FarmaciaView ecgs={ecgs} setEcgs={setEcgs} />}
       {role==="azienda"    && <AziendaView  ecgs={ecgs} setEcgs={setEcgs} />}
       {role==="cardiologo" && <CardiologoView ecgs={ecgs} setEcgs={setEcgs} meCardiologo={meCardiologo} caricaEcgs={caricaEcgs} />}
-      {role==="admin"      && <AdminView    ecgs={ecgs} setEcgs={setEcgs} />}
+      {role==="admin"      && <AdminView    ecgs={ecgs} setEcgs={setEcgs} cardiologiDB={cardiologiDB} />}
     </Shell>
   );
 }
