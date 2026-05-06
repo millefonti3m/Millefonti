@@ -666,43 +666,95 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato }) => {
   const [generating, setGenerating] = useState(false);
   const [generato, setGenerato] = useState(false);
   const [pdfBlob, setPdfBlob] = useState(null);
+  const [zoom, setZoom] = useState(1);
+  const [confirming, setConfirming] = useState(false);
   const canvasRef = useRef(null);
+  const previewCanvasRef = useRef(null);
+  const [previewDataUrl, setPreviewDataUrl] = useState(null);
   const fileId = useRef("rf-"+Math.random().toString(36).slice(2,7)).current;
 
-  const handleFile = (f) => {
+  const handleFile = async (f) => {
     setEcgFile(f);
     const url = URL.createObjectURL(f);
     setEcgUrl(url);
-    setEcgType(f.type === "application/pdf" ? "pdf" : "image");
+    const tipo = f.type === "application/pdf" ? "pdf" : "image";
+    setEcgType(tipo);
     setGenerato(false);
+    if (tipo === 'pdf') {
+      try {
+        const pdfjsLib = await import("pdfjs-dist");
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+        const ab = await f.arrayBuffer();
+        const pdfDoc = await pdfjsLib.getDocument({ data: ab }).promise;
+        const page = await pdfDoc.getPage(1);
+        const vp = page.getViewport({ scale: 1.5 });
+        const cv = document.createElement('canvas');
+        cv.width = vp.width; cv.height = vp.height;
+        const ctx2 = cv.getContext('2d');
+        ctx2.fillStyle = '#fff'; ctx2.fillRect(0,0,cv.width,cv.height);
+        await page.render({ canvasContext: ctx2, viewport: vp }).promise;
+        setPreviewDataUrl(cv.toDataURL('image/jpeg', 0.85));
+      } catch(e) { setPreviewDataUrl(url); }
+    } else {
+      setPreviewDataUrl(url);
+    }
   };
 
   // Carica automaticamente il file da Supabase Storage se disponibile
   useEffect(() => {
-    const caricaDaStorage = async () => {
-      if (!ecg?.file_ecg_url) {
-        console.log('[Storage] Nessun file_ecg_url per ECG', ecg?.id);
-        return;
-      }
-      console.log('[Storage] Caricando:', ecg.file_ecg_url);
-      try {
-        const { data, error } = await supabase.storage.from('ecg-files').download(ecg.file_ecg_url);
-        if (error) { console.error('[Storage] Errore download:', error); alert('Errore caricamento ECG: ' + error.message); return; }
-        if (!data) { console.error('[Storage] Nessun dato'); return; }
+    let cancelled = false;
+    
+    // Reset immediato quando cambia l'ECG
+    setEcgFile(null);
+    setEcgUrl(null);
+    setEcgType(null);
+    setPreviewDataUrl(null);
+    setGenerato(false);
+    setPdfBlob(null);
+    setCrocette({ limiti:false, correlare:false, approfondire:false, visita:false, urgente:false });
+    setCommento("");
+    
+    if (!ecg?.file_ecg_url) return;
+    
+    console.log('[Storage] Caricando:', ecg.file_ecg_url);
+    supabase.storage.from('ecg-files').download(ecg.file_ecg_url)
+      .then(({ data, error }) => {
+        if (cancelled) { console.log('[Storage] Annullato:', ecg.file_ecg_url); return; }
+        if (error || !data) { console.error('[Storage] Errore:', error); return; }
         const ext = ecg.file_ecg_url.split('.').pop().toLowerCase();
         const mimeType = ext === 'pdf' ? 'application/pdf' : `image/${ext}`;
         const file = new File([data], ecg.file_ecg_url, { type: mimeType });
         const url = URL.createObjectURL(data);
-        console.log('[Storage] File caricato:', file.name, file.size, 'bytes');
+        console.log('[Storage] File caricato:', file.name);
         setEcgFile(file);
         setEcgUrl(url);
-        setEcgType(mimeType === 'application/pdf' ? 'pdf' : 'image');
-      } catch(e) { 
-        console.error('[Storage] Errore caricamento ECG:', e);
-        alert('Errore: ' + e.message);
-      }
-    };
-    caricaDaStorage();
+        const tipo = mimeType === 'application/pdf' ? 'pdf' : 'image';
+        setEcgType(tipo);
+        // Per PDF: renderizza su canvas per anteprima pulita
+        if (tipo === 'pdf') {
+          (async () => {
+            try {
+              const pdfjsLib = await import("pdfjs-dist");
+              pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+              const ab = await data.arrayBuffer();
+              const pdfDoc = await pdfjsLib.getDocument({ data: ab }).promise;
+              const page = await pdfDoc.getPage(1);
+              const vp = page.getViewport({ scale: 1.5 });
+              const cv = document.createElement('canvas');
+              cv.width = vp.width; cv.height = vp.height;
+              const ctx2 = cv.getContext('2d');
+              ctx2.fillStyle = '#fff'; ctx2.fillRect(0,0,cv.width,cv.height);
+              await page.render({ canvasContext: ctx2, viewport: vp }).promise;
+              if (!cancelled) setPreviewDataUrl(cv.toDataURL('image/jpeg', 0.85));
+            } catch(e) { console.error('Preview PDF error:', e); }
+          })();
+        } else {
+          if (!cancelled) setPreviewDataUrl(url);
+        }
+      })
+      .catch(e => { if (!cancelled) console.error('[Storage] Errore:', e); });
+    
+    return () => { cancelled = true; };
   }, [ecg?.id, ecg?.file_ecg_url]);
 
   const almenoCrocetta = crocette.limiti || crocette.correlare || crocette.approfondire || crocette.visita || crocette.urgente;
@@ -1041,49 +1093,41 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato }) => {
   };
 
   const confermaSend = async () => {
-    try {
-      // Usa il blob già generato
-      const blobDaUsare = pdfBlob;
-      if (!blobDaUsare) { alert("Genera prima il referto PDF!"); return; }
-
-      // 2. Salva referto su Storage
-      const nomePaziente = (ecg.paziente_nome || ecg.paziente || "paziente").replace(/[^a-zA-Z0-9]/g, "_");
-      const refertoFileName = `referti/${ecg.id}_${nomePaziente}_refertato.pdf`;
-      await supabase.storage.from('ecg-files').upload(refertoFileName, blobDaUsare, { contentType: 'application/pdf', upsert: true });
-
-      // 3. Genera link pubblico temporaneo (7 giorni)
-      const { data: urlData } = await supabase.storage.from('ecg-files').createSignedUrl(refertoFileName, 60 * 60 * 24 * 7);
-      const downloadUrl = urlData?.signedUrl || "";
-
-      // 4. Aggiorna stato ECG su DB
-      await supabase.from('ecgs').update({ stato: 'refertato', file_referto_url: refertoFileName }).eq('id', ecg.id);
-
-      // 5. Manda email al destinatario
-      if (ecg.email_destinatario && downloadUrl) {
-        await fetch('/api/notify-referto', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: ecg.email_destinatario,
-            paziente: ecg.paziente_nome || ecg.paziente,
-            cardiologo: meCardiologo,
-            downloadUrl,
-            batch: ecg.batch_id || null,
-          })
-        }).catch(() => {});
-      }
-    } catch(e) {
-      console.error('Errore conferma:', e);
-    }
-
+    if (confirming) return;
+    if (!pdfBlob) { alert("Genera prima il referto PDF!"); return; }
+    setConfirming(true);
+    
+    const nomePaziente = (ecg.paziente_nome || ecg.paziente || "paziente").replace(/[^a-zA-Z0-9]/g, "_");
+    const refertoFileName = `referti/${ecg.id}_${nomePaziente}_refertato.pdf`;
+    
+    // Upload + DB update in background (non bloccare la UI!)
+    supabase.storage.from('ecg-files')
+      .upload(refertoFileName, pdfBlob, { contentType: 'application/pdf', upsert: true })
+      .then(() => {
+        supabase.from('ecgs').update({ stato: 'refertato', file_referto_url: refertoFileName }).eq('id', ecg.id);
+        if (ecg.email_destinatario) {
+          supabase.storage.from('ecg-files').createSignedUrl(refertoFileName, 60 * 60 * 24 * 7).then(({ data }) => {
+            if (data?.signedUrl) {
+              fetch('/api/notify-referto', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  email: ecg.email_destinatario,
+                  paziente: ecg.paziente_nome || ecg.paziente,
+                  cardiologo: meCardiologo,
+                  downloadUrl: data.signedUrl,
+                  batch: ecg.batch_id || null,
+                })
+              }).catch(() => {});
+            }
+          });
+        }
+      })
+      .catch(e => console.error('Errore upload referto:', e));
+    
+    // Passa subito al prossimo ECG senza aspettare l'upload!
     onRefertato();
-    setGenerato(false);
-    setEcgFile(null);
-    setEcgUrl(null);
-    setEcgType(null);
-    setCrocette({limiti:false,correlare:false,approfondire:false,visita:false,urgente:false});
-    setCommento("");
-    setPdfBlob(null);
+    setConfirming(false);
   };
 
   const CROCETTE_OPTS = [
@@ -1095,9 +1139,9 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato }) => {
   ];
 
   return (
-    <div style={{display:"flex",gap:20,height:"100%"}}>
-      {/* Sinistra: carica ECG + anteprima */}
-      <div style={{flex:1,display:"flex",flexDirection:"column",gap:14}}>
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      {/* Top: carica ECG + anteprima FULL WIDTH */}
+      <div style={{display:"flex",flexDirection:"column",gap:14}}>
         <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,padding:18,boxShadow:C.shadow}}>
           <div style={{color:C.muted,fontWeight:700,fontSize:11,letterSpacing:1.5,textTransform:"uppercase",marginBottom:12}}>1. Carica tracciato ECG</div>
           <div onClick={()=>document.getElementById(fileId).click()}
@@ -1114,79 +1158,70 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato }) => {
           <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,padding:16,flex:1,boxShadow:C.shadow,overflow:"hidden"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
               <div style={{color:C.muted,fontWeight:700,fontSize:11,letterSpacing:1.5,textTransform:"uppercase"}}>Anteprima tracciato</div>
-              <a href={ecgUrl} target="_blank" rel="noreferrer" style={{color:C.accent,fontSize:12,fontWeight:600,textDecoration:"none"}}>🔍 Apri in grande →</a>
+              <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                <button onClick={()=>setZoom(z=>Math.max(0.5,z-0.25))} style={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:8,padding:"4px 10px",cursor:"pointer",fontWeight:700,fontSize:14}}>−</button>
+                <span style={{fontSize:12,color:C.muted,fontWeight:600,minWidth:40,textAlign:"center"}}>{Math.round(zoom*100)}%</span>
+                <button onClick={()=>setZoom(z=>Math.min(3,z+0.25))} style={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:8,padding:"4px 10px",cursor:"pointer",fontWeight:700,fontSize:14}}>+</button>
+                <button onClick={()=>setZoom(1)} style={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:8,padding:"4px 10px",cursor:"pointer",fontSize:11,color:C.muted}}>reset</button>
+                <a href={ecgUrl} target="_blank" rel="noreferrer" style={{color:C.accent,fontSize:12,fontWeight:600,textDecoration:"none",marginLeft:8}}>🔍 Tab</a>
+              </div>
             </div>
-            {ecgType==="image"
-              ? <img src={ecgUrl} alt="ECG" style={{width:"100%",borderRadius:8,objectFit:"contain",maxHeight:320,cursor:"pointer"}} onClick={()=>window.open(ecgUrl,'_blank')} />
-              : <iframe src={ecgUrl} style={{width:"100%",height:320,border:"none",borderRadius:8}} title="ECG PDF" />
-            }
+            <div style={{overflow:"auto",maxHeight:"40vh",borderRadius:8,background:"#f5f5f5",border:`1px solid ${C.borderLight}`}}>
+              {previewDataUrl
+                ? <img src={previewDataUrl} alt="ECG" style={{width:`${zoom*100}%`,display:"block",cursor:zoom>1?"zoom-in":"default"}} />
+                : <div style={{padding:40,textAlign:"center",color:C.muted}}>⏳ Caricamento...</div>
+              }
+            </div>
           </div>
         )}
       </div>
 
-      {/* Destra: pannello refertazione */}
-      <div style={{width:320,display:"flex",flexDirection:"column",gap:14}}>
-        <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,padding:20,boxShadow:C.shadow}}>
-          <div style={{color:C.muted,fontWeight:700,fontSize:11,letterSpacing:1.5,textTransform:"uppercase",marginBottom:14}}>2. Refertazione</div>
+      {/* Bottom: crocette + commento + bottone - FULL WIDTH */}
+      <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,padding:20,boxShadow:C.shadow}}>
+        <div style={{color:C.muted,fontWeight:700,fontSize:11,letterSpacing:1.5,textTransform:"uppercase",marginBottom:14}}>2. Refertazione</div>
 
-          {/* Crocette */}
-          <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:18}}>
-            {CROCETTE_OPTS.map(({k,label,color})=>(
-              <div key={k} onClick={()=>setCrocette(p=>({...p,[k]:!p[k]}))}
-                style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:12,cursor:"pointer",border:`2px solid ${crocette[k]?color:C.border}`,background:crocette[k]?color+"18":C.bg,transition:"all 0.15s"}}>
-                <div style={{width:22,height:22,borderRadius:6,border:`2px solid ${crocette[k]?color:C.border}`,background:crocette[k]?color:"white",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                  {crocette[k] && <span style={{color:"white",fontWeight:700,fontSize:14}}>✓</span>}
-                </div>
-                <span style={{fontSize:13,color:crocette[k]?color:C.textSoft,fontWeight:crocette[k]?700:400,lineHeight:1.3}}>{label}</span>
+        {/* Crocette in griglia 2 colonne + commento full width */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:14}}>
+          {CROCETTE_OPTS.map(({k,label,color})=>(
+            <div key={k} onClick={()=>setCrocette(p=>({...p,[k]:!p[k]}))}
+              style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:10,cursor:"pointer",border:`2px solid ${crocette[k]?color:C.border}`,background:crocette[k]?color+"18":C.bg,transition:"all 0.15s"}}>
+              <div style={{width:20,height:20,borderRadius:5,border:`2px solid ${crocette[k]?color:C.border}`,background:crocette[k]?color:"white",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                {crocette[k] && <span style={{color:"white",fontWeight:700,fontSize:12}}>✓</span>}
               </div>
-            ))}
-          </div>
-
-          {/* Commento */}
-          <div style={{marginBottom:16}}>
-            <label style={{color:C.textSoft,fontSize:12,fontWeight:600,display:"block",marginBottom:7}}>Commento (opzionale)</label>
-            <textarea value={commento} onChange={e=>setCommento(e.target.value)}
-              placeholder="Note aggiuntive del cardiologo..."
-              rows={3}
-              style={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:10,padding:"10px 12px",color:C.text,fontSize:13,width:"100%",outline:"none",resize:"vertical",fontFamily:SANS}} />
-          </div>
-
-          {/* Posizione overlay */}
-          {ecgType==="image" && (
-            <div style={{marginBottom:16}}>
-              <label style={{color:C.textSoft,fontSize:12,fontWeight:600,display:"block",marginBottom:7}}>Posizione riquadro</label>
-              <div style={{display:"flex",gap:8}}>
-                {[["top-right","↗ Alto dx"],["bottom-right","↘ Basso dx"]].map(([v,l])=>(
-                  <button key={v} onClick={()=>setPosizione(v)}
-                    style={{flex:1,padding:"8px 0",borderRadius:8,cursor:"pointer",fontWeight:600,fontSize:12,border:`2px solid ${posizione===v?C.accent:C.border}`,background:posizione===v?C.accentLight:C.bg,color:posizione===v?C.accent:C.muted}}>
-                    {l}
-                  </button>
-                ))}
-              </div>
+              <span style={{fontSize:12,color:crocette[k]?color:C.textSoft,fontWeight:crocette[k]?700:400,lineHeight:1.3}}>{label}</span>
             </div>
-          )}
-
-          {/* Bottone genera */}
-          <button onClick={generaPDF} disabled={!ecgFile||!almenoCrocetta||generating}
-            style={{background:(!ecgFile||!almenoCrocetta||generating)?C.border:"linear-gradient(135deg,#2e7cf6,#0ea5a0)",color:(!ecgFile||!almenoCrocetta||generating)?C.muted:"white",border:"none",borderRadius:12,padding:"13px 0",cursor:(!ecgFile||!almenoCrocetta||generating)?"not-allowed":"pointer",fontWeight:700,fontSize:14,width:"100%",boxShadow:(!ecgFile||!almenoCrocetta||generating)?"none":"0 4px 16px rgba(46,124,246,0.3)"}}>
-            {generating?"⏳ Generazione...":"📄 Genera referto PDF"}
-          </button>
-
-          {!almenoCrocetta && <div style={{color:C.muted,fontSize:11,textAlign:"center",marginTop:8}}>Seleziona almeno una crocetta</div>}
+          ))}
         </div>
 
-        {/* Bottone conferma dopo generazione */}
-        {generato && (
-          <div style={{background:C.greenLight,border:`1px solid ${C.green}33`,borderRadius:16,padding:18,boxShadow:C.shadow}}>
-            <div style={{color:C.green,fontWeight:700,fontSize:14,marginBottom:6}}>✅ PDF generato e scaricato!</div>
-            <div style={{color:C.textSoft,fontSize:12,marginBottom:14}}>Clicca per segnare questo ECG come refertato.</div>
-            <button onClick={confermaSend}
-              style={{background:C.green,color:"white",border:"none",borderRadius:10,padding:"12px 0",cursor:"pointer",fontWeight:700,fontSize:14,width:"100%",boxShadow:`0 4px 16px ${C.green}44`}}>
-              Conferma refertazione +{ecg.origine==="azienda"?10:15}€
-            </button>
-          </div>
-        )}
+        {/* Commento FULL WIDTH */}
+        <div style={{marginBottom:14}}>
+          <label style={{color:C.textSoft,fontSize:12,fontWeight:600,display:"block",marginBottom:7}}>Commento (opzionale)</label>
+          <textarea value={commento} onChange={e=>setCommento(e.target.value)}
+            placeholder="Note aggiuntive del cardiologo..."
+            rows={3}
+            style={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:10,padding:"10px 12px",color:C.text,fontSize:13,width:"100%",outline:"none",resize:"vertical",fontFamily:SANS,boxSizing:"border-box"}} />
+        </div>
+
+        {/* Bottone genera */}
+        <button onClick={generaPDF} disabled={!ecgFile||!almenoCrocetta||generating}
+          style={{background:(!ecgFile||!almenoCrocetta||generating)?C.border:"linear-gradient(135deg,#2e7cf6,#0ea5a0)",color:(!ecgFile||!almenoCrocetta||generating)?C.muted:"white",border:"none",borderRadius:12,padding:"13px 0",cursor:(!ecgFile||!almenoCrocetta||generating)?"not-allowed":"pointer",fontWeight:700,fontSize:14,width:"100%",boxShadow:(!ecgFile||!almenoCrocetta||generating)?"none":"0 4px 16px rgba(46,124,246,0.3)"}}>
+          {generating?"⏳ Generazione...":"📄 Genera referto PDF"}
+        </button>
+
+        {!almenoCrocetta && <div style={{color:C.muted,fontSize:11,textAlign:"center",marginTop:8}}>Seleziona almeno una crocetta</div>}
       </div>
+
+      {/* Bottone conferma dopo generazione */}
+      {generato && (
+        <div style={{background:C.greenLight,border:`1px solid ${C.green}33`,borderRadius:16,padding:18,boxShadow:C.shadow}}>
+          <div style={{color:C.green,fontWeight:700,fontSize:14,marginBottom:6}}>✅ PDF generato!</div>
+          <div style={{color:C.textSoft,fontSize:12,marginBottom:14}}>Clicca per segnare come refertato.</div>
+          <button onClick={confermaSend} disabled={confirming}
+            style={{background:confirming?C.muted:C.green,color:"white",border:"none",borderRadius:10,padding:"12px 0",cursor:confirming?"wait":"pointer",fontWeight:700,fontSize:14,width:"100%",boxShadow:confirming?"none":`0 4px 16px ${C.green}44`}}>
+            {confirming ? "⏳ Invio in corso..." : `Conferma refertazione +${ecg.origine==="azienda"?10:15}€`}
+          </button>
+        </div>
+      )}
     </div>
   );
 };
@@ -1202,6 +1237,9 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs }) => {
   const refertatiMiei = mieiEcgs.filter(e => e.stato === "refertato");
   // Mostra sempre tutti gli ECG assegnati (in attesa + refertati)
   const ecgDaVisualizzare = mieiEcgs;
+  // Conteggio batch attivo
+  const batchCorrente = selected?.batch_id ? mieiEcgs.filter(e => e.batch_id === selected.batch_id) : null;
+  const batchRefertati = batchCorrente ? batchCorrente.filter(e => e.stato === "refertato").length : 0;
   const me = { referti: 0, guadagno: 0, rating: 4.9, ...Object.values(CARDIOLOGI_DATA).find((_,i)=>Object.keys(CARDIOLOGI_DATA)[i]===meCardiologo)||{} };
   const guadagnoTot = (me.guadagno || 0) + refertatiMiei.reduce((s,e)=>s+(e.origine==="azienda"?10:15),0);
 
@@ -1233,6 +1271,7 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs }) => {
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
             <span style={{ color:C.textSoft, fontWeight:700, fontSize:13 }}>Da refertare</span>
             <span style={{ background:C.accentLight, color:C.accent, borderRadius:20, padding:"2px 12px", fontSize:12, fontWeight:700 }}>{inAttesa.length}</span>
+            {batchCorrente && <span style={{background:C.purpleLight,color:C.purple,borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:700,marginLeft:6}}>📦 {batchRefertati}/{batchCorrente.length} ✓</span>}
             
           </div>
         </div>
@@ -1324,23 +1363,23 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs }) => {
                 onRefertato={()=>{
                   const selectedId = selected.id;
                   const selectedBatchId = selected?.batch_id;
-                  // Aggiorna immediatamente lo stato locale
+                  // Aggiorna stato locale e calcola prossimo
+                  let prossimo = null;
                   setEcgs(prev => {
                     const updated = prev.map(e => e.id===selectedId ? {...e,stato:"refertato"} : e);
                     if (selectedBatchId) {
-                      const prossimo = updated.find(e => e.batch_id===selectedBatchId && e.stato==="in_attesa" && e.id!==selectedId);
-                      if (prossimo) {
-                        setTimeout(() => { setSelected(prossimo); setDone(false); }, 100);
-                      } else {
-                        setTimeout(() => setDone(true), 100);
-                      }
-                    } else {
-                      setTimeout(() => setDone(true), 100);
+                      prossimo = updated.find(e => e.batch_id===selectedBatchId && e.stato==="in_attesa" && e.id!==selectedId);
                     }
                     return updated;
                   });
-                  // Ricarica anche da DB per sincronizzare
-                  if (caricaEcgs) setTimeout(caricaEcgs, 500);
+                  // Passa al prossimo ECG immediatamente, oppure mostra fine
+                  if (prossimo) {
+                    setSelected(prossimo);
+                    setDone(false);
+                  } else {
+                    setSelected(null);
+                    setDone(true);
+                  }
                 }}
               />
             </div>
