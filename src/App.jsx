@@ -1133,34 +1133,41 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
       : (ecg.paziente_nome || ecg.paziente || "paziente").replace(/[^a-zA-Z0-9]/g, "_");
     const refertoFileName = `referti/${nomeFileOriginale}_refertato.pdf`;
     
-    // Upload + DB update in background (non bloccare la UI!)
-    supabase.storage.from('ecg-files')
-      .upload(refertoFileName, pdfBlob, { contentType: 'application/pdf', upsert: true })
-      .then(() => {
-        supabase.from('ecgs').update({ stato: 'refertato', file_referto_url: refertoFileName }).eq('id', ecg.id);
-        // Elimina il file ECG originale per risparmiare spazio
+    // Upload + DB update (async in background)
+    (async () => {
+      try {
+        const { error: uploadError } = await supabase.storage.from('ecg-files')
+          .upload(refertoFileName, pdfBlob, { contentType: 'application/pdf', upsert: true });
+        if (uploadError) { console.error('Upload error:', uploadError); return; }
+        
+        const { error: dbError } = await supabase.from('ecgs')
+          .update({ stato: 'refertato', file_referto_url: refertoFileName })
+          .eq('id', ecg.id);
+        if (dbError) console.error('DB update error:', dbError);
+        
+        // Elimina file ECG originale
         if (ecg.file_ecg_url) {
-          supabase.storage.from('ecg-files').remove([ecg.file_ecg_url]).catch(() => {});
+          await supabase.storage.from('ecg-files').remove([ecg.file_ecg_url]).catch(() => {});
         }
-        if (ecg.email_destinatario) {
-          supabase.storage.from('ecg-files').createSignedUrl(refertoFileName, 60 * 60 * 24 * 7).then(({ data }) => {
-            if (data?.signedUrl) {
-              fetch('/api/notify-referto', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  email: ecg.email_destinatario,
-                  paziente: ecg.paziente_nome || ecg.paziente,
-                  cardiologo: meCardiologo,
-                  downloadUrl: data.signedUrl,
-                  batch: ecg.batch_id || null,
-                })
-              }).catch(() => {});
-            }
-          });
+        
+        // Email solo per ECG singoli
+        if (!ecg.batch_id && ecg.email_destinatario) {
+          const { data: urlData } = await supabase.storage.from('ecg-files').createSignedUrl(refertoFileName, 60 * 60 * 24 * 7);
+          if (urlData?.signedUrl) {
+            fetch('/api/notify-referto', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                email: ecg.email_destinatario,
+                paziente: ecg.paziente_nome || ecg.paziente,
+                cardiologo: meCardiologo,
+                downloadUrl: urlData.signedUrl,
+              })
+            }).catch(() => {});
+          }
         }
-      })
-      .catch(e => console.error('Errore upload referto:', e));
+      } catch(e) { console.error('Errore confermaSend:', e); }
+    })();
     
     // Passa subito al prossimo ECG senza aspettare l'upload!
     onRefertato();
