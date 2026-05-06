@@ -901,7 +901,8 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
     }
 
     // ── FIRMA (centrale, con spazio per firma scannerizzata sopra il nome) ──
-    const nomeFirma = meCardiologo.replace(/^Dott\.\s*Dr\.?/i, "Dott.").replace(/^Dr\.?\s/i, "Dott. ");
+    const nomeFirmaBase = meCardiologo.replace(/^Dott\.\s*Dr\.?/i, "").replace(/^Dr\.?\s*/i, "").replace(/^Dott\.?\s*/i, "").trim();
+    const nomeFirma = "Dott. " + nomeFirmaBase;
     const firmaSectionX = rX + Math.round(rW * 0.45);
     const firmaSectionW = Math.round(rW * 0.30);
     const firmaY = sepY + bottomH - fsFirma * 1.3;
