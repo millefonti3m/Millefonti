@@ -168,13 +168,13 @@ const Login = ({ onLogin, onSelectCardiologo }) => {
         <h2 style={{ color:C.text, fontSize:24, fontWeight:700, marginBottom:6 }}>Seleziona il tuo profilo</h2>
         <p style={{ color:C.muted, fontSize:13, marginBottom:24 }}>Vedrai <strong>solo gli ECG che l'admin ti ha assegnato</strong> — nessun accesso alla coda generale</p>
         <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-          {Object.entries(CARDIOLOGI_DATA).map(([nome,d])=>(
+          {Object.entries(CARDIOLOGI_DATA).length > 0 && Object.entries(CARDIOLOGI_DATA).map(([nome,d])=>(
             <button key={nome} onClick={()=>{ onSelectCardiologo(nome); onLogin("cardiologo"); }}
               style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:14, padding:"16px 20px", cursor:"pointer", display:"flex", alignItems:"center", gap:14, textAlign:"left", boxShadow:C.shadow }}>
               <div style={{ width:40, height:40, background:C.accentLight, borderRadius:12, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18 }}>🫀</div>
               <div style={{ flex:1 }}>
                 <div style={{ fontWeight:700, fontSize:14, color:C.text }}>{nome}</div>
-                <div style={{ fontSize:12, color:C.muted, marginTop:3 }}>{d.referti} referti · ★ {d.rating}</div>
+                <div style={{ fontSize:12, color:C.muted, marginTop:3 }}>{d.referti || 0} referti</div>
               </div>
               <span style={{ color:C.mutedLight }}>›</span>
             </button>
@@ -2026,7 +2026,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
                           style={{ background:C.bg, border:`1.5px solid ${C.accent}`, borderRadius:10, padding:"9px 14px", color:C.text, fontFamily:SANS, fontSize:13, outline:"none", minWidth:160 }}>
                           <option value="">Scegli cardiologo...</option>
                           {nomi.map(n=>(
-                            <option key={n} value={n}>{n} (★{CARDIOLOGI_DATA[n].rating})</option>
+                            <option key={n} value={n}>{n}</option>
                           ))}
                         </select>
                         <button
@@ -2292,7 +2292,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
                     <div style={{ width:46, height:46, background:C.accentLight, borderRadius:12, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20 }}>🫀</div>
                     <div style={{ flex:1, minWidth:160 }}>
                       <div style={{ color:C.text, fontWeight:700, fontSize:16 }}>{nome}</div>
-                      <div style={{ color:C.muted, fontSize:12, marginTop:2 }}>{d.referti+mieiEcgs.filter(e=>e.stato==="refertato").length} referti · ★ {d.rating}</div>
+                      <div style={{ color:C.muted, fontSize:12, marginTop:2 }}>{mieiEcgs.filter(e=>e.stato==="refertato").length} referti completati</div>
                     </div>
                     <div style={{ display:"flex", gap:10 }}>
                       <div style={{ background:C.accentLight, borderRadius:10, padding:"8px 14px", textAlign:"center" }}>
