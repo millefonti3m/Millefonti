@@ -1630,7 +1630,10 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs }) => {
                     <div style={{ padding:"10px 14px", background: tuttiRefertati ? "#f0fdf4" : C.accentLight, borderBottom:`1px solid ${C.borderLight}` }}>
                       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                         <div style={{ fontWeight:700, fontSize:13, color:C.text }}>📦 {batch.nome}</div>
-                        <span style={{ background:tuttiRefertati?C.green:C.purple, color:"white", borderRadius:20, padding:"2px 8px", fontSize:11, fontWeight:700 }}>{refertati}/{totale}</span>
+                        <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                          <span style={{ background:tuttiRefertati?C.green:C.purple, color:"white", borderRadius:20, padding:"2px 8px", fontSize:11, fontWeight:700 }}>{refertati}/{totale}</span>
+                          <button onClick={()=>eliminaBatch(batchId, batch.nome)} style={{ background:"#fdedf0", color:"#e03e5a", border:"1px solid #e03e5a33", borderRadius:6, padding:"3px 8px", cursor:"pointer", fontSize:11, fontWeight:600 }}>🗑 Elimina lotto</button>
+                        </div>
                       </div>
                       {tuttiRefertati && (
                         <div style={{ marginTop:8, display:"flex", gap:6 }}>
@@ -1855,6 +1858,18 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
         await supabase.from('ecgs').update({ cardiologo_nome: dest }).eq('id', ecg.id);
       }
     }
+  };
+
+  const eliminaEcg = async (ecgId) => {
+    if (!confirm("Eliminare questo ECG? L'azione non è reversibile.")) return;
+    await supabase.from('ecgs').delete().eq('id', ecgId);
+    setEcgs(prev => prev.filter(e => e.id !== ecgId));
+  };
+
+  const eliminaBatch = async (batchId, nomeBatch) => {
+    if (!confirm(`Eliminare l'intero lotto "${nomeBatch}"? L'azione non è reversibile.`)) return;
+    await supabase.from('ecgs').delete().eq('batch_id', batchId);
+    setEcgs(prev => prev.filter(e => e.batch_id !== batchId));
   };
 
   const assegnaBatch = async (batchId, cardiologo) => {
@@ -2134,6 +2149,42 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
       {/* ── TAB: STORICO ── */}
       {tab==="storico" && (
         <div>
+          {/* Statistiche mensili per azienda */}
+          {(() => {
+            const refertati = ecgs.filter(e => e.stato === "refertato");
+            const perAzienda = {};
+            refertati.forEach(e => {
+              const azienda = e.origine_dettaglio || e.azienda || e.farmacia || e.origine || "Altro";
+              const mese = new Date(e.created_at || e.ts).toLocaleDateString("it-IT", { month: "long", year: "numeric" });
+              if (!perAzienda[azienda]) perAzienda[azienda] = {};
+              if (!perAzienda[azienda][mese]) perAzienda[azienda][mese] = 0;
+              perAzienda[azienda][mese]++;
+            });
+            if (Object.keys(perAzienda).length === 0) return null;
+            return (
+              <div style={{ marginBottom:24 }}>
+                <div style={{ fontWeight:700, fontSize:15, color:C.text, marginBottom:12 }}>📊 Statistiche referti completati</div>
+                <div style={{ display:"flex", flexWrap:"wrap", gap:12 }}>
+                  {Object.entries(perAzienda).map(([azienda, mesi]) => (
+                    <div key={azienda} style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:14, padding:16, minWidth:200, boxShadow:C.shadow }}>
+                      <div style={{ fontWeight:700, fontSize:13, color:C.text, marginBottom:10 }}>🏢 {azienda}</div>
+                      {Object.entries(mesi).sort().reverse().map(([mese, count]) => (
+                        <div key={mese} style={{ display:"flex", justifyContent:"space-between", fontSize:12, color:C.muted, marginBottom:4 }}>
+                          <span>{mese}</span>
+                          <span style={{ fontWeight:700, color:C.accent }}>{count} referti</span>
+                        </div>
+                      ))}
+                      <div style={{ marginTop:8, borderTop:`1px solid ${C.borderLight}`, paddingTop:6, display:"flex", justifyContent:"space-between", fontSize:12 }}>
+                        <span style={{ fontWeight:600, color:C.textSoft }}>Totale</span>
+                        <span style={{ fontWeight:700, color:C.green }}>{Object.values(mesi).reduce((a,b)=>a+b,0)} referti</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
           <div style={{ display:"flex", gap:8, marginBottom:16, flexWrap:"wrap" }}>
             {[["tutti","Tutti"],["in_attesa","In attesa"],["refertato","Refertati"],["prenotato","Prenotazioni"]].map(([v,l])=>(
               <button key={v} onClick={()=>setFiltroStato(v)} style={{ background:filtroStato===v?C.accent:C.white, color:filtroStato===v?C.white:C.muted, border:`1px solid ${filtroStato===v?C.accent:C.border}`, borderRadius:20, padding:"6px 16px", cursor:"pointer", fontWeight:600, fontSize:12 }}>{l}</button>
@@ -2160,6 +2211,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
                     ? <div style={{ background:C.accentLight, color:C.accent, borderRadius:10, padding:"6px 12px", fontSize:12, fontWeight:600 }}>🫀 {ecg.cardiologo}</div>
                     : ecg.stato!=="prenotato" && <div style={{ background:C.orangeLight, color:C.orange, borderRadius:10, padding:"6px 12px", fontSize:12, fontWeight:600 }}>⚠ Non assegnato</div>
                   }
+                  <button onClick={()=>eliminaEcg(ecg.id)} style={{ background:"#fdedf0", color:"#e03e5a", border:"1px solid #e03e5a33", borderRadius:8, padding:"5px 10px", cursor:"pointer", fontSize:12, fontWeight:600 }}>🗑</button>
                 </div>
               </div>
             ))}
