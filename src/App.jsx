@@ -2433,12 +2433,18 @@ export default function App() {
   const caricaRuolo = async (supabase, userId) => {
     const { data } = await supabase
       .from('user_profiles')
-      .select('ruolo, nome, cognome')
+      .select('ruolo, ruoli, nome, cognome')
       .eq('id', userId)
       .single();
-    if (data?.ruolo) setRole(data.ruolo);
     if (data?.nome || data?.cognome) {
       setMeCardiologo(`${data.nome||''} ${data.cognome||''}`.trim());
+    }
+    // Se ha più ruoli, mostra il selettore
+    if (data?.ruoli && data.ruoli.length > 1) {
+      setRuoliDisponibili(data.ruoli);
+      setRole(null);
+    } else if (data?.ruolo) {
+      setRole(data.ruolo);
     }
     setLoading(false);
   };
