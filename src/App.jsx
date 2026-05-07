@@ -1228,8 +1228,10 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(0, 0, cvs.width, cvs.height);
         await page.render({ canvasContext: ctx, viewport }).promise;
-        // Applica il riquadro di refertazione direttamente sul tracciato
-        disegnaOverlay(ctx, cvs.width, cvs.height);
+        // Applica il riquadro SOLO se non è pagina separata
+        if (posizione !== "pagina-separata") {
+          disegnaOverlay(ctx, cvs.width, cvs.height);
+        }
         // Salva come PDF
         const ratio = cvs.width / cvs.height;
         const isLandscape2 = ratio > 1;
