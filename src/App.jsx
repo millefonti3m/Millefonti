@@ -1778,13 +1778,19 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [cardiologiDB, setCardiologiDB] = useState(cardiologiProp);
 
-  // Carica cardiologi dal DB
+  // Carica cardiologi dal DB (sia ruolo singolo che ruoli multipli)
   useEffect(() => {
-    supabase.from('user_profiles').select('nome, cognome').eq('ruolo', 'cardiologo')
-      .then(({ data, error }) => {
-        console.log('Cardiologi DB:', data, error);
-        if (data) setCardiologiDB(data.map(c => (c.nome ? c.nome + ' ' + c.cognome : c.cognome).trim()));
-      });
+    Promise.all([
+      supabase.from('user_profiles').select('nome, cognome').eq('ruolo', 'cardiologo'),
+      supabase.from('user_profiles').select('nome, cognome').contains('ruoli', ['cardiologo'])
+    ]).then(([res1, res2]) => {
+      const tutti = [...(res1.data || []), ...(res2.data || [])];
+      const unici = Array.from(new Map(tutti.map(c => {
+        const nome = (c.nome ? c.nome + ' ' + c.cognome : c.cognome).trim();
+        return [nome, nome];
+      })).values());
+      setCardiologiDB(unici);
+    });
   }, []);
   const [regole, setRegole] = useState({ modalita:'manuale', cardiologo_unico:'', lunedi:'', martedi:'', mercoledi:'', giovedi:'', venerdi:'', sabato:'', domenica:'' });
   const [salvandoRegole, setSalvandoRegole] = useState(false);
