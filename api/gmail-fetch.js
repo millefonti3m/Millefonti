@@ -75,6 +75,19 @@ export default async function handler(req, res) {
     let processed = 0;
 
     for (const msg of messages) {
+      // Controlla se email già processata
+      const { data: giàProcessata } = await supabase
+        .from('email_processate')
+        .select('message_id')
+        .eq('message_id', msg.id)
+        .single();
+      
+      if (giàProcessata) {
+        console.log(`Email ${msg.id} già processata, skip`);
+        await markAsRead(accessToken, msg.id);
+        continue;
+      }
+
       const email = await getEmail(accessToken, msg.id);
       const headers = email.payload.headers;
       const from = headers.find(h => h.name === 'From')?.value || '';
@@ -174,6 +187,8 @@ export default async function handler(req, res) {
         console.log(`Processata email da ${fromEmail}: ${ecgs.length} ECG lotto "${batchNome}"`);
       }
 
+      // Segna come processata nel DB
+      await supabase.from('email_processate').insert({ message_id: msg.id }).catch(() => {});
       await markAsRead(accessToken, msg.id);
     }
 
