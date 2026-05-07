@@ -174,7 +174,7 @@ const Login = ({ onLogin, onSelectCardiologo }) => {
               <div style={{ width:40, height:40, background:C.accentLight, borderRadius:12, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18 }}>🫀</div>
               <div style={{ flex:1 }}>
                 <div style={{ fontWeight:700, fontSize:14, color:C.text }}>{nome}</div>
-                <div style={{ fontSize:12, color:C.muted, marginTop:3 }}>{d.referti || 0} referti</div>
+                <div style={{ fontSize:12, color:C.muted, marginTop:3 }}>{0 || 0} referti</div>
               </div>
               <span style={{ color:C.mutedLight }}>›</span>
             </button>
@@ -2096,7 +2096,6 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
           <h3 style={{ color:C.text, fontWeight:700, fontSize:17, marginBottom:4 }}>Performance cardiologi</h3>
           <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
             {nomi.map(nome=>{
-              const d = CARDIOLOGI_DATA[nome];
               const miei = ecgs.filter(e=>e.cardiologo===nome);
               const fatti = miei.filter(e=>e.stato==="refertato").length;
               const inCorso = miei.filter(e=>e.stato==="in_attesa").length;
@@ -2105,7 +2104,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
                   <div style={{ width:44, height:44, background:C.accentLight, borderRadius:12, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>🫀</div>
                   <div style={{ flex:1, minWidth:160 }}>
                     <div style={{ color:C.text, fontWeight:700, fontSize:15 }}>{nome}</div>
-                    <div style={{ color:C.muted, fontSize:12, marginTop:2 }}>★ {d.rating} · {d.guadagno+fatti*15}€ guadagnati</div>
+                    <div style={{ color:C.muted, fontSize:12, marginTop:2 }}>{fatti} referti completati</div>
                   </div>
                   <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
                     <div style={{ textAlign:"center", background:C.greenLight, borderRadius:10, padding:"8px 14px" }}>
@@ -2284,7 +2283,6 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
           </div>
           <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
             {nomi.map(nome=>{
-              const d = CARDIOLOGI_DATA[nome];
               const mieiEcgs = ecgs.filter(e=>e.cardiologo===nome);
               return (
                 <div key={nome} style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:16, padding:"20px 24px", boxShadow:C.shadow }}>
