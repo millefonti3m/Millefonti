@@ -2666,12 +2666,19 @@ export default function App() {
       }
 
       // Ascolta login/logout
-      supabase.auth.onAuthStateChange(async (_event, session) => {
-        if (session) {
-          await caricaRuolo(supabase, session.user.id);
-        } else {
+      supabase.auth.onAuthStateChange(async (event, session) => {
+        // Solo su SIGNED_IN e SIGNED_OUT, non su TOKEN_REFRESH
+        if (event === 'SIGNED_OUT') {
           setRole(null);
           setLoading(false);
+        } else if (event === 'SIGNED_IN' && session) {
+          await caricaRuolo(supabase, session.user.id);
+        } else if (event === 'INITIAL_SESSION') {
+          if (session) {
+            await caricaRuolo(supabase, session.user.id);
+          } else {
+            setLoading(false);
+          }
         }
       });
     } catch(e) {
