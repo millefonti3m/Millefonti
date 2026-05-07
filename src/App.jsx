@@ -2090,6 +2090,28 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
       {/* ── TAB: DASHBOARD ── */}
       {tab==="dashboard" && (
         <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+          {/* Storage indicator */}
+          {(() => {
+            const refertati = ecgs.filter(e=>e.stato==="refertato" && e.file_referto_url).length;
+            const inAttesa = ecgs.filter(e=>e.stato==="in_attesa" && e.file_ecg_url).length;
+            const stimaMB = Math.round(refertati * 1.5 + inAttesa * 0.7);
+            const percentuale = Math.min(100, Math.round((stimaMB / 1024) * 100));
+            const colore = percentuale > 80 ? "#e03e5a" : percentuale > 60 ? "#f59e0b" : C.green;
+            return (
+              <div style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:14, padding:"14px 20px", boxShadow:C.shadow }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+                  <div style={{ fontWeight:700, fontSize:13, color:C.text }}>💾 Storage utilizzato (stima)</div>
+                  <div style={{ fontWeight:700, fontSize:13, color:colore }}>{stimaMB} MB / 1024 MB</div>
+                </div>
+                <div style={{ background:C.bg, borderRadius:20, height:8, overflow:"hidden" }}>
+                  <div style={{ height:"100%", width:`${percentuale}%`, background:colore, borderRadius:20, transition:"width 0.5s" }} />
+                </div>
+                <div style={{ color:C.muted, fontSize:11, marginTop:6 }}>
+                  {percentuale < 60 ? "✅ Spazio sufficiente" : percentuale < 80 ? "⚠️ Monitora lo spazio" : "🔴 Considera upgrade a Piano Pro Supabase (25$/mese)"}
+                </div>
+              </div>
+            );
+          })()}
           <h3 style={{ color:C.text, fontWeight:700, fontSize:17, marginBottom:4 }}>Performance cardiologi</h3>
           <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
             {nomi.map(nome=>{

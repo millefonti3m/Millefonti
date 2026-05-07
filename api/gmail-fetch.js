@@ -197,7 +197,33 @@ export default async function handler(req, res) {
       await markAsRead(accessToken, msg.id);
     }
 
-    return res.status(200).json({ message: `Processate ${processed} email`, processed });
+    // Pulizia automatica referti più vecchi di 60 giorni
+    const sessantaGiorniFa = new Date();
+    sessantaGiorniFa.setDate(sessantaGiorniFa.getDate() - 60);
+    const { data: vecchi } = await supabase
+      .from('ecgs')
+      .select('id, file_referto_url, file_ecg_url')
+      .eq('stato', 'refertato')
+      .lt('created_at', sessantaGiorniFa.toISOString());
+    
+    if (vecchi && vecchi.length > 0) {
+      const filesDaEliminare = vecchi
+        .flatMap(e => [e.file_referto_url, e.file_ecg_url])
+        .filter(Boolean);
+      
+      if (filesDaEliminare.length > 0) {
+        await supabase.storage.from('ecg-files').remove(filesDaEliminare);
+      }
+      
+      // Aggiorna DB: togli i riferimenti ai file ma mantieni il record
+      await supabase.from('ecgs')
+        .update({ file_referto_url: null, file_ecg_url: null })
+        .in('id', vecchi.map(e => e.id));
+      
+      console.log(`Pulizia: eliminati ${filesDaEliminare.length} file vecchi di 60+ giorni`);
+    }
+
+    return res.status(200).json({ message: `Processate ${processed} email`, processed, cleaned: vecchi?.length || 0 });
   } catch (error) {
     console.error('Gmail fetch error:', error);
     return res.status(500).json({ error: error.message });
