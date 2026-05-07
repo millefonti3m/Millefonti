@@ -1632,10 +1632,7 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs }) => {
                     <div style={{ padding:"10px 14px", background: tuttiRefertati ? "#f0fdf4" : C.accentLight, borderBottom:`1px solid ${C.borderLight}` }}>
                       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                         <div style={{ fontWeight:700, fontSize:13, color:C.text }}>📦 {batch.nome}</div>
-                        <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                          <span style={{ background:tuttiRefertati?C.green:C.purple, color:"white", borderRadius:20, padding:"2px 8px", fontSize:11, fontWeight:700 }}>{refertati}/{totale}</span>
-                          <button onClick={()=>eliminaBatch(batchId, batch.nome)} style={{ background:"#fdedf0", color:"#e03e5a", border:"1px solid #e03e5a33", borderRadius:6, padding:"3px 8px", cursor:"pointer", fontSize:11, fontWeight:600 }}>🗑 Elimina lotto</button>
-                        </div>
+                        <span style={{ background:tuttiRefertati?C.green:C.purple, color:"white", borderRadius:20, padding:"2px 8px", fontSize:11, fontWeight:700 }}>{refertati}/{totale}</span>
                       </div>
                       {tuttiRefertati && (
                         <div style={{ marginTop:8, display:"flex", gap:6 }}>
