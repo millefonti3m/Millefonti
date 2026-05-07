@@ -80,7 +80,7 @@ export default async function handler(req, res) {
         .from('email_processate')
         .select('message_id')
         .eq('message_id', msg.id)
-        .single();
+        .maybeSingle();
       
       if (giàProcessata) {
         console.log(`Email ${msg.id} già processata, skip`);
@@ -187,8 +187,13 @@ export default async function handler(req, res) {
         console.log(`Processata email da ${fromEmail}: ${ecgs.length} ECG lotto "${batchNome}"`);
       }
 
-      // Segna come processata nel DB
-      await supabase.from('email_processate').insert({ message_id: msg.id }).catch(() => {});
+      // Segna come processata nel DB PRIMA di marcare come letta
+      const { error: insertError } = await supabase.from('email_processate').insert({ message_id: msg.id });
+      if (insertError) {
+        console.error('Errore salvataggio email processata:', insertError);
+      } else {
+        console.log(`Email ${msg.id} salvata come processata`);
+      }
       await markAsRead(accessToken, msg.id);
     }
 
