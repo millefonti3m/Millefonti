@@ -2335,6 +2335,7 @@ const LoginReale = ({ onLogin }) => {
 // ── APP ───────────────────────────────────────────────────────────────────
 export default function App() {
   const [role, setRole] = useState(null);
+  const [ruoliDisponibili, setRuoliDisponibili] = useState([]);
   const [meCardiologo, setMeCardiologo] = useState(ME_CARDIOLOGO_DEFAULT);
   const [ecgs, setEcgs] = useState([]);
   const [cardiologiDB, setCardiologiDB] = useState([]);
@@ -2443,15 +2444,14 @@ export default function App() {
   };
 
   const handleLogin = async (email, password) => {
-    // Retry fino a 2 volte in caso di errore di rete
     for (let i = 0; i < 2; i++) {
       try {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (!error) return null;
         if (error.message.includes('Invalid login') || error.message.includes('Email not confirmed')) {
-          return error.message; // Errore credenziali - non riprovare
+          return error.message;
         }
-        if (i === 0) await new Promise(r => setTimeout(r, 800)); // Attendi e riprova
+        if (i === 0) await new Promise(r => setTimeout(r, 800));
       } catch(e) {
         if (i === 1) return 'Errore di connessione. Riprova.';
         await new Promise(r => setTimeout(r, 800));
@@ -2465,6 +2465,7 @@ export default function App() {
     setMeCardiologo(ME_CARDIOLOGO_DEFAULT);
     setCardiologiDB([]);
     setRole(null);
+    setRuoliDisponibili([]);
     supabase.auth.signOut();
   };
 
@@ -2479,6 +2480,35 @@ export default function App() {
 
   // Route /carica — pagina pubblica senza login
   if (window.location.pathname === '/carica') return <UploadGenerico />;
+
+  if (ruoliDisponibili.length > 1 && !role) return (
+    <div style={{ minHeight:"100vh", background:"linear-gradient(135deg, #e8f2ff, #f4f7fb, #e8f9f4)", display:"flex", alignItems:"center", justifyContent:"center", padding:24, fontFamily:SANS }}>
+      <div style={{ maxWidth:400, width:"100%", textAlign:"center" }}>
+        <img src="/logo-squared.png" alt="logo" style={{ width:120, height:120, objectFit:"contain", margin:"0 auto 20px", display:"block", mixBlendMode:"multiply" }} />
+        <h2 style={{ color:"#1a2640", fontSize:22, fontWeight:700, marginBottom:8 }}>Con quale ruolo vuoi accedere?</h2>
+        <p style={{ color:"#8098b8", fontSize:13, marginBottom:32 }}>Seleziona il profilo per questa sessione</p>
+        <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+          {ruoliDisponibili.map(r => (
+            <button key={r} onClick={async () => {
+              setRole(r);
+              if (r === 'cardiologo') {
+                const { data: { session } } = await supabase.auth.getSession();
+                const { data: profile } = await supabase.from('user_profiles').select('nome, cognome').eq('id', session.user.id).single();
+                if (profile) setMeCardiologo((profile.nome ? profile.nome + ' ' + profile.cognome : profile.cognome).trim());
+              }
+            }}
+              style={{ background:"white", border:"2px solid #dde5f0", borderRadius:14, padding:"18px 24px", cursor:"pointer", fontWeight:700, fontSize:16, color:"#1a2640", display:"flex", alignItems:"center", gap:14, boxShadow:"0 2px 12px rgba(46,124,246,0.08)", transition:"all 0.15s" }}>
+              <span style={{ fontSize:28 }}>{r === 'admin' ? '🔑' : r === 'cardiologo' ? '🫀' : r === 'farmacia' ? '💊' : '🏢'}</span>
+              <div style={{ textAlign:"left" }}>
+                <div style={{ fontWeight:700, fontSize:15 }}>{r === 'admin' ? 'Amministratore' : r === 'cardiologo' ? 'Cardiologo' : r === 'farmacia' ? 'Farmacia' : 'Azienda'}</div>
+                <div style={{ color:"#8098b8", fontSize:12, fontWeight:400, marginTop:2 }}>{r === 'admin' ? 'Gestione completa della piattaforma' : r === 'cardiologo' ? 'Refertazione ECG' : ''}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 
   if (!role) return <LoginReale onLogin={handleLogin} />;
 
