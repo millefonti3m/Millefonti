@@ -17,6 +17,10 @@ async function getAccessToken() {
     }),
   });
   const data = await res.json();
+  console.log('Google token response:', JSON.stringify(data));
+  console.log('ENV check - CLIENT_ID exists:', !!process.env.GMAIL_CLIENT_ID);
+  console.log('ENV check - SECRET exists:', !!process.env.GMAIL_CLIENT_SECRET);
+  console.log('ENV check - REFRESH exists:', !!process.env.GMAIL_REFRESH_TOKEN);
   return data.access_token;
 }
 
@@ -165,4 +169,3 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: error.message });
   }
 }
-// deploy
