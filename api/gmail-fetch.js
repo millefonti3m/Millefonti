@@ -81,11 +81,25 @@ export default async function handler(req, res) {
       const subject = headers.find(h => h.name === 'Subject')?.value || 'Lotto ECG';
       const fromEmail = from.match(/<(.+)>/)?.[1] || from.trim();
 
-      // Cerca utente azienda con questa email
+      // Cerca utente azienda con questa email (diretta o autorizzata)
       const { data: { users } } = await supabase.auth.admin.listUsers();
-      const matchUser = users?.find(u => u.email === fromEmail);
+      let matchUser = users?.find(u => u.email === fromEmail);
+      let userId = matchUser?.id;
 
+      // Se non trovato direttamente, cerca nelle email autorizzate
       if (!matchUser) {
+        const { data: emailAuth } = await supabase
+          .from('email_autorizzate')
+          .select('user_id')
+          .eq('email', fromEmail)
+          .single();
+        if (emailAuth?.user_id) {
+          userId = emailAuth.user_id;
+          matchUser = users?.find(u => u.id === userId);
+        }
+      }
+
+      if (!userId) {
         console.log(`Mittente sconosciuto: ${fromEmail}`);
         await markAsRead(accessToken, msg.id);
         continue;
@@ -95,7 +109,7 @@ export default async function handler(req, res) {
       const { data: profile } = await supabase
         .from('user_profiles')
         .select('nome, cognome, ruolo')
-        .eq('id', matchUser.id)
+        .eq('id', userId)
         .single();
 
       if (!profile || profile.ruolo !== 'azienda') {
