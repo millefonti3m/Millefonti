@@ -43,12 +43,8 @@ async function getAttachment(accessToken, messageId, attachmentId) {
     { headers: { Authorization: `Bearer ${accessToken}` } }
   );
   const data = await res.json();
-  // Gmail returns base64url encoded data
   const base64 = data.data.replace(/-/g, '+').replace(/_/g, '/');
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes;
+  return Buffer.from(base64, 'base64');
 }
 
 async function markAsRead(accessToken, messageId) {
@@ -63,14 +59,11 @@ async function markAsRead(accessToken, messageId) {
 }
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST' && req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
   try {
     const accessToken = await getAccessToken();
-    const messages = await getUnreadEmails(accessToken);
+    if (!accessToken) return res.status(500).json({ error: 'Token non ottenuto' });
     
+    const messages = await getUnreadEmails(accessToken);
     if (messages.length === 0) {
       return res.status(200).json({ message: 'Nessuna email nuova', processed: 0 });
     }
@@ -79,71 +72,76 @@ export default async function handler(req, res) {
 
     for (const msg of messages) {
       const email = await getEmail(accessToken, msg.id);
-      
-      // Estrai mittente e oggetto
       const headers = email.payload.headers;
       const from = headers.find(h => h.name === 'From')?.value || '';
       const subject = headers.find(h => h.name === 'Subject')?.value || 'Lotto ECG';
-      
-      // Estrai email mittente
-      const fromEmail = from.match(/<(.+)>/)?.[1] || from;
-      
-      // Cerca azienda associata a questa email
+      const fromEmail = from.match(/<(.+)>/)?.[1] || from.trim();
+
+      // Cerca utente azienda con questa email
+      const { data: { users } } = await supabase.auth.admin.listUsers();
+      const matchUser = users?.find(u => u.email === fromEmail);
+
+      if (!matchUser) {
+        console.log(`Mittente sconosciuto: ${fromEmail}`);
+        await markAsRead(accessToken, msg.id);
+        continue;
+      }
+
+      // Controlla che sia un account azienda
       const { data: profile } = await supabase
         .from('user_profiles')
-        .select('id, nome, cognome')
-        .eq('ruolo', 'azienda')
-        .limit(100);
-      
-      // Trova l'utente dalla email
-      const { data: authUsers } = await supabase.auth.admin.listUsers();
-      const matchUser = authUsers?.users?.find(u => u.email === fromEmail);
-      
-      if (!matchUser) {
-        console.log(`Email da mittente sconosciuto: ${fromEmail} - ignorata`);
+        .select('nome, cognome, ruolo')
+        .eq('id', matchUser.id)
+        .single();
+
+      if (!profile || profile.ruolo !== 'azienda') {
         await markAsRead(accessToken, msg.id);
         continue;
       }
 
-      // Trova parti con allegati PDF
-      const parts = email.payload.parts || [];
-      const pdfParts = parts.filter(p => 
-        p.filename && (p.filename.toLowerCase().endsWith('.pdf') || 
-                       p.filename.toLowerCase().endsWith('.png') ||
-                       p.filename.toLowerCase().endsWith('.jpg'))
-      );
+      // Trova allegati PDF/PNG/JPG
+      const allParts = [];
+      const extractParts = (parts) => {
+        if (!parts) return;
+        parts.forEach(p => {
+          if (p.filename && p.body?.attachmentId) allParts.push(p);
+          if (p.parts) extractParts(p.parts);
+        });
+      };
+      extractParts(email.payload.parts);
+      
+      const fileParts = allParts.filter(p => {
+        const name = p.filename.toLowerCase();
+        return name.endsWith('.pdf') || name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg');
+      });
 
-      if (pdfParts.length === 0) {
+      if (fileParts.length === 0) {
         await markAsRead(accessToken, msg.id);
         continue;
       }
 
-      // Crea batch
       const batchId = `BATCH-EMAIL-${Date.now()}`;
       const batchNome = subject.trim();
-
-      // Carica ogni allegato
+      const nomeAzienda = `${profile.nome || ''} ${profile.cognome || ''}`.trim();
       const ecgs = [];
-      for (const part of pdfParts) {
-        const attachmentData = await getAttachment(accessToken, msg.id, part.body.attachmentId);
-        const fileName = part.filename;
-        const storageFileName = `${batchId}/${fileName}`;
-        
-        const blob = new Blob([attachmentData], { type: part.mimeType });
+
+      for (const part of fileParts) {
+        const buffer = await getAttachment(accessToken, msg.id, part.body.attachmentId);
+        const storageFileName = `${batchId}/${part.filename}`;
         const { error: uploadError } = await supabase.storage
           .from('ecg-files')
-          .upload(storageFileName, blob, { contentType: part.mimeType });
+          .upload(storageFileName, buffer, { contentType: part.mimeType || 'application/pdf' });
 
         if (!uploadError) {
           ecgs.push({
             origine: 'azienda',
-            paziente_nome: fileName.replace(/\.[^.]+$/, ''),
+            paziente_nome: part.filename.replace(/\.[^.]+$/, ''),
             paziente_eta: 0,
             paziente_sesso: 'M',
             note: 'Caricato via email',
             urgenza: 'normale',
             stato: 'in_attesa',
-            origine_dettaglio: `${profile?.find(p => p.id === matchUser.id)?.nome || ''} ${profile?.find(p => p.id === matchUser.id)?.cognome || ''}`.trim(),
+            origine_dettaglio: nomeAzienda,
             batch_id: batchId,
             batch_nome: batchNome,
             file_ecg_url: storageFileName,
@@ -155,10 +153,9 @@ export default async function handler(req, res) {
       if (ecgs.length > 0) {
         await supabase.from('ecgs').insert(ecgs);
         processed++;
-        console.log(`Processata email da ${fromEmail}: ${ecgs.length} ECG nel lotto "${batchNome}"`);
+        console.log(`Processata email da ${fromEmail}: ${ecgs.length} ECG lotto "${batchNome}"`);
       }
 
-      // Segna come letta
       await markAsRead(accessToken, msg.id);
     }
 
