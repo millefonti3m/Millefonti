@@ -1,4 +1,3 @@
-import React from "react";
 import { supabase } from "./supabase.js";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { jsPDF } from "jspdf";
@@ -3403,36 +3402,41 @@ export default function App() {
   }, []);
 
   // Ref per evitare doppia chiamata a caricaRuolo
-  const authDoneRef = React.useRef(false);
+  const authDoneRef = useRef(false);
 
   const supabaseAuth = async () => {
-    // Safety timeout: se dopo 8 secondi è ancora loading, sblocca
-    const safetyTimer = setTimeout(() => { setLoading(false); }, 8000);
-
+    // Safety: se dopo 6 secondi loading è ancora true, sblocca
+    const safetyTimer = setTimeout(() => setLoading(false), 6000);
     try {
       const { supabase } = await import('./supabase.js');
 
-      // Usa SOLO onAuthStateChange come fonte di verità
-      // INITIAL_SESSION viene sempre sparato subito con la sessione corrente
+      // 1. Controlla sessione esistente (affidabile su tutti i browser)
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session && !authDoneRef.current) {
+        authDoneRef.current = true;
+        clearTimeout(safetyTimer);
+        await caricaRuolo(supabase, session.user.id);
+      } else if (!session) {
+        clearTimeout(safetyTimer);
+        setLoading(false);
+      }
+
+      // 2. Ascolta cambiamenti successivi (login/logout)
       supabase.auth.onAuthStateChange(async (event, session) => {
         if (event === 'SIGNED_OUT') {
           authDoneRef.current = false;
           setRole(null); setRuoliDisponibili([]); setMeCardiologo(ME_CARDIOLOGO_DEFAULT);
-          clearTimeout(safetyTimer); setLoading(false);
-        } else if (event === 'INITIAL_SESSION') {
-          if (session && !authDoneRef.current) {
-            authDoneRef.current = true;
-            await caricaRuolo(supabase, session.user.id);
-          } else if (!session) {
-            clearTimeout(safetyTimer); setLoading(false);
-          }
+          setLoading(false);
         } else if (event === 'SIGNED_IN' && session && !authDoneRef.current) {
+          // Solo se getSession non ha già gestito la sessione
           authDoneRef.current = true;
           await caricaRuolo(supabase, session.user.id);
         }
+        // INITIAL_SESSION ignorato: già gestito da getSession() sopra
       });
     } catch(e) {
-      clearTimeout(safetyTimer); setLoading(false);
+      clearTimeout(safetyTimer);
+      setLoading(false);
     }
   };
 
