@@ -561,11 +561,11 @@ const AziendaView = ({ ecgs, setEcgs }) => {
       const mapped = data.map(e=>({ ...e, paziente:e.paziente_nome, azienda:ME_AZIENDA, batch:batchNome, ts:new Date(e.created_at).getTime(), cardiologo:e.cardiologo_nome||null, chat:[] }));
       setEcgs(prev=>[...prev,...mapped]);
     }
+    // Push PRIMA di setSent (await evita cancellazione fetch)
+    await fetch('/api/push-lotto', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ batchNome, count: filesLotto.length }) }).catch(()=>{});
     setSent(true);
     setCaricando(false);
     fetch('/api/notify', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ paziente:`Lotto ${batchNome} — ${filesLotto.length} ECG`, origine:"azienda", urgenza:"normale", note:`Azienda: ${nomeAzienda||ME_AZIENDA} | Email referto: ${emailLotto}` }) }).catch(()=>{});
-    // Push via endpoint server-side (ha accesso a regole_assegnazione con service key)
-    fetch('/api/push-lotto', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ batchNome, count: filesLotto.length }) }).catch(()=>{});
   };
 
   const scaricaBatchAzienda = async (batchId, bNome) => {
