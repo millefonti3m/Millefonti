@@ -1784,8 +1784,9 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, pushAbilitato
         <div style={{ padding:"20px 20px 16px", background:"linear-gradient(135deg,#e8f4ff,#e6f9f4)", borderBottom:`1px solid ${C.border}` }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
             <div style={{ color:C.muted, fontSize:12, fontWeight:600 }}>{showCompensi ? '💰 Compensi' : 'Guadagni — mese corrente'}</div>
-            <div style={{display:'flex',gap:4}}>
+            <div style={{display:'flex',gap:4,alignItems:'center'}}>
               <button onClick={()=>setShowCompensi(p=>!p)} style={{background:showCompensi?'#e8f9f4':'rgba(255,255,255,0.6)',border:`1px solid ${showCompensi?C.teal:C.border}`,borderRadius:8,padding:"4px 10px",cursor:"pointer",fontSize:12,color:showCompensi?C.teal:C.muted,fontWeight:600}}>💰 {showCompensi?'Chiudi':'Compensi'}</button>
+              {!pushAbilitato ? <button onClick={registraPush} style={{background:'#fff8e1',border:'1px solid #f59e0b',borderRadius:8,padding:"4px 10px",cursor:"pointer",fontSize:13}} title="Abilita notifiche push">🔔</button> : <span style={{fontSize:14}} title="Notifiche attive">🔔✓</span>}
               <button onClick={()=>setShowProfilo(p=>!p)} style={{background:showProfilo?"rgba(46,124,246,0.1)":"rgba(255,255,255,0.6)",border:`1px solid ${showProfilo?C.accent:C.border}`,borderRadius:8,padding:"4px 10px",cursor:"pointer",fontSize:12,color:showProfilo?C.accent:C.muted,fontWeight:600}}>⚙️</button>
             </div>
           </div>
@@ -3108,9 +3109,8 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
             <div style={{ fontSize:18, fontWeight:700 }}>Dott. {meCardiologo}</div>
             <div style={{ fontSize:13, opacity:0.8, marginTop:2 }}>{mieiEcgs.filter(e=>e.stato==='in_attesa').length} ECG da refertare</div>
           </div>
-          <div style={{display:'flex',gap:6,marginTop:4}}>
-            {!pushAbilitato && <button onClick={registraPush} style={{ background:'rgba(255,220,0,0.25)', border:'1px solid rgba(255,220,0,0.5)', color:'white', borderRadius:10, padding:'8px 12px', cursor:'pointer', fontSize:16 }} title="Abilita notifiche">🔔</button>}
-            {pushAbilitato && <span style={{fontSize:16,padding:'8px 4px'}} title="Notifiche attive">🔔✓</span>}
+          <div style={{display:'flex',gap:6,marginTop:4,alignItems:'center'}}>
+            {!pushAbilitato ? <button onClick={registraPush} style={{background:'rgba(255,220,0,0.25)',border:'1px solid rgba(255,220,0,0.5)',color:'white',borderRadius:10,padding:'8px 12px',cursor:'pointer',fontSize:16}} title="Abilita notifiche">🔔</button> : <span style={{fontSize:16,padding:'6px 4px'}} title="Notifiche attive">🔔✓</span>}
             <button onClick={onLogout} style={{ background:'rgba(255,255,255,0.15)', border:'none', color:'white', borderRadius:10, padding:'8px 14px', cursor:'pointer', fontSize:13, fontWeight:600 }}>Esci</button>
           </div>
         </div>
@@ -3460,6 +3460,36 @@ export default function App() {
 
   // Ref per evitare doppia chiamata a caricaRuolo
   const authDoneRef = useRef(false);
+  const [pushAbilitato, setPushAbilitato] = useState(false);
+
+  const urlBase64ToUint8Array = (b64) => {
+    const pad = '='.repeat((4 - b64.length % 4) % 4);
+    const base64 = (b64 + pad).replace(/-/g, '+').replace(/_/g, '/');
+    const raw = atob(base64);
+    return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+  };
+
+  const registraPush = async () => {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      alert('Il tuo browser non supporta le notifiche push'); return;
+    }
+    try {
+      const reg = await navigator.serviceWorker.register('/sw.js');
+      await navigator.serviceWorker.ready;
+      const permesso = await Notification.requestPermission();
+      if (permesso !== 'granted') { alert('Permesso notifiche negato'); return; }
+      const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+      if (!vapidKey) { alert('VAPID key mancante'); return; }
+      const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapidKey) });
+      const { data: { session } } = await supabase.auth.getSession();
+      await fetch('/api/push-subscribe', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscription: sub.toJSON(), cardiologo_nome: meCardiologo, user_id: session.user.id }),
+      });
+      setPushAbilitato(true);
+      alert('✅ Notifiche attivate!');
+    } catch(e) { console.error('Push error:', e); alert('Errore: ' + e.message); }
+  };
 
   const supabaseAuth = async () => {
     // Safety: se dopo 6 secondi loading è ancora true, sblocca
