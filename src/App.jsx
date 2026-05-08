@@ -2582,11 +2582,13 @@ const LoginReale = ({ onLogin }) => {
           <div style={{ marginBottom:16 }}>
             <label style={{ color:"#3d5270", fontSize:12, fontWeight:600, display:"block", marginBottom:7 }}>Email</label>
             <input value={email} onChange={e=>setEmail(e.target.value)} type="email" placeholder="nome@esempio.it"
+              name="email" autoComplete="email"
               style={{ background:"#f4f7fb", border:"1px solid #dde5f0", borderRadius:10, padding:"11px 14px", color:"#1a2640", fontSize:14, width:"100%", outline:"none" }} />
           </div>
           <div style={{ marginBottom:24 }}>
             <label style={{ color:"#3d5270", fontSize:12, fontWeight:600, display:"block", marginBottom:7 }}>Password</label>
             <input value={password} onChange={e=>setPassword(e.target.value)} type="password" placeholder="••••••••"
+              name="password" autoComplete="current-password"
               style={{ background:"#f4f7fb", border:"1px solid #dde5f0", borderRadius:10, padding:"11px 14px", color:"#1a2640", fontSize:14, width:"100%", outline:"none" }}
               onKeyDown={e=>e.key==="Enter"&&handleSubmit()} />
           </div>
