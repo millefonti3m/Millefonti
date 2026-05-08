@@ -62,6 +62,38 @@ async function markAsRead(accessToken, messageId) {
   );
 }
 
+// ── LOGO DETECTION ─────────────────────────────────────────────────────────
+// Regola 1: se ci sono PDF + immagini → le immagini sono loghi email, scarta
+// Regola 2: se ci sono solo immagini → scarta quelle < 50KB (loghi pesano poco)
+// Gli ECG in JPEG pesano sempre > 100KB, i loghi tipicamente < 30KB
+const LOGO_SIZE_THRESHOLD = 50000; // 50KB
+
+function filtraLogoEmail(allFileParts) {
+  const pdfs = allFileParts.filter(p => p.filename.toLowerCase().endsWith('.pdf'));
+  const imgs = allFileParts.filter(p => /\.(jpe?g|png)$/i.test(p.filename.toLowerCase()));
+
+  if (pdfs.length > 0 && imgs.length > 0) {
+    // Mix PDF + immagini: le immagini sono quasi certamente loghi email
+    console.log(`Logo detection [regola 1]: scartate ${imgs.length} immagini perché presenti ${pdfs.length} PDF`);
+    imgs.forEach(p => console.log(`  → scartato: ${p.filename} (${p.body?.size || '?'} bytes)`));
+    return pdfs;
+  }
+
+  if (imgs.length > 0 && pdfs.length === 0) {
+    // Solo immagini: filtra per dimensione
+    const ecgImgs = imgs.filter(p => (p.body?.size || 0) > LOGO_SIZE_THRESHOLD);
+    const logoImgs = imgs.filter(p => (p.body?.size || 0) <= LOGO_SIZE_THRESHOLD);
+    if (logoImgs.length > 0) {
+      console.log(`Logo detection [regola 2]: scartate ${logoImgs.length} immagini piccole (< ${LOGO_SIZE_THRESHOLD/1000}KB)`);
+      logoImgs.forEach(p => console.log(`  → scartato: ${p.filename} (${p.body?.size || '?'} bytes)`));
+    }
+    return ecgImgs;
+  }
+
+  return allFileParts; // solo PDF, nessun problema
+}
+// ───────────────────────────────────────────────────────────────────────────
+
 export default async function handler(req, res) {
   try {
     const accessToken = await getAccessToken();
@@ -141,12 +173,16 @@ export default async function handler(req, res) {
       };
       extractParts(email.payload.parts);
       
-      const fileParts = allParts.filter(p => {
+      const allFileParts = allParts.filter(p => {
         const name = p.filename.toLowerCase();
         return name.endsWith('.pdf') || name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg');
       });
 
+      // ── Applica logo detection ──
+      const fileParts = filtraLogoEmail(allFileParts);
+
       if (fileParts.length === 0) {
+        console.log(`Nessun allegato ECG valido da ${fromEmail} (tutti filtrati come loghi)`);
         await markAsRead(accessToken, msg.id);
         continue;
       }
@@ -215,7 +251,6 @@ export default async function handler(req, res) {
         await supabase.storage.from('ecg-files').remove(filesDaEliminare);
       }
       
-      // Aggiorna DB: togli i riferimenti ai file ma mantieni il record
       await supabase.from('ecgs')
         .update({ file_referto_url: null, file_ecg_url: null })
         .in('id', vecchi.map(e => e.id));

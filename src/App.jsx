@@ -497,6 +497,7 @@ const AziendaView = ({ ecgs, setEcgs }) => {
   const [emailLotto, setEmailLotto] = useState("");
   const [noteGenerali, setNoteGenerali] = useState("");
   const [filesLotto, setFilesLotto] = useState([]);
+  const [logoWarning, setLogoWarning] = useState(false);
   const [sent, setSent] = useState(false);
   const miei = ecgs.filter(e=>e.origine==="azienda"&&e.azienda===ME_AZIENDA);
   // Conteggio ECG del mese corrente
@@ -619,11 +620,37 @@ const AziendaView = ({ ecgs, setEcgs }) => {
             <div onClick={()=>document.getElementById('batch-files').click()}
               style={{border:`2px dashed ${filesLotto.length>0?C.green:C.border}`,borderRadius:12,padding:"28px 20px",textAlign:"center",cursor:"pointer",background:filesLotto.length>0?C.greenLight:"#f8faff",marginBottom:14}}>
               <input id="batch-files" type="file" accept=".pdf,.png,.jpg,.jpeg" multiple style={{display:"none"}}
-                onChange={e=>setFilesLotto(e.target.files)} />
+                onChange={e=>{
+                const files = Array.from(e.target.files||[]);
+                const pdfs = files.filter(f=>f.name.toLowerCase().endsWith('.pdf'));
+                const imgs = files.filter(f=>/\.(jpe?g|png)$/i.test(f.name));
+                // Se ci sono PDF E immagini → probabile logo email
+                if (pdfs.length>0 && imgs.length>0) {
+                  setLogoWarning(imgs.map(f=>f.name));
+                  setFilesLotto(pdfs); // carica solo i PDF automaticamente
+                } else {
+                  setLogoWarning(false);
+                  setFilesLotto(files);
+                }
+              }} />
               {filesLotto.length>0
                 ? <div style={{color:C.green,fontWeight:700}}>{filesLotto.length} file selezionati ✓<br/><span style={{fontSize:12,fontWeight:400,color:C.muted}}>{Array.from(filesLotto).map(f=>f.name).join(', ')}</span></div>
                 : <><div style={{fontSize:28,marginBottom:8}}>📁</div><div style={{color:C.textSoft,fontSize:14,fontWeight:500}}>Clicca per selezionare tutti i PDF del lotto</div><div style={{color:C.muted,fontSize:12,marginTop:4}}>Selezione multipla • PDF · PNG · JPG</div></>}
             </div>
+            {logoWarning && logoWarning.length>0 && (
+              <div style={{background:'#fff8e1',border:'1px solid #f59e0b',borderRadius:10,padding:'12px 16px',marginBottom:12,display:'flex',alignItems:'flex-start',gap:10}}>
+                <span style={{fontSize:20}}>⚠️</span>
+                <div>
+                  <div style={{fontWeight:700,color:'#856404',fontSize:13,marginBottom:4}}>
+                    {logoWarning.length} immagine{logoWarning.length>1?'i':''} rimoss{logoWarning.length>1?'e':'a'} automaticamente
+                  </div>
+                  <div style={{color:'#856404',fontSize:12}}>
+                    Rilevat{logoWarning.length>1?'i':'o'} file immagine insieme ai PDF: probabilmente loghi email.<br/>
+                    <strong>{logoWarning.join(', ')}</strong>
+                  </div>
+                </div>
+              </div>
+            )}
             <div style={{ color:C.textSoft, fontWeight:600, fontSize:13, marginBottom:6 }}>Note (opzionale)</div>
             <textarea style={{...inputStyle, resize:"vertical", marginBottom:14}} rows={2} value={noteGenerali} onChange={e=>setNoteGenerali(e.target.value)} placeholder="Es. idoneità annuale, visita periodica..." />
             <button onClick={inviaLotto} style={btnPrimary(!!(batchNome&&filesLotto.length>0))}>
@@ -1295,7 +1322,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
     const nomeFileOriginale = ecg.file_ecg_url 
       ? ecg.file_ecg_url.split('/').pop().replace(/\.[^.]+$/, '') // rimuove estensione
       : (ecg.paziente_nome || ecg.paziente || "paziente").replace(/[^a-zA-Z0-9]/g, "_");
-    const refertoFileName = `referti/${nomeFileOriginale}_refertato.pdf`;
+    const refertoFileName = `referti/_${nomeFileOriginale}.pdf`;
     
     // Upload + DB update (async in background)
     (async () => {
@@ -1514,27 +1541,34 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs }) => {
 
   const chiudiBatch = async (batchId) => {
     setChiudendoBatch(batchId);
-    const ecgsBatch = mieiEcgs.filter(e => e.batch_id === batchId && e.stato === "refertato");
-    // Genera signed URLs per tutti i referti del batch
-    const links = await Promise.all(ecgsBatch.map(async (e) => {
-      if (!e.file_referto_url) return null;
-      const { data } = await supabase.storage.from('ecg-files').createSignedUrl(e.file_referto_url, 60 * 60 * 24 * 7);
-      return { paziente: e.paziente_nome || e.paziente, url: data?.signedUrl };
-    }));
-    const validLinks = links.filter(Boolean);
-    // Email unica con tutti i link
+    const ecgsBatch = mieiEcgs.filter(e => e.batch_id === batchId && e.stato === "refertato" && e.file_referto_url);
     const email = ecgsBatch[0]?.email_destinatario;
     const batchNome = ecgsBatch[0]?.batch_nome || batchId;
-    if (email && validLinks.length > 0) {
-      const linksHtml = validLinks.map(l => `<li><a href="${l.url}" style="color:#2e7cf6;font-weight:bold;">${l.paziente}</a></li>`).join('');
-      await fetch('/api/notify-batch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, batchNome, cardiologo: meCardiologo, linksHtml, count: validLinks.length })
-      }).catch(() => {});
-    }
+    if (ecgsBatch.length === 0 || !email) { setChiudendoBatch(null); alert("Nessun referto disponibile o email mancante"); return; }
+    try {
+      const zip = new JSZip();
+      await Promise.all(ecgsBatch.map(async (e) => {
+        const { data } = await supabase.storage.from('ecg-files').download(e.file_referto_url);
+        if (data) zip.file(e.file_referto_url.split('/').pop(), data);
+      }));
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const zipFileName = `referti/zip/_${batchNome.replace(/[^a-zA-Z0-9]/g,'_')}_${batchId}.zip`;
+      await supabase.storage.from('ecg-files').upload(zipFileName, zipBlob, { contentType:'application/zip', upsert:true });
+      const { data: urlData } = await supabase.storage.from('ecg-files').createSignedUrl(zipFileName, 60*60*24*7);
+      if (urlData?.signedUrl) {
+        await fetch('/api/notify-referto', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email, cardiologo: meCardiologo,
+            downloadUrl: urlData.signedUrl,
+            isBatch: true, batchNome, count: ecgsBatch.length,
+          })
+        }).catch(() => {});
+      }
+      alert(`Lotto "${batchNome}" chiuso! Email con ZIP inviata a ${email}`);
+    } catch(e) { console.error('chiudiBatch error:', e); alert('Errore: ' + e.message); }
     setChiudendoBatch(null);
-    alert(`Lotto "${batchNome}" chiuso! Email inviata a ${email}`);
   };
 
   const caricaFirma = async (file) => {
