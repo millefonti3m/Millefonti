@@ -500,6 +500,7 @@ const AziendaView = ({ ecgs, setEcgs }) => {
   const [logoWarning, setLogoWarning] = useState(false);
   const [sent, setSent] = useState(false);
   const [scaricandoBatch, setScaricandoBatch] = useState(null);
+  const [caricando, setCaricando] = useState(false);
   const [nomeAzienda, setNomeAzienda] = useState("");
   const [meEmail, setMeEmail] = useState("");
   useEffect(() => {
@@ -528,7 +529,8 @@ const AziendaView = ({ ecgs, setEcgs }) => {
   );
 
   const inviaLotto = async () => {
-    if (!batchNome||filesLotto.length===0) return;
+    if (!batchNome||filesLotto.length===0||caricando) return;
+    setCaricando(true);
     const batchId = `BATCH-${Date.now()}`;
     const { data: { session } } = await supabase.auth.getSession();
     const emailAccount = session?.user?.email || '';
@@ -560,6 +562,7 @@ const AziendaView = ({ ecgs, setEcgs }) => {
       setEcgs(prev=>[...prev,...mapped]);
     }
     setSent(true);
+    setCaricando(false);
     fetch('/api/notify', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ paziente:`Lotto ${batchNome} — ${filesLotto.length} ECG`, origine:"azienda", urgenza:"normale", note:`Azienda: ${nomeAzienda||ME_AZIENDA} | Email referto: ${emailLotto}` }) }).catch(()=>{});
   };
 
@@ -694,7 +697,7 @@ const AziendaView = ({ ecgs, setEcgs }) => {
             )}
             <div style={{ color:C.textSoft, fontWeight:600, fontSize:13, marginBottom:6 }}>Note (opzionale)</div>
             <textarea style={{...inputStyle, resize:"vertical", marginBottom:14}} rows={2} value={noteGenerali} onChange={e=>setNoteGenerali(e.target.value)} placeholder="Es. idoneità annuale, visita periodica..." />
-            <button onClick={inviaLotto} style={btnPrimary(!!(batchNome&&filesLotto.length>0))}>
+            <button onClick={inviaLotto} disabled={caricando} style={btnPrimary(!!(batchNome&&filesLotto.length>0&&!caricando))}>
               Invia lotto ({filesLotto.length} ECG) →
             </button>
           </div>
@@ -3538,8 +3541,14 @@ export default function App() {
         setMeCardiologo(`${data.nome||''} ${data.cognome||''}`.trim());
       }
       if (data?.ruoli && data.ruoli.length > 1) {
-        setRuoliDisponibili(data.ruoli);
-        setRole(null);
+        const savedRole = localStorage.getItem('preferito_ruolo');
+        if (savedRole && data.ruoli.includes(savedRole)) {
+          // Usa il ruolo salvato — niente selettore
+          setRole(savedRole);
+        } else {
+          setRuoliDisponibili(data.ruoli);
+          setRole(null);
+        }
       } else if (data?.ruolo) {
         setRole(data.ruolo);
       }
@@ -3567,8 +3576,9 @@ export default function App() {
     return 'Errore di connessione. Riprova.';
   };
 
-  const handleLogout = () => {
+  const handleLogout = (cambiaProfilo = false) => {
     authDoneRef.current = false;
+    if (cambiaProfilo) localStorage.removeItem('preferito_ruolo');
     setEcgs([]);
     setMeCardiologo(ME_CARDIOLOGO_DEFAULT);
     setCardiologiDB([]);
@@ -3599,6 +3609,7 @@ export default function App() {
         <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
           {ruoliDisponibili.map(r => (
             <button key={r} onClick={async () => {
+              localStorage.setItem('preferito_ruolo', r);
               setRole(r);
               if (r === 'cardiologo') {
                 const { data: { session } } = await supabase.auth.getSession();
