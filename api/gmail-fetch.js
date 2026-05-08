@@ -221,6 +221,21 @@ export default async function handler(req, res) {
         await supabase.from('ecgs').insert(ecgs);
         processed++;
         console.log(`Processata email da ${fromEmail}: ${ecgs.length} ECG lotto "${batchNome}"`);
+        // Push notification a tutti i cardiologi
+        const { data: cardiologi } = await supabase.from('user_profiles')
+          .select('nome, cognome').eq('ruolo', 'cardiologo');
+        for (const c of cardiologi || []) {
+          const nome = `${c.nome||''} ${c.cognome||''}`.trim();
+          fetch('https://ambulatoriomillefonti.it/api/push-send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              cardiologo_nome: nome,
+              title: '🫀 Nuovi ECG da refertare',
+              body: `${ecgs.length} ECG del lotto "${batchNome}" pronti per la refertazione`,
+            })
+          }).catch(() => {});
+        }
       }
 
       // Segna come processata nel DB PRIMA di marcare come letta

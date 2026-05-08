@@ -2176,6 +2176,15 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: user.email, cardiologo, count, batchNome: batchNome || null })
     }).catch(() => {});
+    fetch('/api/push-send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        cardiologo_nome: cardiologo,
+        title: '🫀 Nuovi ECG assegnati',
+        body: batchNome ? `${count} ECG del lotto "${batchNome}" da refertare` : `${count} ECG da refertare`,
+      })
+    }).catch(() => {});
   };
 
   const assegnaBatch = async (batchId, cardiologo) => {
