@@ -564,19 +564,8 @@ const AziendaView = ({ ecgs, setEcgs }) => {
     setSent(true);
     setCaricando(false);
     fetch('/api/notify', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ paziente:`Lotto ${batchNome} — ${filesLotto.length} ECG`, origine:"azienda", urgenza:"normale", note:`Azienda: ${nomeAzienda||ME_AZIENDA} | Email referto: ${emailLotto}` }) }).catch(()=>{});
-    // Push al cardiologo assegnato secondo le regole
-    supabase.from('regole_assegnazione').select('*').single().then(({ data: regole }) => {
-      if (!regole) return;
-      const giorni = ['domenica','lunedi','martedi','mercoledi','giovedi','venerdi','sabato'];
-      let dest = '';
-      if (regole.modalita === 'unico') dest = regole.cardiologo_unico || '';
-      else if (regole.modalita === 'giorni') dest = regole[giorni[new Date().getDay()]] || '';
-      if (!dest) return;
-      fetch('/api/push-send', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cardiologo_nome: dest, title: '🫀 Nuovi ECG da refertare', body: `${filesLotto.length} ECG del lotto "${batchNome}" pronti per la refertazione` })
-      }).catch(() => {});
-    }).catch(() => {});
+    // Push via endpoint server-side (ha accesso a regole_assegnazione con service key)
+    fetch('/api/push-lotto', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ batchNome, count: filesLotto.length }) }).catch(()=>{});
   };
 
   const scaricaBatchAzienda = async (batchId, bNome) => {
