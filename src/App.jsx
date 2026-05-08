@@ -3198,8 +3198,6 @@ export default function App() {
   // Route /carica — pagina pubblica senza login
   if (window.location.pathname === '/carica') return <UploadGenerico />;
 
-  const isMobile = useIsMobile();
-
   if (ruoliDisponibili.length > 1 && !role) return (
     <div style={{ minHeight:"100vh", background:"linear-gradient(135deg, #e8f2ff, #f4f7fb, #e8f9f4)", display:"flex", alignItems:"center", justifyContent:"center", padding:24, fontFamily:SANS }}>
       <div style={{ maxWidth:400, width:"100%", textAlign:"center" }}>
@@ -3231,9 +3229,7 @@ export default function App() {
 
   if (!role) return <LoginReale onLogin={handleLogin} />;
 
-  // Mobile views (no Shell header)
-  if (isMobile && role === "cardiologo") return <CardiologoMobile ecgs={ecgs} setEcgs={setEcgs} meCardiologo={meCardiologo} caricaEcgs={caricaEcgs} />;
-  if (isMobile && role === "admin") return <AdminMobile ecgs={ecgs} setEcgs={setEcgs} caricaEcgs={caricaEcgs} />;
+
 
   return (
     <Shell role={role} onLogout={handleLogout} meCardiologo={meCardiologo}>
