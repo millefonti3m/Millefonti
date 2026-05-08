@@ -2590,19 +2590,18 @@ const LoginReale = ({ onLogin }) => {
             <label style={{ color:"#3d5270", fontSize:12, fontWeight:600, display:"block", marginBottom:7 }}>Password</label>
             <input value={password} onChange={e=>setPassword(e.target.value)} type="password" placeholder="••••••••"
               name="password" autoComplete="current-password"
-              style={{ background:"#f4f7fb", border:"1px solid #dde5f0", borderRadius:10, padding:"11px 14px", color:"#1a2640", fontSize:14, width:"100%", outline:"none" }}
-               />
+              style={{ background:"#f4f7fb", border:"1px solid #dde5f0", borderRadius:10, padding:"11px 14px", color:"#1a2640", fontSize:14, width:"100%", outline:"none" }} />
           </div>
+          </form>
           {errore && (
             <div style={{ background:"#fdedf0", border:"1px solid #e03e5a33", borderRadius:10, padding:"10px 14px", color:"#e03e5a", fontSize:13, marginBottom:16 }}>
               {errore}
             </div>
           )}
-          <button type="submit" disabled={loading || !email || !password}
+          <button onClick={handleSubmit} disabled={loading || !email || !password}
             style={{ background: (loading||!email||!password) ? "#dde5f0" : "#2e7cf6", color: (loading||!email||!password) ? "#8098b8" : "white", border:"none", borderRadius:10, padding:"13px 0", cursor: (loading||!email||!password) ? "not-allowed" : "pointer", fontWeight:700, fontSize:15, width:"100%", boxShadow: (!loading&&email&&password) ? "0 4px 16px rgba(46,124,246,0.3)" : "none" }}>
             {loading ? "Accesso in corso..." : "Accedi →"}
           </button>
-          </form>
         </div>
         <div style={{ color:"#b0c2d8", fontFamily:"'DM Mono', monospace", fontSize:10, marginTop:20, letterSpacing:2 }}>MILLEFONTI · ACCESSO SICURO</div>
       </div>
@@ -2612,9 +2611,9 @@ const LoginReale = ({ onLogin }) => {
 
 // ── MOBILE HOOK ────────────────────────────────────────────────────────────
 const useIsMobile = () => {
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   useEffect(() => {
-    const handler = () => setIsMobile(window.innerWidth < 1024);
+    const handler = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener('resize', handler);
     return () => window.removeEventListener('resize', handler);
   }, []);
@@ -3017,7 +3016,7 @@ const AdminMobile = ({ ecgs, setEcgs, caricaEcgs }) => {
             {cardiologiDB.map(nome=>(
               <button key={nome} onClick={()=>assegnaBatch(batchId,nome)} disabled={assegnando===batchId}
                 style={{ width:'100%', background:assegnando===batchId?C.border:C.accent, color:'white', border:'none', borderRadius:10, padding:'14px 0', cursor:'pointer', fontWeight:700, fontSize:14, marginBottom:8 }}>
-                {assegnando===batchId?'⏳ Assegnando...':`→ Assegna a ${nome}`}
+                {assegnando===batchId?'⏳ Assegnando...`:`→ Assegna a ${nome}`}
               </button>
             ))}
           </div>
@@ -3227,9 +3226,13 @@ export default function App() {
     </div>
   );
 
+  const isMobile = useIsMobile();
+
   if (!role) return <LoginReale onLogin={handleLogin} />;
 
-
+  // Mobile views (no Shell header)
+  if (isMobile && role === "cardiologo") return <CardiologoMobile ecgs={ecgs} setEcgs={setEcgs} meCardiologo={meCardiologo} caricaEcgs={caricaEcgs} />;
+  if (isMobile && role === "admin") return <AdminMobile ecgs={ecgs} setEcgs={setEcgs} caricaEcgs={caricaEcgs} />;
 
   return (
     <Shell role={role} onLogout={handleLogout} meCardiologo={meCardiologo}>
