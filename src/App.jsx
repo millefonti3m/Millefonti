@@ -2579,7 +2579,7 @@ const LoginReale = ({ onLogin }) => {
         <h1 style={{ color:"#1a2640", fontSize:36, fontWeight:700, marginBottom:4, letterSpacing:-1 }}>Ambulatorio Millefonti</h1>
         <p style={{ color:"#8098b8", fontSize:13, marginBottom:36 }}>Accedi al tuo account</p>
         <div style={{ background:"white", border:"1px solid #dde5f0", borderRadius:18, padding:28, boxShadow:"0 2px 12px rgba(46,124,246,0.08)", textAlign:"left" }}>
-          <form onSubmit={e=>{e.preventDefault();handleSubmit();}} autoComplete="on" style={{margin:0}}>
+          <form onSubmit={e=>{e.preventDefault();handleSubmit();}} autoComplete="on" action="#" method="post" style={{margin:0}}>
           <div style={{ marginBottom:16 }}>
             <label style={{ color:"#3d5270", fontSize:12, fontWeight:600, display:"block", marginBottom:7 }}>Email</label>
             <input value={email} onChange={e=>setEmail(e.target.value)} type="email" placeholder="nome@esempio.it"
@@ -2786,7 +2786,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs }) => {
 
   // SCREEN: LISTA LOTTI
   if (screen === 'lista') return (
-    <div style={{ minHeight:'100vh', background:C.bg, fontFamily:SANS }}>
+    <div style={{ position:'fixed', inset:0, background:C.bg, fontFamily:SANS, overflowY:'auto', zIndex:9999 }}>
       <div style={{ background:'linear-gradient(135deg,#1a2640,#2e7cf6)', padding:'20px 16px 16px', color:'white' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
           <div>
@@ -2845,7 +2845,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs }) => {
     const batchEcgs = selectedBatch ? mieiEcgs.filter(e=>e.batch_id===selectedBatch.id) : [];
     const tuttiRefertati = batchEcgs.every(e=>e.stato==='refertato');
     return (
-      <div style={{ minHeight:'100vh', background:C.bg, fontFamily:SANS }}>
+      <div style={{ position:'fixed', inset:0, background:C.bg, fontFamily:SANS, overflowY:'auto', zIndex:9999 }}>
         <div style={{ background:'linear-gradient(135deg,#1a2640,#2e7cf6)', padding:'20px 16px 16px', color:'white', display:'flex', alignItems:'center', gap:12 }}>
           <button onClick={()=>setScreen('lista')} style={{ background:'rgba(255,255,255,0.2)', border:'none', color:'white', borderRadius:10, padding:'8px 12px', cursor:'pointer', fontSize:18 }}>←</button>
           <div>
@@ -2887,7 +2887,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs }) => {
   ];
 
   return (
-    <div style={{ minHeight:'100vh', background:'#f4f7fb', fontFamily:SANS, paddingBottom:100 }}>
+    <div style={{ position:'fixed', inset:0, background:'#f4f7fb', fontFamily:SANS, overflowY:'auto', paddingBottom:100, zIndex:9999 }}>
       {/* Header */}
       <div style={{ background:'linear-gradient(135deg,#1a2640,#2e7cf6)', padding:'16px', color:'white', display:'flex', alignItems:'center', gap:10 }}>
         <button onClick={()=>{ setScreen(selectedEcg?.batch_id?'lotto':'lista'); resetReferta(); }}
@@ -2984,7 +2984,7 @@ const AdminMobile = ({ ecgs, setEcgs, caricaEcgs }) => {
   };
 
   if (screen === 'dashboard') return (
-    <div style={{ minHeight:'100vh', background:C.bg, fontFamily:SANS }}>
+    <div style={{ position:'fixed', inset:0, background:C.bg, fontFamily:SANS, overflowY:'auto', zIndex:9999 }}>
       <div style={{ background:'linear-gradient(135deg,#1a2640,#2e7cf6)', padding:'20px 16px', color:'white' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
           <div>
@@ -3024,7 +3024,7 @@ const AdminMobile = ({ ecgs, setEcgs, caricaEcgs }) => {
   );
 
   if (screen === 'assegna') return (
-    <div style={{ minHeight:'100vh', background:C.bg, fontFamily:SANS }}>
+    <div style={{ position:'fixed', inset:0, background:C.bg, fontFamily:SANS, overflowY:'auto', zIndex:9999 }}>
       <div style={{ background:'linear-gradient(135deg,#1a2640,#2e7cf6)', padding:'16px', color:'white', display:'flex', alignItems:'center', gap:12 }}>
         <button onClick={()=>setScreen('dashboard')} style={{ background:'rgba(255,255,255,0.2)', border:'none', color:'white', borderRadius:10, padding:'8px 12px', cursor:'pointer', fontSize:18 }}>←</button>
         <div style={{ fontSize:18, fontWeight:700 }}>Lotti da assegnare</div>
