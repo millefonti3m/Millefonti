@@ -3468,6 +3468,20 @@ export default function App() {
     }).catch(() => {});
 
     supabaseAuth();
+
+    // Ricarica ECG quando l'app torna in primo piano (PWA iPhone)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') caricaEcgs();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+
+    // Polling ogni 30 secondi come fallback al realtime
+    const pollInterval = setInterval(() => caricaEcgs(), 30000);
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      clearInterval(pollInterval);
+    };
   }, []);
 
   // Ref per evitare doppia chiamata a caricaRuolo
