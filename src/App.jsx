@@ -2668,6 +2668,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout })
   const [generating, setGenerating] = useState(false);
   const [previewDataUrl, setPreviewDataUrl] = useState(null);
   const [zoom, setZoom] = useState(1);
+  const [chiudendo, setChiudendo] = useState(false);
 
   const mieiEcgs = ecgs.filter(e => e.cardiologo === meCardiologo);
   const almenoCrocetta = Object.values(crocette).some(Boolean);
@@ -2717,6 +2718,49 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout })
 
   const apriEcg = (ecg) => {
     setSelectedEcg(ecg); resetReferta(); setScreen('referta');
+  };
+
+  const scaricaBatchMobile = async (batchId, batchNome) => {
+    const batchEcgs = mieiEcgs.filter(e => e.batch_id === batchId && e.stato === 'refertato' && e.file_referto_url);
+    if (batchEcgs.length === 0) { alert('Nessun referto disponibile'); return; }
+    const { JSZip } = await import('jszip').then(m => ({ JSZip: m.default }));
+    const zip = new JSZip();
+    await Promise.all(batchEcgs.map(async (e) => {
+      const { data } = await supabase.storage.from('ecg-files').download(e.file_referto_url);
+      if (data) zip.file(e.file_referto_url.split('/').pop(), data);
+    }));
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `${batchNome}_referti.zip`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const chiudiBatchMobile = async (batchId, batchNome, emailDest) => {
+    if (!emailDest) { alert('Email destinatario non trovata'); return; }
+    setChiudendo(true);
+    try {
+      const JSZip = (await import('jszip')).default;
+      const batchEcgs = mieiEcgs.filter(e => e.batch_id === batchId && e.stato === 'refertato' && e.file_referto_url);
+      const zip = new JSZip();
+      await Promise.all(batchEcgs.map(async (e) => {
+        const { data } = await supabase.storage.from('ecg-files').download(e.file_referto_url);
+        if (data) zip.file(e.file_referto_url.split('/').pop(), data);
+      }));
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const zipFileName = `referti/zip/_${batchNome.replace(/[^a-zA-Z0-9]/g,'_')}_${batchId}.zip`;
+      await supabase.storage.from('ecg-files').upload(zipFileName, zipBlob, { contentType:'application/zip', upsert:true });
+      const { data: urlData } = await supabase.storage.from('ecg-files').createSignedUrl(zipFileName, 60*60*24*7);
+      if (urlData?.signedUrl) {
+        await fetch('/api/notify-referto', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: emailDest, cardiologo: meCardiologo, downloadUrl: urlData.signedUrl, isBatch: true, batchNome, count: batchEcgs.length })
+        });
+        alert(`✅ Email inviata a ${emailDest}`);
+      }
+    } catch(e) { alert('Errore: ' + e.message); }
+    setChiudendo(false);
   };
 
   const generaEConferma = async () => {
@@ -2891,9 +2935,21 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout })
             </div>
           ))}
           {tuttiRefertati && (
-            <div style={{ background:'#f0fdf4', border:`2px solid ${C.green}`, borderRadius:14, padding:20, textAlign:'center' }}>
-              <div style={{ color:C.green, fontWeight:700, fontSize:16, marginBottom:4 }}>🎉 Lotto completato!</div>
-              <div style={{ color:C.muted, fontSize:13 }}>Vai su desktop per inviare l'email al cliente</div>
+            <div style={{ background:'#f0fdf4', border:`2px solid ${C.green}`, borderRadius:14, padding:20 }}>
+              <div style={{ color:C.green, fontWeight:700, fontSize:16, marginBottom:4, textAlign:'center' }}>🎉 Lotto completato!</div>
+              <div style={{ color:C.muted, fontSize:13, textAlign:'center', marginBottom:16 }}>
+                {selectedBatch?.email || 'Nessuna email'}</div>
+              <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                <button onClick={()=>chiudiBatchMobile(selectedBatch.id, selectedBatch.nome, selectedBatch.email)}
+                  disabled={chiudendo}
+                  style={{ background:chiudendo?C.border:'linear-gradient(135deg,#1aaa6e,#0ea5a0)', color:chiudendo?C.muted:'white', border:'none', borderRadius:12, padding:'16px 0', cursor:chiudendo?'not-allowed':'pointer', fontWeight:700, fontSize:15 }}>
+                  {chiudendo ? '⏳ Invio in corso...' : '✉️ Invia email al cliente'}
+                </button>
+                <button onClick={()=>scaricaBatchMobile(selectedBatch.id, selectedBatch.nome)}
+                  style={{ background:'white', border:`2px solid ${C.accent}`, color:C.accent, borderRadius:12, padding:'14px 0', cursor:'pointer', fontWeight:700, fontSize:15 }}>
+                  ⬇️ Scarica ZIP
+                </button>
+              </div>
             </div>
           )}
         </div>
