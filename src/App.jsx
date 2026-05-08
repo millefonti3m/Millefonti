@@ -2904,7 +2904,7 @@ const useIsMobile = () => {
 };
 
 // ── CARDIOLOGO MOBILE ──────────────────────────────────────────────────────
-const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout }) => {
+const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, pushAbilitato, registraPush }) => {
   const [screen, setScreen] = useState('lista'); // lista | lotto | referta
   const [selectedBatch, setSelectedBatch] = useState(null);
   const [selectedEcg, setSelectedEcg] = useState(null);
@@ -3108,7 +3108,11 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout })
             <div style={{ fontSize:18, fontWeight:700 }}>Dott. {meCardiologo}</div>
             <div style={{ fontSize:13, opacity:0.8, marginTop:2 }}>{mieiEcgs.filter(e=>e.stato==='in_attesa').length} ECG da refertare</div>
           </div>
-          <button onClick={onLogout} style={{ background:'rgba(255,255,255,0.15)', border:'none', color:'white', borderRadius:10, padding:'8px 14px', cursor:'pointer', fontSize:13, fontWeight:600, marginTop:4 }}>Esci</button>
+          <div style={{display:'flex',gap:6,marginTop:4}}>
+            {!pushAbilitato && <button onClick={registraPush} style={{ background:'rgba(255,220,0,0.25)', border:'1px solid rgba(255,220,0,0.5)', color:'white', borderRadius:10, padding:'8px 12px', cursor:'pointer', fontSize:16 }} title="Abilita notifiche">🔔</button>}
+            {pushAbilitato && <span style={{fontSize:16,padding:'8px 4px'}} title="Notifiche attive">🔔✓</span>}
+            <button onClick={onLogout} style={{ background:'rgba(255,255,255,0.15)', border:'none', color:'white', borderRadius:10, padding:'8px 14px', cursor:'pointer', fontSize:13, fontWeight:600 }}>Esci</button>
+          </div>
         </div>
       </div>
       <div style={{ padding:16, display:'flex', flexDirection:'column', gap:12 }}>
@@ -3588,7 +3592,7 @@ export default function App() {
   if (!role) return <LoginReale onLogin={handleLogin} />;
 
   // Vista mobile — bypassa completamente Shell
-  if (isMobile && role === 'cardiologo') return <CardiologoMobile ecgs={ecgs} setEcgs={setEcgs} meCardiologo={meCardiologo} caricaEcgs={caricaEcgs} onLogout={handleLogout} />;
+  if (isMobile && role === 'cardiologo') return <CardiologoMobile ecgs={ecgs} setEcgs={setEcgs} meCardiologo={meCardiologo} caricaEcgs={caricaEcgs} onLogout={handleLogout} pushAbilitato={pushAbilitato} registraPush={registraPush} />;
   if (isMobile && role === 'admin') return <AdminMobile ecgs={ecgs} setEcgs={setEcgs} caricaEcgs={caricaEcgs} onLogout={handleLogout} />;
 
   return (
