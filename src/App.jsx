@@ -2690,17 +2690,27 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs }) => {
     setGenerating(true);
     try {
       const { jsPDF } = await import("jspdf");
-      const pdfjsLib = await import("pdfjs-dist");
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
-      const ab = await ecgFile.arrayBuffer();
-      const pdfDoc = await pdfjsLib.getDocument({ data: ab }).promise;
-      const page = await pdfDoc.getPage(1);
-      const vp = page.getViewport({ scale: 2.0 });
       const cv = document.createElement('canvas');
-      cv.width = vp.width; cv.height = vp.height;
       const ctx = cv.getContext('2d');
-      ctx.fillStyle = '#fff'; ctx.fillRect(0,0,cv.width,cv.height);
-      await page.render({ canvasContext: ctx, viewport: vp }).promise;
+      if (ecgType === 'image') {
+        // JPEG/PNG: disegna direttamente su canvas
+        const img = new Image();
+        img.src = ecgUrl;
+        await new Promise(r => { img.onload = r; });
+        cv.width = img.naturalWidth; cv.height = img.naturalHeight;
+        ctx.drawImage(img, 0, 0);
+      } else {
+        // PDF: rasterizza con pdfjs
+        const pdfjsLib = await import("pdfjs-dist");
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+        const ab = await ecgFile.arrayBuffer();
+        const pdfDoc = await pdfjsLib.getDocument({ data: ab }).promise;
+        const page = await pdfDoc.getPage(1);
+        const vp = page.getViewport({ scale: 2.0 });
+        cv.width = vp.width; cv.height = vp.height;
+        ctx.fillStyle = '#fff'; ctx.fillRect(0,0,cv.width,cv.height);
+        await page.render({ canvasContext: ctx, viewport: vp }).promise;
+      }
 
       // Overlay semplice per mobile
       const W = cv.width, H = cv.height;
@@ -2778,9 +2788,14 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs }) => {
   if (screen === 'lista') return (
     <div style={{ minHeight:'100vh', background:C.bg, fontFamily:SANS }}>
       <div style={{ background:'linear-gradient(135deg,#1a2640,#2e7cf6)', padding:'20px 16px 16px', color:'white' }}>
-        <div style={{ fontSize:11, opacity:0.7, marginBottom:4, textTransform:'uppercase', letterSpacing:1 }}>Cardiologo</div>
-        <div style={{ fontSize:18, fontWeight:700 }}>Dott. {meCardiologo}</div>
-        <div style={{ fontSize:13, opacity:0.8, marginTop:2 }}>{mieiEcgs.filter(e=>e.stato==='in_attesa').length} ECG da refertare</div>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+          <div>
+            <div style={{ fontSize:11, opacity:0.7, marginBottom:4, textTransform:'uppercase', letterSpacing:1 }}>Cardiologo</div>
+            <div style={{ fontSize:18, fontWeight:700 }}>Dott. {meCardiologo}</div>
+            <div style={{ fontSize:13, opacity:0.8, marginTop:2 }}>{mieiEcgs.filter(e=>e.stato==='in_attesa').length} ECG da refertare</div>
+          </div>
+          <button onClick={()=>supabase.auth.signOut()} style={{ background:'rgba(255,255,255,0.18)', border:'none', color:'white', borderRadius:10, padding:'8px 14px', cursor:'pointer', fontSize:13, fontWeight:600 }}>Esci</button>
+        </div>
       </div>
       <div style={{ padding:16, display:'flex', flexDirection:'column', gap:12 }}>
         {Object.entries(batches).map(([batchId, batch]) => {
@@ -2971,8 +2986,13 @@ const AdminMobile = ({ ecgs, setEcgs, caricaEcgs }) => {
   if (screen === 'dashboard') return (
     <div style={{ minHeight:'100vh', background:C.bg, fontFamily:SANS }}>
       <div style={{ background:'linear-gradient(135deg,#1a2640,#2e7cf6)', padding:'20px 16px', color:'white' }}>
-        <div style={{ fontSize:11, opacity:0.7, textTransform:'uppercase', letterSpacing:1, marginBottom:4 }}>Ambulatorio Millefonti</div>
-        <div style={{ fontSize:20, fontWeight:700 }}>Dashboard Admin</div>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+          <div>
+            <div style={{ fontSize:11, opacity:0.7, textTransform:'uppercase', letterSpacing:1, marginBottom:4 }}>Ambulatorio Millefonti</div>
+            <div style={{ fontSize:20, fontWeight:700 }}>Dashboard Admin</div>
+          </div>
+          <button onClick={()=>supabase.auth.signOut()} style={{ background:'rgba(255,255,255,0.18)', border:'none', color:'white', borderRadius:10, padding:'8px 14px', cursor:'pointer', fontSize:13, fontWeight:600 }}>Esci</button>
+        </div>
       </div>
       <div style={{ padding:16, display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
         {[
@@ -3017,7 +3037,7 @@ const AdminMobile = ({ ecgs, setEcgs, caricaEcgs }) => {
             {cardiologiDB.map(nome=>(
               <button key={nome} onClick={()=>assegnaBatch(batchId,nome)} disabled={assegnando===batchId}
                 style={{ width:'100%', background:assegnando===batchId?C.border:C.accent, color:'white', border:'none', borderRadius:10, padding:'14px 0', cursor:'pointer', fontWeight:700, fontSize:14, marginBottom:8 }}>
-                {assegnando===batchId?'⏳ Assegnando...`:`→ Assegna a ${nome}`}
+                {assegnando===batchId?'⏳ Assegnando...':`→ Assegna a ${nome}`}
               </button>
             ))}
           </div>
