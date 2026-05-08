@@ -2579,7 +2579,7 @@ const LoginReale = ({ onLogin }) => {
         <h1 style={{ color:"#1a2640", fontSize:36, fontWeight:700, marginBottom:4, letterSpacing:-1 }}>Ambulatorio Millefonti</h1>
         <p style={{ color:"#8098b8", fontSize:13, marginBottom:36 }}>Accedi al tuo account</p>
         <div style={{ background:"white", border:"1px solid #dde5f0", borderRadius:18, padding:28, boxShadow:"0 2px 12px rgba(46,124,246,0.08)", textAlign:"left" }}>
-          <form onSubmit={e=>{e.preventDefault();handleSubmit();}} autoComplete="on" action="javascript:void(0)" style={{margin:0}}>
+          <form onSubmit={e=>{e.preventDefault();handleSubmit();}} autoComplete="on" style={{margin:0}}>
           <div style={{ marginBottom:16 }}>
             <label style={{ color:"#3d5270", fontSize:12, fontWeight:600, display:"block", marginBottom:7 }}>Email</label>
             <input value={email} onChange={e=>setEmail(e.target.value)} type="email" placeholder="nome@esempio.it"
@@ -2776,16 +2776,11 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs }) => {
 
   // SCREEN: LISTA LOTTI
   if (screen === 'lista') return (
-    <div style={{ position:'fixed', top:0, right:0, bottom:0, left:0, background:C.bg, fontFamily:SANS, overflowY:'auto', zIndex:9999 }}>
+    <div style={{ minHeight:'100vh', background:C.bg, fontFamily:SANS }}>
       <div style={{ background:'linear-gradient(135deg,#1a2640,#2e7cf6)', padding:'20px 16px 16px', color:'white' }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
-          <div>
-            <div style={{ fontSize:11, opacity:0.7, marginBottom:4, textTransform:'uppercase', letterSpacing:1 }}>Cardiologo</div>
-            <div style={{ fontSize:18, fontWeight:700 }}>Dott. {meCardiologo}</div>
-            <div style={{ fontSize:13, opacity:0.8, marginTop:2 }}>{mieiEcgs.filter(e=>e.stato==='in_attesa').length} ECG da refertare</div>
-          </div>
-          <button onClick={()=>supabase.auth.signOut()} style={{ background:'rgba(255,255,255,0.18)', border:'none', color:'white', borderRadius:10, padding:'8px 14px', cursor:'pointer', fontSize:13, fontWeight:600 }}>Esci</button>
-        </div>
+        <div style={{ fontSize:11, opacity:0.7, marginBottom:4, textTransform:'uppercase', letterSpacing:1 }}>Cardiologo</div>
+        <div style={{ fontSize:18, fontWeight:700 }}>Dott. {meCardiologo}</div>
+        <div style={{ fontSize:13, opacity:0.8, marginTop:2 }}>{mieiEcgs.filter(e=>e.stato==='in_attesa').length} ECG da refertare</div>
       </div>
       <div style={{ padding:16, display:'flex', flexDirection:'column', gap:12 }}>
         {Object.entries(batches).map(([batchId, batch]) => {
@@ -2835,7 +2830,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs }) => {
     const batchEcgs = selectedBatch ? mieiEcgs.filter(e=>e.batch_id===selectedBatch.id) : [];
     const tuttiRefertati = batchEcgs.every(e=>e.stato==='refertato');
     return (
-      <div style={{ position:'fixed', top:0, right:0, bottom:0, left:0, background:C.bg, fontFamily:SANS, overflowY:'auto', zIndex:9999 }}>
+      <div style={{ minHeight:'100vh', background:C.bg, fontFamily:SANS }}>
         <div style={{ background:'linear-gradient(135deg,#1a2640,#2e7cf6)', padding:'20px 16px 16px', color:'white', display:'flex', alignItems:'center', gap:12 }}>
           <button onClick={()=>setScreen('lista')} style={{ background:'rgba(255,255,255,0.2)', border:'none', color:'white', borderRadius:10, padding:'8px 12px', cursor:'pointer', fontSize:18 }}>←</button>
           <div>
@@ -2877,7 +2872,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs }) => {
   ];
 
   return (
-    <div style={{ position:'fixed', top:0, right:0, bottom:0, left:0, background:'#f4f7fb', fontFamily:SANS, overflowY:'auto', paddingBottom:100, zIndex:9999 }}>
+    <div style={{ minHeight:'100vh', background:'#f4f7fb', fontFamily:SANS, paddingBottom:100 }}>
       {/* Header */}
       <div style={{ background:'linear-gradient(135deg,#1a2640,#2e7cf6)', padding:'16px', color:'white', display:'flex', alignItems:'center', gap:10 }}>
         <button onClick={()=>{ setScreen(selectedEcg?.batch_id?'lotto':'lista'); resetReferta(); }}
@@ -2974,15 +2969,10 @@ const AdminMobile = ({ ecgs, setEcgs, caricaEcgs }) => {
   };
 
   if (screen === 'dashboard') return (
-    <div style={{ position:'fixed', top:0, right:0, bottom:0, left:0, background:C.bg, fontFamily:SANS, overflowY:'auto', zIndex:9999 }}>
+    <div style={{ minHeight:'100vh', background:C.bg, fontFamily:SANS }}>
       <div style={{ background:'linear-gradient(135deg,#1a2640,#2e7cf6)', padding:'20px 16px', color:'white' }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
-          <div>
-            <div style={{ fontSize:11, opacity:0.7, textTransform:'uppercase', letterSpacing:1, marginBottom:4 }}>Ambulatorio Millefonti</div>
-            <div style={{ fontSize:20, fontWeight:700 }}>Dashboard Admin</div>
-          </div>
-          <button onClick={()=>supabase.auth.signOut()} style={{ background:'rgba(255,255,255,0.18)', border:'none', color:'white', borderRadius:10, padding:'8px 14px', cursor:'pointer', fontSize:13, fontWeight:600 }}>Esci</button>
-        </div>
+        <div style={{ fontSize:11, opacity:0.7, textTransform:'uppercase', letterSpacing:1, marginBottom:4 }}>Ambulatorio Millefonti</div>
+        <div style={{ fontSize:20, fontWeight:700 }}>Dashboard Admin</div>
       </div>
       <div style={{ padding:16, display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
         {[
@@ -3014,7 +3004,7 @@ const AdminMobile = ({ ecgs, setEcgs, caricaEcgs }) => {
   );
 
   if (screen === 'assegna') return (
-    <div style={{ position:'fixed', top:0, right:0, bottom:0, left:0, background:C.bg, fontFamily:SANS, overflowY:'auto', zIndex:9999 }}>
+    <div style={{ minHeight:'100vh', background:C.bg, fontFamily:SANS }}>
       <div style={{ background:'linear-gradient(135deg,#1a2640,#2e7cf6)', padding:'16px', color:'white', display:'flex', alignItems:'center', gap:12 }}>
         <button onClick={()=>setScreen('dashboard')} style={{ background:'rgba(255,255,255,0.2)', border:'none', color:'white', borderRadius:10, padding:'8px 12px', cursor:'pointer', fontSize:18 }}>←</button>
         <div style={{ fontSize:18, fontWeight:700 }}>Lotti da assegnare</div>
