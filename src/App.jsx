@@ -2158,7 +2158,17 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
   };
 
   const inviaNotificaCardiologo = async (cardiologo, count, batchNome) => {
-    // Non mandare notifica a Mansour (usa ecg.millefonti@gmail.com)
+    // Push sempre — prima di qualsiasi early return
+    fetch('/api/push-send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        cardiologo_nome: cardiologo,
+        title: '🫀 Nuovi ECG assegnati',
+        body: batchNome ? `${count} ECG del lotto "${batchNome}" da refertare` : `${count} ECG da refertare`,
+      })
+    }).catch(() => {});
+    // Email solo per cardiologi diversi da Mansour
     if (cardiologo === 'Mansour') return;
     // Trova email del cardiologo
     const { data: profiles } = await supabase.from('user_profiles')
@@ -2175,15 +2185,6 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: user.email, cardiologo, count, batchNome: batchNome || null })
-    }).catch(() => {});
-    fetch('/api/push-send', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        cardiologo_nome: cardiologo,
-        title: '🫀 Nuovi ECG assegnati',
-        body: batchNome ? `${count} ECG del lotto "${batchNome}" da refertare` : `${count} ECG da refertare`,
-      })
     }).catch(() => {});
   };
 
