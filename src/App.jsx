@@ -2606,6 +2606,432 @@ const LoginReale = ({ onLogin }) => {
   );
 };
 
+// ── MOBILE HOOK ────────────────────────────────────────────────────────────
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+  return isMobile;
+};
+
+// ── CARDIOLOGO MOBILE ──────────────────────────────────────────────────────
+const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs }) => {
+  const [screen, setScreen] = useState('lista'); // lista | lotto | referta
+  const [selectedBatch, setSelectedBatch] = useState(null);
+  const [selectedEcg, setSelectedEcg] = useState(null);
+  const [crocette, setCrocette] = useState({ limiti:false, correlare:false, approfondire:false, visita:false, urgente:false });
+  const [commento, setCommento] = useState('');
+  const [ecgFile, setEcgFile] = useState(null);
+  const [ecgUrl, setEcgUrl] = useState(null);
+  const [ecgType, setEcgType] = useState(null);
+  const [generating, setGenerating] = useState(false);
+  const [previewDataUrl, setPreviewDataUrl] = useState(null);
+  const [zoom, setZoom] = useState(1);
+
+  const mieiEcgs = ecgs.filter(e => e.cardiologo === meCardiologo);
+  const almenoCrocetta = Object.values(crocette).some(Boolean);
+
+  // Carica file da Storage quando cambia ECG
+  useEffect(() => {
+    if (!selectedEcg?.file_ecg_url) return;
+    setEcgFile(null); setEcgUrl(null); setPreviewDataUrl(null);
+    let cancelled = false;
+    supabase.storage.from('ecg-files').download(selectedEcg.file_ecg_url)
+      .then(({ data, error }) => {
+        if (cancelled || error || !data) return;
+        const ext = selectedEcg.file_ecg_url.split('.').pop().toLowerCase();
+        const mimeType = ext === 'pdf' ? 'application/pdf' : `image/${ext}`;
+        const file = new File([data], selectedEcg.file_ecg_url, { type: mimeType });
+        const url = URL.createObjectURL(data);
+        setEcgFile(file); setEcgUrl(url);
+        setEcgType(mimeType === 'application/pdf' ? 'pdf' : 'image');
+        if (mimeType !== 'application/pdf') {
+          setPreviewDataUrl(url);
+        } else {
+          (async () => {
+            try {
+              const pdfjsLib = await import("pdfjs-dist");
+              pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+              const ab = await data.arrayBuffer();
+              const pdfDoc = await pdfjsLib.getDocument({ data: ab }).promise;
+              const page = await pdfDoc.getPage(1);
+              const vp = page.getViewport({ scale: 1.5 });
+              const cv = document.createElement('canvas');
+              cv.width = vp.width; cv.height = vp.height;
+              const ctx2 = cv.getContext('2d');
+              ctx2.fillStyle = '#fff'; ctx2.fillRect(0,0,cv.width,cv.height);
+              await page.render({ canvasContext: ctx2, viewport: vp }).promise;
+              if (!cancelled) setPreviewDataUrl(cv.toDataURL('image/jpeg', 0.85));
+            } catch(e) {}
+          })();
+        }
+      });
+    return () => { cancelled = true; };
+  }, [selectedEcg?.id]);
+
+  const resetReferta = () => {
+    setCrocette({ limiti:false, correlare:false, approfondire:false, visita:false, urgente:false });
+    setCommento(''); setEcgFile(null); setEcgUrl(null); setPreviewDataUrl(null); setZoom(1);
+  };
+
+  const apriEcg = (ecg) => {
+    setSelectedEcg(ecg); resetReferta(); setScreen('referta');
+  };
+
+  const generaEConferma = async () => {
+    if (!ecgFile || !almenoCrocetta || generating) return;
+    setGenerating(true);
+    try {
+      const { jsPDF } = await import("jspdf");
+      const pdfjsLib = await import("pdfjs-dist");
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+      const ab = await ecgFile.arrayBuffer();
+      const pdfDoc = await pdfjsLib.getDocument({ data: ab }).promise;
+      const page = await pdfDoc.getPage(1);
+      const vp = page.getViewport({ scale: 2.0 });
+      const cv = document.createElement('canvas');
+      cv.width = vp.width; cv.height = vp.height;
+      const ctx = cv.getContext('2d');
+      ctx.fillStyle = '#fff'; ctx.fillRect(0,0,cv.width,cv.height);
+      await page.render({ canvasContext: ctx, viewport: vp }).promise;
+
+      // Overlay semplice per mobile
+      const W = cv.width, H = cv.height;
+      const rX = Math.round(W*0.21), rY = Math.round(H*0.082), rW = Math.round(W*0.78), rH = Math.round(H*0.162);
+      ctx.fillStyle = '#fff'; ctx.fillRect(rX,rY,rW,rH);
+      ctx.strokeStyle = '#1a2640'; ctx.lineWidth = 2; ctx.strokeRect(rX,rY,rW,rH);
+      ctx.fillStyle = '#1a2640'; ctx.font = `bold ${Math.round(rH*0.14)}px Arial`;
+      ctx.fillText('REFERTO ECG', rX+10, rY+rH*0.2);
+      const voci = [
+        [crocette.limiti,'ECG nei limiti della norma'],
+        [crocette.correlare,'ECG da correlare con la clinica'],
+        [crocette.approfondire,'ECG da approfondire con medico Curante'],
+        [crocette.visita,'ECG da approfondire con visita cardiologica'],
+        [crocette.urgente,'Se nuova sintomatologia: visita cardiologica urgente'],
+      ];
+      let cy = rY + rH*0.28;
+      const fs = Math.round(rH*0.063);
+      voci.forEach(([checked, label]) => {
+        ctx.fillStyle = checked ? '#1aaa6e' : '#1a2640';
+        ctx.font = `${checked?'bold ':' '}${fs}px Arial`;
+        ctx.fillText((checked?'✓ ':' ')+label, rX+10, cy);
+        cy += fs*1.8;
+      });
+      if (commento) {
+        ctx.fillStyle = '#1a2640'; ctx.font = `${fs}px Arial`;
+        ctx.fillText(commento.substring(0,80), rX+10, cy+fs);
+      }
+      const nb = meCardiologo.replace(/^Dott\.\s*Dr\.?/i,'').replace(/^Dr\.?\s*/i,'').replace(/^Dott\.?\s*/i,'').trim();
+      ctx.fillStyle = '#1a2640'; ctx.font = `bold ${Math.round(rH*0.1)}px Arial`;
+      ctx.fillText('Dott. '+nb, rX+rW*0.45, rY+rH*0.88);
+      ctx.font = `${Math.round(rH*0.075)}px Arial`; ctx.fillStyle = '#6b7d99';
+      ctx.fillText(new Date().toLocaleDateString('it-IT'), rX+rW*0.45, rY+rH*0.98);
+
+      const ratio = W/H, isLandscape = ratio>1;
+      const pdfW = isLandscape?297:210, pdfH = pdfW/ratio;
+      const pdf = new jsPDF({ orientation:isLandscape?'landscape':'portrait', unit:'mm', format:[pdfW,pdfH] });
+      pdf.addImage(cv.toDataURL('image/jpeg',0.78),'JPEG',0,0,pdfW,pdfH);
+      const pdfBlob = pdf.output('blob');
+
+      // Salva su Storage
+      const nomePaziente = (selectedEcg.file_ecg_url||'').split('/').pop().replace(/\.[^.]+$/,'');
+      const refertoFileName = `referti/${nomePaziente}_refertato.pdf`;
+      (async () => {
+        await supabase.storage.from('ecg-files').upload(refertoFileName, pdfBlob, { contentType:'application/pdf', upsert:true });
+        await supabase.from('ecgs').update({ stato:'refertato', file_referto_url:refertoFileName }).eq('id', selectedEcg.id);
+        if (selectedEcg.file_ecg_url) await supabase.storage.from('ecg-files').remove([selectedEcg.file_ecg_url]).catch(()=>{});
+      })();
+
+      // Aggiorna stato locale
+      setEcgs(prev => prev.map(e => e.id===selectedEcg.id ? {...e, stato:'refertato'} : e));
+
+      // Vai al prossimo ECG del batch o torna alla lista
+      if (selectedEcg.batch_id) {
+        const prossimo = mieiEcgs.find(e => e.batch_id===selectedEcg.batch_id && e.stato==='in_attesa' && e.id!==selectedEcg.id);
+        if (prossimo) { setSelectedEcg(prossimo); resetReferta(); }
+        else { setScreen('lotto'); }
+      } else {
+        setScreen('lista');
+      }
+    } catch(e) { alert('Errore: '+e.message); }
+    setGenerating(false);
+  };
+
+  // Raggruppa ECG per batch
+  const batches = {};
+  const singoli = [];
+  mieiEcgs.forEach(e => {
+    if (e.batch_id) {
+      if (!batches[e.batch_id]) batches[e.batch_id] = { nome: e.batch_nome||e.batch_id, ecgs:[], email: e.email_destinatario };
+      batches[e.batch_id].ecgs.push(e);
+    } else singoli.push(e);
+  });
+
+  // SCREEN: LISTA LOTTI
+  if (screen === 'lista') return (
+    <div style={{ minHeight:'100vh', background:C.bg, fontFamily:SANS }}>
+      <div style={{ background:'linear-gradient(135deg,#1a2640,#2e7cf6)', padding:'20px 16px 16px', color:'white' }}>
+        <div style={{ fontSize:11, opacity:0.7, marginBottom:4, textTransform:'uppercase', letterSpacing:1 }}>Cardiologo</div>
+        <div style={{ fontSize:18, fontWeight:700 }}>Dott. {meCardiologo}</div>
+        <div style={{ fontSize:13, opacity:0.8, marginTop:2 }}>{mieiEcgs.filter(e=>e.stato==='in_attesa').length} ECG da refertare</div>
+      </div>
+      <div style={{ padding:16, display:'flex', flexDirection:'column', gap:12 }}>
+        {Object.entries(batches).map(([batchId, batch]) => {
+          const refertati = batch.ecgs.filter(e=>e.stato==='refertato').length;
+          const totale = batch.ecgs.length;
+          const tuttiRefertati = refertati===totale;
+          return (
+            <div key={batchId} onClick={()=>{ setSelectedBatch({id:batchId,...batch}); setScreen('lotto'); }}
+              style={{ background:C.white, borderRadius:16, padding:20, boxShadow:'0 2px 12px rgba(0,0,0,0.06)', border:`1px solid ${C.border}`, cursor:'pointer', active:{background:C.accentLight} }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+                <div style={{ fontWeight:700, fontSize:16, color:C.text }}>📦 {batch.nome}</div>
+                <div style={{ background:tuttiRefertati?C.green:C.purple, color:'white', borderRadius:20, padding:'4px 12px', fontSize:13, fontWeight:700 }}>{refertati}/{totale}</div>
+              </div>
+              <div style={{ background:C.bg, borderRadius:20, height:6 }}>
+                <div style={{ height:'100%', width:`${(refertati/totale)*100}%`, background:tuttiRefertati?C.green:C.accent, borderRadius:20 }} />
+              </div>
+              {!tuttiRefertati && <div style={{ color:C.muted, fontSize:12, marginTop:8 }}>Tocca per aprire il lotto →</div>}
+              {tuttiRefertati && <div style={{ color:C.green, fontSize:12, fontWeight:600, marginTop:8 }}>✓ Lotto completato</div>}
+            </div>
+          );
+        })}
+        {singoli.filter(e=>e.stato==='in_attesa').map(ecg => (
+          <div key={ecg.id} onClick={()=>apriEcg(ecg)}
+            style={{ background:C.white, borderRadius:16, padding:20, boxShadow:'0 2px 12px rgba(0,0,0,0.06)', border:`1px solid ${C.border}`, cursor:'pointer' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <div>
+                <div style={{ fontWeight:700, fontSize:15, color:C.text }}>💊 {ecg.paziente_nome||ecg.paziente}</div>
+                <div style={{ color:C.muted, fontSize:12, marginTop:2 }}>{ecg.farmacia||ecg.origine_dettaglio}</div>
+              </div>
+              <div style={{ color:C.accent, fontWeight:700, fontSize:13 }}>Referta →</div>
+            </div>
+          </div>
+        ))}
+        {mieiEcgs.filter(e=>e.stato==='in_attesa').length===0 && (
+          <div style={{ textAlign:'center', padding:60 }}>
+            <div style={{ fontSize:48, marginBottom:12 }}>🎉</div>
+            <div style={{ color:C.green, fontWeight:700, fontSize:18 }}>Coda vuota!</div>
+            <div style={{ color:C.muted, fontSize:14, marginTop:4 }}>Nessun ECG da refertare</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  // SCREEN: LOTTO
+  if (screen === 'lotto') {
+    const batchEcgs = selectedBatch ? mieiEcgs.filter(e=>e.batch_id===selectedBatch.id) : [];
+    const tuttiRefertati = batchEcgs.every(e=>e.stato==='refertato');
+    return (
+      <div style={{ minHeight:'100vh', background:C.bg, fontFamily:SANS }}>
+        <div style={{ background:'linear-gradient(135deg,#1a2640,#2e7cf6)', padding:'20px 16px 16px', color:'white', display:'flex', alignItems:'center', gap:12 }}>
+          <button onClick={()=>setScreen('lista')} style={{ background:'rgba(255,255,255,0.2)', border:'none', color:'white', borderRadius:10, padding:'8px 12px', cursor:'pointer', fontSize:18 }}>←</button>
+          <div>
+            <div style={{ fontSize:18, fontWeight:700 }}>{selectedBatch?.nome}</div>
+            <div style={{ fontSize:13, opacity:0.8 }}>{batchEcgs.filter(e=>e.stato==='refertato').length}/{batchEcgs.length} refertati</div>
+          </div>
+        </div>
+        <div style={{ padding:16, display:'flex', flexDirection:'column', gap:10 }}>
+          {batchEcgs.map(ecg => (
+            <div key={ecg.id} onClick={()=>ecg.stato==='in_attesa'&&apriEcg(ecg)}
+              style={{ background:C.white, borderRadius:14, padding:18, boxShadow:'0 2px 8px rgba(0,0,0,0.05)', border:`2px solid ${ecg.stato==='refertato'?C.green:C.border}`, cursor:ecg.stato==='in_attesa'?'pointer':'default', opacity:ecg.stato==='refertato'?0.7:1 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <div style={{ fontWeight:600, fontSize:15, color:C.text }}>{ecg.paziente_nome||ecg.paziente}</div>
+                <div style={{ background:ecg.stato==='refertato'?C.greenLight:C.orangeLight, color:ecg.stato==='refertato'?C.green:C.orange, borderRadius:20, padding:'4px 12px', fontSize:12, fontWeight:700 }}>
+                  {ecg.stato==='refertato'?'✓ Refertato':'Da refertare'}
+                </div>
+              </div>
+              {ecg.stato==='in_attesa' && <div style={{ color:C.muted, fontSize:12, marginTop:4 }}>Tocca per refertare →</div>}
+            </div>
+          ))}
+          {tuttiRefertati && (
+            <div style={{ background:'#f0fdf4', border:`2px solid ${C.green}`, borderRadius:14, padding:20, textAlign:'center' }}>
+              <div style={{ color:C.green, fontWeight:700, fontSize:16, marginBottom:4 }}>🎉 Lotto completato!</div>
+              <div style={{ color:C.muted, fontSize:13 }}>Vai su desktop per inviare l'email al cliente</div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // SCREEN: REFERTAZIONE
+  const CROCETTE_MOBILE = [
+    {k:'limiti', label:'ECG nei limiti della norma', color:'#1aaa6e'},
+    {k:'correlare', label:'ECG da correlare con la clinica', color:'#f59e0b'},
+    {k:'approfondire', label:'ECG da approfondire con medico Curante', color:'#e03e5a'},
+    {k:'visita', label:'ECG da approfondire con visita cardiologica', color:'#8b5cf6'},
+    {k:'urgente', label:'Se nuova sintomatologia: visita cardiologica urgente', color:'#ef4444'},
+  ];
+
+  return (
+    <div style={{ minHeight:'100vh', background:'#f4f7fb', fontFamily:SANS, paddingBottom:100 }}>
+      {/* Header */}
+      <div style={{ background:'linear-gradient(135deg,#1a2640,#2e7cf6)', padding:'16px', color:'white', display:'flex', alignItems:'center', gap:10 }}>
+        <button onClick={()=>{ setScreen(selectedEcg?.batch_id?'lotto':'lista'); resetReferta(); }}
+          style={{ background:'rgba(255,255,255,0.2)', border:'none', color:'white', borderRadius:10, padding:'8px 12px', cursor:'pointer', fontSize:18 }}>←</button>
+        <div style={{ flex:1 }}>
+          <div style={{ fontWeight:700, fontSize:15 }}>{selectedEcg?.paziente_nome||selectedEcg?.paziente}</div>
+          <div style={{ fontSize:12, opacity:0.8 }}>{selectedEcg?.batch_nome||selectedEcg?.farmacia||selectedEcg?.origine_dettaglio}</div>
+        </div>
+      </div>
+
+      {/* Anteprima ECG */}
+      <div style={{ margin:12, background:'white', borderRadius:14, overflow:'hidden', boxShadow:'0 2px 12px rgba(0,0,0,0.06)' }}>
+        <div style={{ padding:'10px 14px', display:'flex', justifyContent:'space-between', alignItems:'center', borderBottom:`1px solid ${C.borderLight}` }}>
+          <div style={{ fontWeight:600, fontSize:12, color:C.muted, textTransform:'uppercase', letterSpacing:1 }}>Tracciato ECG</div>
+          <div style={{ display:'flex', gap:6 }}>
+            <button onClick={()=>setZoom(z=>Math.max(0.5,z-0.25))} style={{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:8, padding:'4px 10px', cursor:'pointer', fontWeight:700 }}>−</button>
+            <button onClick={()=>setZoom(z=>Math.min(3,z+0.25))} style={{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:8, padding:'4px 10px', cursor:'pointer', fontWeight:700 }}>+</button>
+          </div>
+        </div>
+        <div style={{ overflow:'auto', maxHeight:'38vh', background:'#f5f5f5' }}>
+          {previewDataUrl
+            ? <img src={previewDataUrl} alt="ECG" style={{ width:`${zoom*100}%`, display:'block' }} />
+            : <div style={{ padding:40, textAlign:'center', color:C.muted }}>⏳ Caricamento...</div>
+          }
+        </div>
+      </div>
+
+      {/* Crocette */}
+      <div style={{ margin:'0 12px', display:'flex', flexDirection:'column', gap:8 }}>
+        {CROCETTE_MOBILE.map(({k,label,color}) => (
+          <button key={k} onClick={()=>setCrocette(p=>({...p,[k]:!p[k]}))}
+            style={{ background:crocette[k]?color+'18':'white', border:`2px solid ${crocette[k]?color:C.border}`, borderRadius:12, padding:'14px 16px', cursor:'pointer', textAlign:'left', display:'flex', alignItems:'center', gap:12, transition:'all 0.15s' }}>
+            <div style={{ width:26, height:26, borderRadius:8, border:`2px solid ${crocette[k]?color:C.border}`, background:crocette[k]?color:'white', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+              {crocette[k] && <span style={{ color:'white', fontWeight:700, fontSize:16 }}>✓</span>}
+            </div>
+            <span style={{ fontSize:14, color:crocette[k]?color:C.textSoft, fontWeight:crocette[k]?700:400, lineHeight:1.3 }}>{label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Commento */}
+      <div style={{ margin:'12px 12px 0' }}>
+        <textarea value={commento} onChange={e=>setCommento(e.target.value)}
+          placeholder="Commento del cardiologo (opzionale)..."
+          rows={3}
+          style={{ width:'100%', background:'white', border:`1px solid ${C.border}`, borderRadius:12, padding:'12px 14px', color:C.text, fontSize:14, outline:'none', resize:'none', fontFamily:SANS, boxSizing:'border-box' }} />
+      </div>
+
+      {/* Bottone fisso in basso */}
+      <div style={{ position:'fixed', bottom:0, left:0, right:0, padding:'12px 16px', background:'white', borderTop:`1px solid ${C.border}`, boxShadow:'0 -4px 20px rgba(0,0,0,0.08)' }}>
+        {!ecgFile && <div style={{ textAlign:'center', color:C.muted, fontSize:13, marginBottom:8 }}>⏳ Caricamento ECG...</div>}
+        <button onClick={generaEConferma} disabled={!ecgFile||!almenoCrocetta||generating}
+          style={{ width:'100%', background:(!ecgFile||!almenoCrocetta||generating)?C.border:'linear-gradient(135deg,#1aaa6e,#0ea5a0)', color:(!ecgFile||!almenoCrocetta||generating)?C.muted:'white', border:'none', borderRadius:14, padding:'18px 0', cursor:(!ecgFile||!almenoCrocetta||generating)?'not-allowed':'pointer', fontWeight:700, fontSize:16, letterSpacing:0.3 }}>
+          {generating ? '⏳ Generazione in corso...' : !almenoCrocetta ? 'Seleziona almeno una crocetta' : '✓ Genera e Conferma referto'}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ── ADMIN MOBILE ───────────────────────────────────────────────────────────
+const AdminMobile = ({ ecgs, setEcgs, caricaEcgs }) => {
+  const [screen, setScreen] = useState('dashboard');
+  const [cardiologiDB, setCardiologiDB] = useState([]);
+  const [assegnando, setAssegnando] = useState(null);
+
+  useEffect(() => {
+    Promise.all([
+      supabase.from('user_profiles').select('nome, cognome').eq('ruolo', 'cardiologo'),
+      supabase.from('user_profiles').select('nome, cognome').contains('ruoli', ['cardiologo'])
+    ]).then(([r1, r2]) => {
+      const tutti = [...(r1.data||[]), ...(r2.data||[])];
+      const unici = [...new Set(tutti.map(c=>(c.nome?c.nome+' '+c.cognome:c.cognome).trim()))];
+      setCardiologiDB(unici);
+    });
+  }, []);
+
+  const inAttesa = ecgs.filter(e=>e.stato==='in_attesa');
+  const refertati = ecgs.filter(e=>e.stato==='refertato');
+  const urgenti = inAttesa.filter(e=>e.urgenza==='urgente');
+
+  // Lotti non assegnati
+  const batches = {};
+  inAttesa.filter(e=>e.batch_id&&!e.cardiologo).forEach(e=>{
+    if(!batches[e.batch_id]) batches[e.batch_id]={nome:e.batch_nome||e.batch_id,ecgs:[],email:e.email_destinatario};
+    batches[e.batch_id].ecgs.push(e);
+  });
+
+  const assegnaBatch = async (batchId, cardiologo) => {
+    setAssegnando(batchId);
+    await supabase.from('ecgs').update({ cardiologo_nome: cardiologo }).eq('batch_id', batchId).is('cardiologo_nome', null);
+    setEcgs(prev=>prev.map(e=>e.batch_id===batchId&&!e.cardiologo?{...e,cardiologo,cardiologo_nome:cardiologo}:e));
+    setAssegnando(null);
+  };
+
+  if (screen === 'dashboard') return (
+    <div style={{ minHeight:'100vh', background:C.bg, fontFamily:SANS }}>
+      <div style={{ background:'linear-gradient(135deg,#1a2640,#2e7cf6)', padding:'20px 16px', color:'white' }}>
+        <div style={{ fontSize:11, opacity:0.7, textTransform:'uppercase', letterSpacing:1, marginBottom:4 }}>Ambulatorio Millefonti</div>
+        <div style={{ fontSize:20, fontWeight:700 }}>Dashboard Admin</div>
+      </div>
+      <div style={{ padding:16, display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+        {[
+          ['📋', 'Totali', ecgs.length, C.accent],
+          ['📥', 'In attesa', inAttesa.length, C.orange],
+          ['✅', 'Refertati', refertati.length, C.green],
+          ['⚡', 'Urgenti', urgenti.length, '#ef4444'],
+        ].map(([icon,label,value,color])=>(
+          <div key={label} style={{ background:'white', borderRadius:16, padding:20, boxShadow:'0 2px 8px rgba(0,0,0,0.05)', border:`1px solid ${C.border}` }}>
+            <div style={{ fontSize:28, marginBottom:6 }}>{icon}</div>
+            <div style={{ fontSize:28, fontWeight:700, color, lineHeight:1 }}>{value}</div>
+            <div style={{ fontSize:12, color:C.muted, marginTop:4 }}>{label}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ padding:'0 16px', display:'flex', flexDirection:'column', gap:10 }}>
+        <button onClick={()=>setScreen('assegna')} style={{ background:'white', border:`2px solid ${C.accent}`, borderRadius:14, padding:18, cursor:'pointer', textAlign:'left', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <div>
+            <div style={{ fontWeight:700, fontSize:15, color:C.text }}>📥 Assegna lotti</div>
+            <div style={{ color:C.muted, fontSize:13, marginTop:2 }}>{Object.keys(batches).length} lotti in attesa</div>
+          </div>
+          <div style={{ color:C.accent, fontSize:20 }}>→</div>
+        </button>
+        <button onClick={caricaEcgs} style={{ background:'white', border:`1px solid ${C.border}`, borderRadius:14, padding:16, cursor:'pointer', color:C.muted, fontWeight:600, fontSize:14 }}>
+          🔄 Aggiorna dati
+        </button>
+      </div>
+    </div>
+  );
+
+  if (screen === 'assegna') return (
+    <div style={{ minHeight:'100vh', background:C.bg, fontFamily:SANS }}>
+      <div style={{ background:'linear-gradient(135deg,#1a2640,#2e7cf6)', padding:'16px', color:'white', display:'flex', alignItems:'center', gap:12 }}>
+        <button onClick={()=>setScreen('dashboard')} style={{ background:'rgba(255,255,255,0.2)', border:'none', color:'white', borderRadius:10, padding:'8px 12px', cursor:'pointer', fontSize:18 }}>←</button>
+        <div style={{ fontSize:18, fontWeight:700 }}>Lotti da assegnare</div>
+      </div>
+      <div style={{ padding:16, display:'flex', flexDirection:'column', gap:12 }}>
+        {Object.entries(batches).map(([batchId,batch])=>(
+          <div key={batchId} style={{ background:'white', borderRadius:16, padding:20, boxShadow:'0 2px 8px rgba(0,0,0,0.05)', border:`1px solid ${C.border}` }}>
+            <div style={{ fontWeight:700, fontSize:15, color:C.text, marginBottom:4 }}>📦 {batch.nome}</div>
+            <div style={{ color:C.muted, fontSize:13, marginBottom:14 }}>{batch.ecgs.length} ECG · {batch.email||'—'}</div>
+            {cardiologiDB.map(nome=>(
+              <button key={nome} onClick={()=>assegnaBatch(batchId,nome)} disabled={assegnando===batchId}
+                style={{ width:'100%', background:assegnando===batchId?C.border:C.accent, color:'white', border:'none', borderRadius:10, padding:'14px 0', cursor:'pointer', fontWeight:700, fontSize:14, marginBottom:8 }}>
+                {assegnando===batchId?'⏳ Assegnando...`:`→ Assegna a ${nome}`}
+              </button>
+            ))}
+          </div>
+        ))}
+        {Object.keys(batches).length===0 && (
+          <div style={{ textAlign:'center', padding:60 }}>
+            <div style={{ fontSize:48, marginBottom:12 }}>✅</div>
+            <div style={{ color:C.green, fontWeight:700, fontSize:18 }}>Tutto assegnato!</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  return null;
+};
+
+
 // ── APP ───────────────────────────────────────────────────────────────────
 export default function App() {
   const [role, setRole] = useState(null);
@@ -2797,7 +3223,13 @@ export default function App() {
     </div>
   );
 
+  const isMobile = useIsMobile();
+
   if (!role) return <LoginReale onLogin={handleLogin} />;
+
+  // Mobile views (no Shell header)
+  if (isMobile && role === "cardiologo") return <CardiologoMobile ecgs={ecgs} setEcgs={setEcgs} meCardiologo={meCardiologo} caricaEcgs={caricaEcgs} />;
+  if (isMobile && role === "admin") return <AdminMobile ecgs={ecgs} setEcgs={setEcgs} caricaEcgs={caricaEcgs} />;
 
   return (
     <Shell role={role} onLogout={handleLogout} meCardiologo={meCardiologo}>
