@@ -1871,6 +1871,27 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
     setEcgs(prev => prev.filter(e => e.batch_id !== batchId));
   };
 
+  const inviaNotificaCardiologo = async (cardiologo, count, batchNome) => {
+    // Non mandare notifica a Mansour (usa ecg.millefonti@gmail.com)
+    if (cardiologo === 'Mansour') return;
+    // Trova email del cardiologo
+    const { data: profiles } = await supabase.from('user_profiles')
+      .select('id, nome, cognome, ruolo, ruoli')
+      .or(`ruolo.eq.cardiologo,ruoli.cs.{cardiologo}`);
+    const profile = profiles?.find(p => 
+      (p.nome ? p.nome + ' ' + p.cognome : p.cognome).trim() === cardiologo
+    );
+    if (!profile) return;
+    const { data: { users } } = await supabase.auth.admin.listUsers();
+    const user = users?.find(u => u.id === profile.id);
+    if (!user?.email) return;
+    fetch('/api/notify-cardiologo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: user.email, cardiologo, count, batchNome: batchNome || null })
+    }).catch(() => {});
+  };
+
   const assegnaBatch = async (batchId, cardiologo) => {
     if (!batchId || !cardiologo) return;
     const { error } = await supabase.from('ecgs')
@@ -1879,6 +1900,9 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
       .is('cardiologo_nome', null);
     if (!error) {
       setEcgs(prev => prev.map(e => e.batch_id === batchId && !e.cardiologo ? {...e, cardiologo, cardiologo_nome: cardiologo} : e));
+      // Notifica cardiologo
+      const batch = ecgs.filter(e => e.batch_id === batchId);
+      await inviaNotificaCardiologo(cardiologo, batch.length, batch[0]?.batch_nome || batchId);
     }
   };
 
@@ -1889,6 +1913,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
     if (!error) {
       setEcgs(prev=>prev.map(e=>e.id===ecgId?{...e,cardiologo:dest,cardiologo_nome:dest}:e));
       setAssegnazioneTemp(p=>({...p,[ecgId]:undefined}));
+      inviaNotificaCardiologo(dest, 1, null);
     } else {
       console.error('Errore assegnazione:', error);
     }
