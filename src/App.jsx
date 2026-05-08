@@ -1,3 +1,4 @@
+import React from "react";
 import { supabase } from "./supabase.js";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { jsPDF } from "jspdf";
@@ -3401,56 +3402,61 @@ export default function App() {
     supabaseAuth();
   }, []);
 
+  // Ref per evitare doppia chiamata a caricaRuolo
+  const authDoneRef = React.useRef(false);
+
   const supabaseAuth = async () => {
+    // Safety timeout: se dopo 8 secondi è ancora loading, sblocca
+    const safetyTimer = setTimeout(() => { setLoading(false); }, 8000);
+
     try {
       const { supabase } = await import('./supabase.js');
 
-      // Sessione esistente?
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        await caricaRuolo(supabase, session.user.id);
-      } else {
-        setLoading(false);
-      }
-
-      // Ascolta login/logout
+      // Usa SOLO onAuthStateChange come fonte di verità
+      // INITIAL_SESSION viene sempre sparato subito con la sessione corrente
       supabase.auth.onAuthStateChange(async (event, session) => {
-        // Solo su SIGNED_IN e SIGNED_OUT, non su TOKEN_REFRESH
         if (event === 'SIGNED_OUT') {
-          setRole(null);
-          setLoading(false);
-        } else if (event === 'SIGNED_IN' && session) {
-          await caricaRuolo(supabase, session.user.id);
+          authDoneRef.current = false;
+          setRole(null); setRuoliDisponibili([]); setMeCardiologo(ME_CARDIOLOGO_DEFAULT);
+          clearTimeout(safetyTimer); setLoading(false);
         } else if (event === 'INITIAL_SESSION') {
-          if (session) {
+          if (session && !authDoneRef.current) {
+            authDoneRef.current = true;
             await caricaRuolo(supabase, session.user.id);
-          } else {
-            setLoading(false);
+          } else if (!session) {
+            clearTimeout(safetyTimer); setLoading(false);
           }
+        } else if (event === 'SIGNED_IN' && session && !authDoneRef.current) {
+          authDoneRef.current = true;
+          await caricaRuolo(supabase, session.user.id);
         }
       });
     } catch(e) {
-      setLoading(false);
+      clearTimeout(safetyTimer); setLoading(false);
     }
   };
 
   const caricaRuolo = async (supabase, userId) => {
-    const { data } = await supabase
-      .from('user_profiles')
-      .select('ruolo, ruoli, nome, cognome')
-      .eq('id', userId)
-      .single();
-    if (data?.nome || data?.cognome) {
-      setMeCardiologo(`${data.nome||''} ${data.cognome||''}`.trim());
+    try {
+      const { data } = await supabase
+        .from('user_profiles')
+        .select('ruolo, ruoli, nome, cognome')
+        .eq('id', userId)
+        .single();
+      if (data?.nome || data?.cognome) {
+        setMeCardiologo(`${data.nome||''} ${data.cognome||''}`.trim());
+      }
+      if (data?.ruoli && data.ruoli.length > 1) {
+        setRuoliDisponibili(data.ruoli);
+        setRole(null);
+      } else if (data?.ruolo) {
+        setRole(data.ruolo);
+      }
+    } catch(e) {
+      console.error('caricaRuolo error:', e);
+    } finally {
+      setLoading(false);
     }
-    // Se ha più ruoli, mostra il selettore
-    if (data?.ruoli && data.ruoli.length > 1) {
-      setRuoliDisponibili(data.ruoli);
-      setRole(null);
-    } else if (data?.ruolo) {
-      setRole(data.ruolo);
-    }
-    setLoading(false);
   };
 
   const handleLogin = async (email, password) => {
@@ -3471,6 +3477,7 @@ export default function App() {
   };
 
   const handleLogout = () => {
+    authDoneRef.current = false;
     setEcgs([]);
     setMeCardiologo(ME_CARDIOLOGO_DEFAULT);
     setCardiologiDB([]);
