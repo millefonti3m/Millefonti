@@ -1588,7 +1588,7 @@ const FirmaPreview = ({ firmaUrl }) => {
   return <img src={url} alt="Firma" style={{ maxHeight:60, maxWidth:200, objectFit:"contain" }} />;
 };
 
-const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs }) => {
+const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, pushAbilitato, registraPush }) => {
   const [selected, setSelected] = useState(null);
   const [done, setDone] = useState(false);
   const [file, setFile] = useState(null);
@@ -1786,8 +1786,6 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs }) => {
             <div style={{ color:C.muted, fontSize:12, fontWeight:600 }}>{showCompensi ? '💰 Compensi' : 'Guadagni — mese corrente'}</div>
             <div style={{display:'flex',gap:4}}>
               <button onClick={()=>setShowCompensi(p=>!p)} style={{background:showCompensi?'#e8f9f4':'rgba(255,255,255,0.6)',border:`1px solid ${showCompensi?C.teal:C.border}`,borderRadius:8,padding:"4px 10px",cursor:"pointer",fontSize:12,color:showCompensi?C.teal:C.muted,fontWeight:600}}>💰 {showCompensi?'Chiudi':'Compensi'}</button>
-              {!pushAbilitato && 'Notification' in window && <button onClick={registraPush} style={{background:'#fff8e1',border:'1px solid #f59e0b',borderRadius:8,padding:"4px 10px",cursor:"pointer",fontSize:12,color:'#856404',fontWeight:600}} title="Abilita notifiche push">🔔</button>}
-              {pushAbilitato && <span style={{fontSize:16}} title="Notifiche attive">🔔✓</span>}
               <button onClick={()=>setShowProfilo(p=>!p)} style={{background:showProfilo?"rgba(46,124,246,0.1)":"rgba(255,255,255,0.6)",border:`1px solid ${showProfilo?C.accent:C.border}`,borderRadius:8,padding:"4px 10px",cursor:"pointer",fontSize:12,color:showProfilo?C.accent:C.muted,fontWeight:600}}>⚙️</button>
             </div>
           </div>
@@ -2173,16 +2171,6 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: user.email, cardiologo, count, batchNome: batchNome || null })
-    }).catch(() => {});
-    // Push notification
-    fetch('/api/push-send', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        cardiologo_nome: cardiologo,
-        title: '🫀 Nuovi ECG assegnati',
-        body: batchNome ? `${count} ECG del lotto "${batchNome}" da refertare` : `${count} nuovo/i ECG da refertare`,
-      })
     }).catch(() => {});
   };
 
@@ -3468,38 +3456,6 @@ export default function App() {
 
   // Ref per evitare doppia chiamata a caricaRuolo
   const authDoneRef = useRef(false);
-  const [pushAbilitato, setPushAbilitato] = useState(false);
-
-  // Converte VAPID public key per PushManager
-  const urlBase64ToUint8Array = (base64String) => {
-    const padding = '='.repeat((4 - base64String.length % 4) % 4);
-    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-    const rawData = atob(base64);
-    return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
-  };
-
-  const registraPush = async () => {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
-    try {
-      const reg = await navigator.serviceWorker.register('/sw.js');
-      await navigator.serviceWorker.ready;
-      const permesso = await Notification.requestPermission();
-      if (permesso !== 'granted') return;
-      const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
-      if (!vapidKey) return;
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidKey),
-      });
-      const { data: { session } } = await supabase.auth.getSession();
-      await fetch('/api/push-subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subscription: sub.toJSON(), cardiologo_nome: meCardiologo, user_id: session.user.id }),
-      });
-      setPushAbilitato(true);
-    } catch(e) { console.error('Push registration error:', e); }
-  };
 
   const supabaseAuth = async () => {
     // Safety: se dopo 6 secondi loading è ancora true, sblocca
@@ -3640,7 +3596,7 @@ export default function App() {
       {role==="pubblico"   && <PubblicoView setEcgs={setEcgs} />}
       {role==="farmacia"   && <FarmaciaView ecgs={ecgs} setEcgs={setEcgs} />}
       {role==="azienda"    && <AziendaView  ecgs={ecgs} setEcgs={setEcgs} />}
-      {role==="cardiologo" && <CardiologoView ecgs={ecgs} setEcgs={setEcgs} meCardiologo={meCardiologo} caricaEcgs={caricaEcgs} />}
+      {role==="cardiologo" && <CardiologoView ecgs={ecgs} setEcgs={setEcgs} meCardiologo={meCardiologo} caricaEcgs={caricaEcgs} pushAbilitato={pushAbilitato} registraPush={registraPush} />}
       {role==="admin"      && <AdminView    ecgs={ecgs} setEcgs={setEcgs} cardiologiDB={cardiologiDB} />}
     </Shell>
   );
