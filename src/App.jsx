@@ -2579,10 +2579,11 @@ const LoginReale = ({ onLogin }) => {
         <h1 style={{ color:"#1a2640", fontSize:36, fontWeight:700, marginBottom:4, letterSpacing:-1 }}>Ambulatorio Millefonti</h1>
         <p style={{ color:"#8098b8", fontSize:13, marginBottom:36 }}>Accedi al tuo account</p>
         <div style={{ background:"white", border:"1px solid #dde5f0", borderRadius:18, padding:28, boxShadow:"0 2px 12px rgba(46,124,246,0.08)", textAlign:"left" }}>
+          <form onSubmit={e=>{e.preventDefault();handleSubmit();}} autoComplete="on" style={{margin:0}}>
           <div style={{ marginBottom:16 }}>
             <label style={{ color:"#3d5270", fontSize:12, fontWeight:600, display:"block", marginBottom:7 }}>Email</label>
             <input value={email} onChange={e=>setEmail(e.target.value)} type="email" placeholder="nome@esempio.it"
-              name="email" autoComplete="email"
+              name="email" autoComplete="username"
               style={{ background:"#f4f7fb", border:"1px solid #dde5f0", borderRadius:10, padding:"11px 14px", color:"#1a2640", fontSize:14, width:"100%", outline:"none" }} />
           </div>
           <div style={{ marginBottom:24 }}>
@@ -2590,17 +2591,18 @@ const LoginReale = ({ onLogin }) => {
             <input value={password} onChange={e=>setPassword(e.target.value)} type="password" placeholder="••••••••"
               name="password" autoComplete="current-password"
               style={{ background:"#f4f7fb", border:"1px solid #dde5f0", borderRadius:10, padding:"11px 14px", color:"#1a2640", fontSize:14, width:"100%", outline:"none" }}
-              onKeyDown={e=>e.key==="Enter"&&handleSubmit()} />
+               />
           </div>
           {errore && (
             <div style={{ background:"#fdedf0", border:"1px solid #e03e5a33", borderRadius:10, padding:"10px 14px", color:"#e03e5a", fontSize:13, marginBottom:16 }}>
               {errore}
             </div>
           )}
-          <button onClick={handleSubmit} disabled={loading || !email || !password}
+          <button type="submit" disabled={loading || !email || !password}
             style={{ background: (loading||!email||!password) ? "#dde5f0" : "#2e7cf6", color: (loading||!email||!password) ? "#8098b8" : "white", border:"none", borderRadius:10, padding:"13px 0", cursor: (loading||!email||!password) ? "not-allowed" : "pointer", fontWeight:700, fontSize:15, width:"100%", boxShadow: (!loading&&email&&password) ? "0 4px 16px rgba(46,124,246,0.3)" : "none" }}>
             {loading ? "Accesso in corso..." : "Accedi →"}
           </button>
+          </form>
         </div>
         <div style={{ color:"#b0c2d8", fontFamily:"'DM Mono', monospace", fontSize:10, marginTop:20, letterSpacing:2 }}>MILLEFONTI · ACCESSO SICURO</div>
       </div>
@@ -3196,6 +3198,8 @@ export default function App() {
   // Route /carica — pagina pubblica senza login
   if (window.location.pathname === '/carica') return <UploadGenerico />;
 
+  const isMobile = useIsMobile();
+
   if (ruoliDisponibili.length > 1 && !role) return (
     <div style={{ minHeight:"100vh", background:"linear-gradient(135deg, #e8f2ff, #f4f7fb, #e8f9f4)", display:"flex", alignItems:"center", justifyContent:"center", padding:24, fontFamily:SANS }}>
       <div style={{ maxWidth:400, width:"100%", textAlign:"center" }}>
@@ -3224,8 +3228,6 @@ export default function App() {
       </div>
     </div>
   );
-
-  const isMobile = useIsMobile();
 
   if (!role) return <LoginReale onLogin={handleLogin} />;
 
