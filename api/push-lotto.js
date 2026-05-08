@@ -14,10 +14,33 @@ webpush.setVapidDetails(
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
-  const { batchNome, count } = req.body;
+
+  let batchNome, count;
+
+  // Formato webhook Supabase: { type, table, record, old_record }
+  if (req.body?.type === 'INSERT' && req.body?.record) {
+    const record = req.body.record;
+    batchNome = record.batch_nome || 'Nuovo ECG';
+    count = 1;
+    console.log('push-lotto: webhook Supabase INSERT, batch_id:', record.batch_id);
+
+    // Evita push duplicati per lo stesso batch: controlla se già notificato
+    const { count: existing } = await supabase
+      .from('ecgs')
+      .select('*', { count: 'exact', head: true })
+      .eq('batch_id', record.batch_id);
+    if (existing > 1) {
+      return res.status(200).json({ sent: 0, msg: 'Batch già notificato' });
+    }
+  } else {
+    // Chiamata diretta (es. da inviaLotto)
+    batchNome = req.body?.batchNome || 'Nuovo lotto';
+    count = req.body?.count || 1;
+    console.log('push-lotto: chiamata diretta, batchNome:', batchNome);
+  }
 
   try {
-    // 1. Legge le regole di assegnazione
+    // Legge le regole con service key
     const { data: regole } = await supabase
       .from('regole_assegnazione').select('*').single();
 
@@ -27,23 +50,24 @@ export default async function handler(req, res) {
       if (regole.modalita === 'unico') dest = regole.cardiologo_unico || '';
       else if (regole.modalita === 'giorni') dest = regole[giorni[new Date().getDay()]] || '';
     }
-    console.log('push-lotto: destinatario =', dest);
-    if (!dest) return res.status(200).json({ sent: 0, msg: 'Nessun destinatario nelle regole' });
+    console.log('push-lotto: destinatario:', dest);
+    if (!dest) return res.status(200).json({ sent: 0, msg: 'Nessun destinatario' });
 
-    // 2. Carica subscriptions del cardiologo
+    // Carica subscriptions
     const { data: subs } = await supabase
       .from('push_subscriptions')
       .select('subscription')
       .eq('cardiologo_nome', dest);
 
-    console.log('push-lotto: subscriptions trovate =', subs?.length || 0);
     if (!subs?.length) return res.status(200).json({ sent: 0, msg: 'Nessuna subscription per ' + dest });
 
-    // 3. Manda push direttamente
     const payload = JSON.stringify({
       title: '🫀 Nuovi ECG da refertare',
-      body: `${count} ECG del lotto "${batchNome}" pronti per la refertazione`,
+      body: count > 1
+        ? `${count} ECG del lotto "${batchNome}" pronti`
+        : `Nuovo ECG "${batchNome}" pronto`,
       url: '/',
+      tag: 'ecg-notification',
     });
 
     const results = await Promise.allSettled(
@@ -51,7 +75,7 @@ export default async function handler(req, res) {
     );
 
     const sent = results.filter(r => r.status === 'fulfilled').length;
-    console.log('push-lotto: inviati', sent, 'su', subs.length);
+    console.log('push-lotto: inviati', sent);
     return res.status(200).json({ sent, dest });
   } catch(e) {
     console.error('push-lotto error:', e.message);
