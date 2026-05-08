@@ -221,31 +221,7 @@ export default async function handler(req, res) {
         await supabase.from('ecgs').insert(ecgs);
         processed++;
         console.log(`Processata email da ${fromEmail}: ${ecgs.length} ECG lotto "${batchNome}"`);
-        // Push al cardiologo assegnato secondo le regole di assegnazione
-        try {
-          const { data: regole } = await supabase.from('regole_assegnazione').select('*').single();
-          let destinatario = '';
-          if (regole) {
-            const giorni = ['domenica','lunedi','martedi','mercoledi','giovedi','venerdi','sabato'];
-            if (regole.modalita === 'unico') {
-              destinatario = regole.cardiologo_unico || '';
-            } else if (regole.modalita === 'giorni') {
-              destinatario = regole[giorni[new Date().getDay()]] || '';
-            }
-          }
-          if (destinatario) {
-            fetch('https://ambulatoriomillefonti.it/api/push-send', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                cardiologo_nome: destinatario,
-                title: '🫀 Nuovi ECG da refertare',
-                body: `${ecgs.length} ECG del lotto "${batchNome}" pronti per la refertazione`,
-              })
-            }).catch(() => {});
-            console.log(`Push inviato a ${destinatario} per lotto "${batchNome}"`);
-          }
-        } catch(e) { console.error('Push error:', e); }
+        // Push gestito dal Supabase webhook — niente duplicati
       }
 
       // Segna come processata nel DB PRIMA di marcare come letta
