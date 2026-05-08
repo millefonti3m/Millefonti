@@ -2988,9 +2988,9 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout })
           method:'POST', headers:{'Content-Type':'application/json'},
           body: JSON.stringify({ email:emailDest, cardiologo:meCardiologo, downloadUrl:urlData.signedUrl, isBatch:true, batchNome, count:batchEcgs.length })
         });
-        alert(`✅ Email inviata a ${emailDest}`);
+        alert('✅ Email inviata a ' + emailDest);
       }
-    } catch(e) { alert('Errore: '+e.message); }
+    } catch(err) { alert('Errore: ' + err.message); }
     setChiudendo(false);
   };
 
@@ -3005,7 +3005,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout })
     }));
     const blob = await zip.generateAsync({ type:'blob' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href=url; a.download=`${batchNome}_referti.zip`; a.click();
+    const a = document.createElement('a'); a.href=url; a.download=batchNome+'_referti.zip'; a.click();
     URL.revokeObjectURL(url);
   };
 
@@ -3183,12 +3183,12 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout })
           {tuttiRefertati && (
             <div style={{ background:'#f0fdf4', border:`2px solid ${C.green}`, borderRadius:14, padding:20 }}>
               <div style={{ color:C.green, fontWeight:700, fontSize:16, marginBottom:4, textAlign:'center' }}>🎉 Lotto completato!</div>
-              <div style={{ color:C.muted, fontSize:12, textAlign:'center', marginBottom:14 }}>{selectedBatch?.email || '—'}</div>
+              <div style={{ color:C.muted, fontSize:12, textAlign:'center', marginBottom:14 }}>{selectedBatch?.email || 'nessuna email'}</div>
               <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
                 <button onClick={()=>chiudiBatchMobile(selectedBatch.id, selectedBatch.nome, selectedBatch.email)}
                   disabled={chiudendo}
                   style={{ background:chiudendo?C.border:'linear-gradient(135deg,#1aaa6e,#0ea5a0)', color:chiudendo?C.muted:'white', border:'none', borderRadius:12, padding:'16px 0', cursor:chiudendo?'not-allowed':'pointer', fontWeight:700, fontSize:15 }}>
-                  {chiudendo ? '⏳ Invio in corso...' : '✉️ Invia email al cliente'}
+                  {chiudendo ? '⏳ Invio...' : '✉️ Invia email al cliente'}
                 </button>
                 <button onClick={()=>scaricaBatchMobile(selectedBatch.id, selectedBatch.nome)}
                   style={{ background:'white', border:`2px solid ${C.accent}`, color:C.accent, borderRadius:12, padding:'14px 0', cursor:'pointer', fontWeight:700, fontSize:15 }}>
