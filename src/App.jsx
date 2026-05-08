@@ -2656,7 +2656,7 @@ const useIsMobile = () => {
 };
 
 // ── CARDIOLOGO MOBILE ──────────────────────────────────────────────────────
-const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs }) => {
+const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout }) => {
   const [screen, setScreen] = useState('lista'); // lista | lotto | referta
   const [selectedBatch, setSelectedBatch] = useState(null);
   const [selectedEcg, setSelectedEcg] = useState(null);
@@ -2812,9 +2812,14 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs }) => {
   if (screen === 'lista') return (
     <div style={{ minHeight:'100vh', background:C.bg, fontFamily:SANS }}>
       <div style={{ background:'linear-gradient(135deg,#1a2640,#2e7cf6)', padding:'20px 16px 16px', color:'white' }}>
-        <div style={{ fontSize:11, opacity:0.7, marginBottom:4, textTransform:'uppercase', letterSpacing:1 }}>Cardiologo</div>
-        <div style={{ fontSize:18, fontWeight:700 }}>Dott. {meCardiologo}</div>
-        <div style={{ fontSize:13, opacity:0.8, marginTop:2 }}>{mieiEcgs.filter(e=>e.stato==='in_attesa').length} ECG da refertare</div>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+          <div>
+            <div style={{ fontSize:11, opacity:0.7, marginBottom:4, textTransform:'uppercase', letterSpacing:1 }}>Cardiologo</div>
+            <div style={{ fontSize:18, fontWeight:700 }}>Dott. {meCardiologo}</div>
+            <div style={{ fontSize:13, opacity:0.8, marginTop:2 }}>{mieiEcgs.filter(e=>e.stato==='in_attesa').length} ECG da refertare</div>
+          </div>
+          <button onClick={onLogout} style={{ background:'rgba(255,255,255,0.15)', border:'none', color:'white', borderRadius:10, padding:'8px 14px', cursor:'pointer', fontSize:13, fontWeight:600, marginTop:4 }}>Esci</button>
+        </div>
       </div>
       <div style={{ padding:16, display:'flex', flexDirection:'column', gap:12 }}>
         {Object.entries(batches).map(([batchId, batch]) => {
@@ -2968,7 +2973,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs }) => {
 };
 
 // ── ADMIN MOBILE ───────────────────────────────────────────────────────────
-const AdminMobile = ({ ecgs, setEcgs, caricaEcgs }) => {
+const AdminMobile = ({ ecgs, setEcgs, caricaEcgs, onLogout }) => {
   const [screen, setScreen] = useState('dashboard');
   const [cardiologiDB, setCardiologiDB] = useState([]);
   const [assegnando, setAssegnando] = useState(null);
@@ -3005,8 +3010,13 @@ const AdminMobile = ({ ecgs, setEcgs, caricaEcgs }) => {
   if (screen === 'dashboard') return (
     <div style={{ minHeight:'100vh', background:C.bg, fontFamily:SANS }}>
       <div style={{ background:'linear-gradient(135deg,#1a2640,#2e7cf6)', padding:'20px 16px', color:'white' }}>
-        <div style={{ fontSize:11, opacity:0.7, textTransform:'uppercase', letterSpacing:1, marginBottom:4 }}>Ambulatorio Millefonti</div>
-        <div style={{ fontSize:20, fontWeight:700 }}>Dashboard Admin</div>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+          <div>
+            <div style={{ fontSize:11, opacity:0.7, textTransform:'uppercase', letterSpacing:1, marginBottom:4 }}>Ambulatorio Millefonti</div>
+            <div style={{ fontSize:20, fontWeight:700 }}>Dashboard Admin</div>
+          </div>
+          <button onClick={onLogout} style={{ background:'rgba(255,255,255,0.15)', border:'none', color:'white', borderRadius:10, padding:'8px 14px', cursor:'pointer', fontSize:13, fontWeight:600, marginTop:4 }}>Esci</button>
+        </div>
       </div>
       <div style={{ padding:16, display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
         {[
@@ -3077,6 +3087,7 @@ export default function App() {
   const [meCardiologo, setMeCardiologo] = useState(ME_CARDIOLOGO_DEFAULT);
   const [ecgs, setEcgs] = useState([]);
   const [cardiologiDB, setCardiologiDB] = useState([]);
+  const isMobile = useIsMobile(); // deve stare prima di qualsiasi return
 
   const mapEcg = (e) => ({
     ...e,
@@ -3263,6 +3274,10 @@ export default function App() {
   );
 
   if (!role) return <LoginReale onLogin={handleLogin} />;
+
+  // Vista mobile — bypassa completamente Shell
+  if (isMobile && role === 'cardiologo') return <CardiologoMobile ecgs={ecgs} setEcgs={setEcgs} meCardiologo={meCardiologo} caricaEcgs={caricaEcgs} onLogout={handleLogout} />;
+  if (isMobile && role === 'admin') return <AdminMobile ecgs={ecgs} setEcgs={setEcgs} caricaEcgs={caricaEcgs} onLogout={handleLogout} />;
 
   return (
     <Shell role={role} onLogout={handleLogout} meCardiologo={meCardiologo}>
