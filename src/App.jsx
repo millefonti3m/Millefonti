@@ -500,17 +500,9 @@ const AziendaView = ({ ecgs, setEcgs }) => {
   const [logoWarning, setLogoWarning] = useState(false);
   const [sent, setSent] = useState(false);
   const [meEmail, setMeEmail] = useState("");
-  const [nomeAzienda, setNomeAzienda] = useState("");
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!session?.user) return;
-      setMeEmail(session.user.email);
-      // Carica nome reale dal profilo (stessa logica di gmail-fetch)
-      const { data: profile } = await supabase.from('user_profiles').select('nome, cognome').eq('id', session.user.id).single();
-      if (profile) {
-        const nome = `${profile.nome||''} ${profile.cognome||''}`.trim();
-        if (nome) setNomeAzienda(nome);
-      }
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user?.email) setMeEmail(session.user.email);
     });
   }, []);
   // Filtra per email destinatario (funziona sia per upload da sito che da mail)
@@ -559,7 +551,7 @@ const AziendaView = ({ ecgs, setEcgs }) => {
     }));
     const { data, error } = await supabase.from('ecgs').insert(nuovi).select();
     if (!error && data) {
-      const mapped = data.map(e=>({ ...e, paziente:e.paziente_nome, azienda:nomeAzienda||ME_AZIENDA, batch:batchNome, ts:new Date(e.created_at).getTime(), cardiologo:e.cardiologo_nome||null, chat:[] }));
+      const mapped = data.map(e=>({ ...e, paziente:e.paziente_nome, azienda:ME_AZIENDA, batch:batchNome, ts:new Date(e.created_at).getTime(), cardiologo:e.cardiologo_nome||null, chat:[] }));
       setEcgs(prev=>[...prev,...mapped]);
     }
     setSent(true);
@@ -570,7 +562,7 @@ const AziendaView = ({ ecgs, setEcgs }) => {
     <div style={{ padding:32, maxWidth:800, margin:"0 auto" }}>
       <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:28 }}>
         <div style={{ width:52, height:52, background:"linear-gradient(135deg,#f3edff,#f4f7fb)", borderRadius:16, display:"flex", alignItems:"center", justifyContent:"center", fontSize:26 }}>🏢</div>
-        <div><h2 style={{ color:C.text, fontSize:24, fontWeight:700 }}>{nomeAzienda || ME_AZIENDA}</h2><div style={{ color:C.muted, fontSize:13, marginTop:2 }}>{ecgRefertatiMese.length} ECG refertati questo mese</div></div>
+        <div><h2 style={{ color:C.text, fontSize:24, fontWeight:700 }}>{ME_AZIENDA}</h2><div style={{ color:C.muted, fontSize:13, marginTop:2 }}>{ecgRefertatiMese.length} ECG refertati questo mese</div></div>
         <div style={{ marginLeft:"auto", background:`linear-gradient(135deg,${C.purpleLight},#eaf2ff)`, borderRadius:14, padding:"10px 18px", textAlign:"right" }}>
           <div style={{ color:C.purple, fontFamily:MONO, fontSize:22, fontWeight:"bold" }}>{ecgMese.length}</div>
           <div style={{ color:C.muted, fontSize:11 }}>ECG caricati</div>
@@ -2410,7 +2402,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
 
 // ── SHELL ─────────────────────────────────────────────────────────────────
 const Shell = ({ role, onLogout, children, meCardiologo }) => {
-  const labels = { pubblico:"👤 Area pubblica", farmacia:`💊 ${ME_FARMACIA}`, azienda:`🏢 ${ME_AZIENDA}`, cardiologo:`🫀 ${meCardiologo}`, admin:"⚙️ Admin" };
+  const labels = { pubblico:"👤 Area pubblica", farmacia:`💊 ${ME_FARMACIA}`, azienda:`🏢 ${meCardiologo || ME_AZIENDA}`, cardiologo:`🫀 ${meCardiologo}`, admin:"⚙️ Admin" };
   return (
     <div style={{ minHeight:"100vh", background:C.bg, color:C.text, fontFamily:SANS }}>
       <div style={{ height:64, background:C.white, borderBottom:`1px solid ${C.border}`, display:"flex", alignItems:"center", padding:"0 28px", gap:16, position:"sticky", top:0, zIndex:100, boxShadow:"0 1px 12px rgba(0,0,0,0.06)" }}>
