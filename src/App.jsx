@@ -499,10 +499,15 @@ const AziendaView = ({ ecgs, setEcgs }) => {
   const [filesLotto, setFilesLotto] = useState([]);
   const [logoWarning, setLogoWarning] = useState(false);
   const [sent, setSent] = useState(false);
+  const [scaricandoBatch, setScaricandoBatch] = useState(null);
+  const [nomeAzienda, setNomeAzienda] = useState("");
   const [meEmail, setMeEmail] = useState("");
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user?.email) setMeEmail(session.user.email);
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session?.user) return;
+      setMeEmail(session.user.email);
+      const { data: profile } = await supabase.from('user_profiles').select('nome, cognome').eq('id', session.user.id).single();
+      if (profile) { const n = `${profile.nome||''} ${profile.cognome||''}`.trim(); if (n) setNomeAzienda(n); }
     });
   }, []);
   // Filtra per email destinatario (funziona sia per upload da sito che da mail)
@@ -555,14 +560,41 @@ const AziendaView = ({ ecgs, setEcgs }) => {
       setEcgs(prev=>[...prev,...mapped]);
     }
     setSent(true);
-    fetch('/api/notify', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ paziente:`Lotto ${batchNome} — ${filesLotto.length} ECG`, origine:"azienda", urgenza:"normale", note:`Azienda: ${ME_AZIENDA} | Email referto: ${emailLotto}` }) }).catch(()=>{});
+    fetch('/api/notify', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ paziente:`Lotto ${batchNome} — ${filesLotto.length} ECG`, origine:"azienda", urgenza:"normale", note:`Azienda: ${nomeAzienda||ME_AZIENDA} | Email referto: ${emailLotto}` }) }).catch(()=>{});
+  };
+
+  const scaricaBatchAzienda = async (batchId, bNome) => {
+    const rows = miei.filter(e => e.batch_id===batchId && e.stato==='refertato' && e.file_referto_url);
+    if (!rows.length) { alert('Nessun referto disponibile'); return; }
+    setScaricandoBatch(batchId);
+    try {
+      const zip = new JSZip();
+      await Promise.all(rows.map(async e => {
+        const { data } = await supabase.storage.from('ecg-files').download(e.file_referto_url);
+        if (data) zip.file(e.file_referto_url.split('/').pop(), data);
+      }));
+      const blob = await zip.generateAsync({ type:'blob' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href=url; a.download=`${bNome}_referti.zip`; a.click();
+      URL.revokeObjectURL(url);
+    } catch(err) { alert('Errore: '+err.message); }
+    setScaricandoBatch(null);
+  };
+
+  const scaricaSingoloAzienda = async (ecg) => {
+    if (!ecg.file_referto_url) return;
+    const { data } = await supabase.storage.from('ecg-files').download(ecg.file_referto_url);
+    if (!data) { alert('File non disponibile'); return; }
+    const url = URL.createObjectURL(data);
+    const a = document.createElement('a'); a.href=url; a.download=ecg.file_referto_url.split('/').pop(); a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
     <div style={{ padding:32, maxWidth:800, margin:"0 auto" }}>
       <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:28 }}>
         <div style={{ width:52, height:52, background:"linear-gradient(135deg,#f3edff,#f4f7fb)", borderRadius:16, display:"flex", alignItems:"center", justifyContent:"center", fontSize:26 }}>🏢</div>
-        <div><h2 style={{ color:C.text, fontSize:24, fontWeight:700 }}>{ME_AZIENDA}</h2><div style={{ color:C.muted, fontSize:13, marginTop:2 }}>{ecgRefertatiMese.length} ECG refertati questo mese</div></div>
+        <div><h2 style={{ color:C.text, fontSize:24, fontWeight:700 }}>{nomeAzienda || ME_AZIENDA}</h2><div style={{ color:C.muted, fontSize:13, marginTop:2 }}>{ecgRefertatiMese.length} ECG refertati questo mese</div></div>
         <div style={{ marginLeft:"auto", background:`linear-gradient(135deg,${C.purpleLight},#eaf2ff)`, borderRadius:14, padding:"10px 18px", textAlign:"right" }}>
           <div style={{ color:C.purple, fontFamily:MONO, fontSize:22, fontWeight:"bold" }}>{ecgMese.length}</div>
           <div style={{ color:C.muted, fontSize:11 }}>ECG caricati</div>
@@ -669,26 +701,79 @@ const AziendaView = ({ ecgs, setEcgs }) => {
         )
       )}
 
-      {tab==="storico" && (
-        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-          {miei.map(e=>(
-            <div key={e.id} style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:14, padding:"14px 20px", boxShadow:C.shadow, display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
-              <div style={{ flex:1, minWidth:160 }}>
-                <div style={{ display:"flex", gap:8, marginBottom:5 }}>
-                  <span style={{ fontFamily:MONO, color:C.muted, fontSize:11 }}>{e.id}</span>
-                  <Badge stato={e.stato} urgenza={e.urgenza} />
+      {tab==="storico" && (() => {
+        const batches={}, singoli=[];
+        [...miei].sort((a,b)=>b.ts-a.ts).forEach(e=>{
+          if(e.batch_id){ if(!batches[e.batch_id]) batches[e.batch_id]={nome:e.batch_nome||e.batch_id,ecgs:[],ts:e.ts}; batches[e.batch_id].ecgs.push(e); }
+          else singoli.push(e);
+        });
+        return (
+          <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+            {miei.length===0 && <div style={{textAlign:"center",padding:40,color:C.muted}}>Nessun ECG ancora caricato</div>}
+            {Object.entries(batches).sort((a,b)=>b[1].ts-a[1].ts).map(([bId,batch])=>{
+              const refertati=batch.ecgs.filter(e=>e.stato==='refertato');
+              const conFile=refertati.filter(e=>e.file_referto_url);
+              const completo=refertati.length===batch.ecgs.length;
+              return (
+                <div key={bId} style={{background:C.white,border:`2px solid ${completo?C.green:C.border}`,borderRadius:16,boxShadow:C.shadow,overflow:'hidden'}}>
+                  <div style={{background:completo?C.greenLight:C.cardAlt,padding:'12px 18px',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:8}}>
+                    <div>
+                      <div style={{fontWeight:700,fontSize:15,color:C.text}}>📦 {batch.nome}</div>
+                      <div style={{color:C.muted,fontSize:12,marginTop:2}}>{refertati.length}/{batch.ecgs.length} referti · {new Date(batch.ts).toLocaleDateString('it-IT')}</div>
+                    </div>
+                    <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                      <div style={{background:C.border,borderRadius:20,height:6,width:70}}>
+                        <div style={{height:'100%',width:`${(refertati.length/batch.ecgs.length)*100}%`,background:completo?C.green:C.accent,borderRadius:20}}/>
+                      </div>
+                      {conFile.length>0
+                        ? <button onClick={()=>scaricaBatchAzienda(bId,batch.nome)} disabled={scaricandoBatch===bId}
+                            style={{background:scaricandoBatch===bId?C.border:C.accent,color:'white',border:'none',borderRadius:10,padding:'7px 14px',cursor:scaricandoBatch===bId?'not-allowed':'pointer',fontWeight:700,fontSize:13}}>
+                            {scaricandoBatch===bId?'⏳':'⬇️ ZIP'} ({conFile.length})
+                          </button>
+                        : refertati.length>0 && <div style={{color:C.muted,fontSize:12}}>⚠️ File scaduti</div>
+                      }
+                    </div>
+                  </div>
+                  <div style={{padding:'6px 10px',display:'flex',flexDirection:'column',gap:4}}>
+                    {batch.ecgs.map(e=>(
+                      <div key={e.id} style={{display:'flex',alignItems:'center',gap:10,padding:'9px 10px',borderRadius:10,background:e.stato==='refertato'?'#f8fffe':'#fffbf5',border:`1px solid ${e.stato==='refertato'?C.green+'33':C.border}`}}>
+                        <div style={{flex:1}}>
+                          <div style={{fontSize:14,fontWeight:600,color:C.text}}>{e.paziente_nome||e.paziente}</div>
+                          <div style={{fontSize:11,color:C.muted,marginTop:1}}>{fmt(e.ts)}</div>
+                        </div>
+                        <Badge stato={e.stato} urgenza={e.urgenza}/>
+                        {e.stato==='refertato' && e.file_referto_url && <button onClick={()=>scaricaSingoloAzienda(e)} style={{background:C.greenLight,color:C.green,border:`1px solid ${C.green}33`,borderRadius:8,padding:'5px 10px',cursor:'pointer',fontWeight:700,fontSize:12}}>📄 PDF</button>}
+                        {e.stato==='refertato' && !e.file_referto_url && <div style={{color:C.muted,fontSize:11,fontStyle:'italic'}}>⚠️ Scaduto</div>}
+                        {e.stato==='in_attesa' && !e.cardiologo && <div style={{background:C.yellowLight,color:C.yellow,borderRadius:8,padding:'5px 10px',fontSize:11,fontWeight:600}}>⏳ In coda</div>}
+                        {e.stato==='in_attesa' && e.cardiologo && <div style={{background:C.purpleLight,color:C.purple,borderRadius:8,padding:'5px 10px',fontSize:11,fontWeight:600}}>🫀 In refertazione</div>}
+                        <SLATimer ecg={e} compact/>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div style={{ color:C.text, fontSize:14, fontWeight:600 }}>{e.paziente}</div>
-                <div style={{ color:C.muted, fontSize:12, marginTop:2 }}>📂 {e.batch}</div>
+              );
+            })}
+            {singoli.length>0 && (
+              <div>
+                <div style={{fontSize:12,fontWeight:600,color:C.muted,marginBottom:8,paddingLeft:4}}>ECG singoli</div>
+                {singoli.map(e=>(
+                  <div key={e.id} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,padding:'12px 18px',boxShadow:C.shadow,display:'flex',alignItems:'center',gap:12,flexWrap:'wrap',marginBottom:8}}>
+                    <div style={{flex:1}}>
+                      <Badge stato={e.stato} urgenza={e.urgenza}/>
+                      <div style={{color:C.text,fontSize:14,fontWeight:600,marginTop:4}}>{e.paziente_nome||e.paziente}</div>
+                      <div style={{color:C.muted,fontSize:12,marginTop:2}}>{fmt(e.ts)}</div>
+                    </div>
+                    {e.stato==='refertato' && e.file_referto_url && <button onClick={()=>scaricaSingoloAzienda(e)} style={{background:C.greenLight,color:C.green,border:`1px solid ${C.green}33`,borderRadius:10,padding:'8px 14px',cursor:'pointer',fontWeight:700,fontSize:13}}>📄 PDF</button>}
+                    {e.stato==='refertato' && !e.file_referto_url && <div style={{color:C.muted,fontSize:12}}>⚠️ File scaduto</div>}
+                    {e.stato==='in_attesa' && !e.cardiologo && <div style={{background:C.yellowLight,color:C.yellow,borderRadius:10,padding:'8px 14px',fontSize:12,fontWeight:600}}>⏳ In coda</div>}
+                    {e.stato==='in_attesa' && e.cardiologo && <div style={{background:C.purpleLight,color:C.purple,borderRadius:10,padding:'8px 14px',fontSize:12,fontWeight:600}}>🫀 In refertazione</div>}
+                  </div>
+                ))}
               </div>
-              {e.stato==="refertato" && <div style={{ background:C.greenLight, color:C.green, borderRadius:10, padding:"8px 16px", fontSize:13, fontWeight:700, cursor:"pointer" }}>📄 Scarica</div>}
-              {e.stato==="in_attesa" && !e.cardiologo && <div style={{ background:C.yellowLight, color:C.yellow, borderRadius:10, padding:"8px 16px", fontSize:12, fontWeight:600 }}>⏳ In coda</div>}
-              {e.stato==="in_attesa" && e.cardiologo && <div style={{ background:C.purpleLight, color:C.purple, borderRadius:10, padding:"8px 16px", fontSize:12, fontWeight:600 }}>🫀 In refertazione</div>}
-            </div>
-          ))}
-          {miei.length===0 && <div style={{ textAlign:"center", padding:40, color:C.muted }}>Nessun ECG ancora caricato</div>}
-        </div>
-      )}
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 };
@@ -1512,6 +1597,10 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs }) => {
   const [showProfilo, setShowProfilo] = useState(false);
   const [pdfBlobsMap, setPdfBlobsMap] = useState({}); // {ecgId: blob} per batch
   const [chiudendoBatch, setChiudendoBatch] = useState(null);
+  const [showCompensi, setShowCompensi] = useState(false);
+  const [tariffario, setTariffario] = useState({});
+  const [meseComp, setMeseComp] = useState(() => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; });
+  const [savingTariff, setSavingTariff] = useState(false);
 
   // Carica firma esistente all'avvio
   useEffect(() => {
@@ -1523,6 +1612,81 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs }) => {
     };
     caricaFirma();
   }, []);
+
+  // Carica tariffario da Supabase
+  useEffect(() => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session?.user) return;
+      const { data } = await supabase.from('user_profiles').select('tariffario').eq('id', session.user.id).single();
+      if (data?.tariffario) setTariffario(typeof data.tariffario === 'string' ? JSON.parse(data.tariffario) : (data.tariffario || {}));
+    });
+  }, []);
+
+  const getTariffa = (orig) => parseFloat(tariffario[orig] ?? 10);
+
+  const salvaTariffario = async () => {
+    setSavingTariff(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    await supabase.from('user_profiles').update({ tariffario }).eq('id', session.user.id);
+    setSavingTariff(false);
+    alert('Tariffario salvato!');
+  };
+
+  const esportaPDFCompensi = () => {
+    const [anno, mese] = meseComp.split('-').map(Number);
+    const ecgsMese = refertatiMiei.filter(e => {
+      const d = new Date(e.created_at || e.ts);
+      return d.getFullYear() === anno && d.getMonth() === mese - 1;
+    });
+    const byAz = {};
+    ecgsMese.forEach(e => {
+      const k = e.origine_dettaglio || e.farmacia || e.azienda || 'Altro';
+      if (!byAz[k]) byAz[k] = [];
+      byAz[k].push(e);
+    });
+    const pdf = new jsPDF({ unit:'mm', format:'a4' });
+    const W = 210, mar = 18;
+    const mesiLabel = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+    // Header
+    pdf.setFillColor(26,38,64); pdf.rect(0,0,W,32,'F');
+    pdf.setTextColor(255,255,255); pdf.setFontSize(16); pdf.setFont('helvetica','bold');
+    pdf.text('Rendiconto Mensile ECG', mar, 14);
+    pdf.setFontSize(10); pdf.setFont('helvetica','normal');
+    pdf.text(`${mesiLabel[mese-1]} ${anno}  ·  Dott. ${meCardiologo}`, mar, 23);
+    // Corpo
+    let y = 48;
+    pdf.setTextColor(26,38,64); pdf.setFontSize(11); pdf.setFont('helvetica','bold');
+    pdf.text('Azienda / Farmacia', mar, y);
+    pdf.text('ECG', 118, y); pdf.text('Tariffa', 138, y); pdf.text('Totale', 168, y);
+    y += 4;
+    pdf.setDrawColor(200,210,230); pdf.line(mar, y, W-mar, y);
+    y += 8;
+    let totaleGlobale = 0;
+    Object.entries(byAz).forEach(([az, rows]) => {
+      const tariffa = getTariffa(az);
+      const tot = rows.length * tariffa;
+      totaleGlobale += tot;
+      pdf.setFont('helvetica','normal'); pdf.setFontSize(10);
+      pdf.text(az.length > 38 ? az.substring(0,35)+'...' : az, mar, y);
+      pdf.text(String(rows.length), 122, y); 
+      pdf.text(`${tariffa}€`, 142, y); 
+      pdf.text(`${tot.toFixed(2)}€`, 165, y);
+      y += 8;
+      if (y > 265) { pdf.addPage(); y = 20; }
+    });
+    y += 2;
+    pdf.setDrawColor(200,210,230); pdf.line(mar, y, W-mar, y);
+    y += 8;
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(12);
+    pdf.text(`Totale ECG: ${ecgsMese.length}`, mar, y);
+    pdf.setTextColor(14,165,160); pdf.setFontSize(14);
+    pdf.text(`${totaleGlobale.toFixed(2)} €`, 148, y);
+    pdf.setTextColor(26,38,64);
+    y += 10;
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(9); pdf.setTextColor(120,130,150);
+    pdf.text(`Generato il ${new Date().toLocaleDateString('it-IT')} — ambulatoriomillefonti.it`, mar, y);
+    pdf.save(`Compensi_${mesiLabel[mese-1]}_${anno}_${meCardiologo.replace(/\s/g,'_')}.pdf`);
+  };
 
   const scaricaBatch = async (batchId) => {
     const ecgsBatch = mieiEcgs.filter(e => e.batch_id === batchId && e.stato === "refertato" && e.file_referto_url);
@@ -1619,8 +1783,11 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs }) => {
       <div style={{ width:320, borderRight:`1px solid ${C.border}`, display:"flex", flexDirection:"column", background:C.white, overflow:"hidden" }}>
         <div style={{ padding:"20px 20px 16px", background:"linear-gradient(135deg,#e8f4ff,#e6f9f4)", borderBottom:`1px solid ${C.border}` }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
-            <div style={{ color:C.muted, fontSize:12, fontWeight:600 }}>Guadagni — mese corrente</div>
-            <button onClick={()=>setShowProfilo(p=>!p)} style={{background:showProfilo?"rgba(46,124,246,0.1)":"rgba(255,255,255,0.6)",border:`1px solid ${showProfilo?C.accent:C.border}`,borderRadius:8,padding:"4px 12px",cursor:"pointer",fontSize:12,color:showProfilo?C.accent:C.muted,fontWeight:600}}>⚙️ {meCardiologo}</button>
+            <div style={{ color:C.muted, fontSize:12, fontWeight:600 }}>{showCompensi ? '💰 Compensi' : 'Guadagni — mese corrente'}</div>
+            <div style={{display:'flex',gap:4}}>
+              <button onClick={()=>setShowCompensi(p=>!p)} style={{background:showCompensi?'#e8f9f4':'rgba(255,255,255,0.6)',border:`1px solid ${showCompensi?C.teal:C.border}`,borderRadius:8,padding:"4px 10px",cursor:"pointer",fontSize:12,color:showCompensi?C.teal:C.muted,fontWeight:600}}>💰 {showCompensi?'Chiudi':'Compensi'}</button>
+              <button onClick={()=>setShowProfilo(p=>!p)} style={{background:showProfilo?"rgba(46,124,246,0.1)":"rgba(255,255,255,0.6)",border:`1px solid ${showProfilo?C.accent:C.border}`,borderRadius:8,padding:"4px 10px",cursor:"pointer",fontSize:12,color:showProfilo?C.accent:C.muted,fontWeight:600}}>⚙️</button>
+            </div>
           </div>
           <div style={{ color:C.green, fontFamily:MONO, fontSize:30, fontWeight:"bold" }}>{guadagnoTot}€</div>
           <div style={{ display:"flex", gap:6, marginTop:10, flexWrap:"wrap" }}>
@@ -1739,7 +1906,79 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs }) => {
 
       {/* Detail */}
       <div style={{ flex:1, overflowY:"auto", padding:32, background:C.bg }}>
-        {!selected ? (
+        {showCompensi ? (
+          <div style={{ maxWidth:680 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:24, flexWrap:'wrap', gap:12 }}>
+              <div>
+                <h2 style={{ color:C.text, fontSize:20, fontWeight:700, marginBottom:4 }}>💰 Compensi</h2>
+                <div style={{ color:C.muted, fontSize:13 }}>Riepilogo mensile per azienda/farmacia</div>
+              </div>
+              <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                <select value={meseComp} onChange={e=>setMeseComp(e.target.value)}
+                  style={{ border:`1px solid ${C.border}`, borderRadius:10, padding:'8px 12px', fontSize:13, color:C.text, background:C.white, cursor:'pointer' }}>
+                  {Array.from({length:12},(_,i)=>{ const d=new Date(); d.setMonth(d.getMonth()-i); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; }).map(v=>{
+                    const [a,m]=v.split('-'); const mn=['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'][Number(m)-1];
+                    return <option key={v} value={v}>{mn} {a}</option>;
+                  })}
+                </select>
+                <button onClick={esportaPDFCompensi} style={{ background:`linear-gradient(135deg,${C.accent},${C.teal})`, color:'white', border:'none', borderRadius:10, padding:'8px 18px', cursor:'pointer', fontWeight:700, fontSize:13 }}>
+                  📄 Esporta PDF
+                </button>
+              </div>
+            </div>
+            {(() => {
+              const [anno,mese] = meseComp.split('-').map(Number);
+              const ecgsMese = refertatiMiei.filter(e=>{ const d=new Date(e.created_at||e.ts); return d.getFullYear()===anno && d.getMonth()===mese-1; });
+              const byAz = {};
+              ecgsMese.forEach(e=>{ const k=e.origine_dettaglio||e.farmacia||e.azienda||'Altro'; if(!byAz[k]) byAz[k]=[]; byAz[k].push(e); });
+              const totale = Object.entries(byAz).reduce((s,[k,rows])=>s+rows.length*getTariffa(k),0);
+              return (
+                <>
+                  {ecgsMese.length===0 && <div style={{textAlign:'center',padding:40,color:C.muted}}>Nessun referto questo mese</div>}
+                  {Object.entries(byAz).length > 0 && (
+                    <div style={{ background:C.white, borderRadius:16, boxShadow:C.shadow, overflow:'hidden', marginBottom:16 }}>
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 70px 90px 80px', padding:'10px 18px', background:C.cardAlt, fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:1 }}>
+                        <div>Azienda / Farmacia</div><div style={{textAlign:'center'}}>ECG</div><div style={{textAlign:'center'}}>Tariffa/ECG</div><div style={{textAlign:'right'}}>Totale</div>
+                      </div>
+                      {Object.entries(byAz).map(([az,rows])=>{
+                        const t = tariffario[az] !== undefined ? String(tariffario[az]) : '10';
+                        return (
+                          <div key={az} style={{ display:'grid', gridTemplateColumns:'1fr 70px 90px 80px', padding:'12px 18px', borderBottom:`1px solid ${C.borderLight}`, alignItems:'center' }}>
+                            <div style={{ color:C.text, fontSize:14, fontWeight:600 }}>{az}</div>
+                            <div style={{ textAlign:'center', color:C.accent, fontWeight:700 }}>{rows.length}</div>
+                            <div style={{ textAlign:'center' }}>
+                              <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:4 }}>
+                                <input type="number" min="0" step="0.5" value={t} onChange={ev=>setTariffario(p=>({...p,[az]:parseFloat(ev.target.value)||0}))}
+                                  style={{ width:52, border:`1px solid ${C.border}`, borderRadius:6, padding:'4px 6px', fontSize:12, textAlign:'center', color:C.text }} />
+                                <span style={{fontSize:12,color:C.muted}}>€</span>
+                              </div>
+                            </div>
+                            <div style={{ textAlign:'right', color:C.green, fontWeight:700 }}>{(rows.length * getTariffa(az)).toFixed(2)}€</div>
+                          </div>
+                        );
+                      })}
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 70px 90px 80px', padding:'14px 18px', background:C.greenLight }}>
+                        <div style={{ fontWeight:700, color:C.text }}>Totale mese</div>
+                        <div style={{ textAlign:'center', fontWeight:700, color:C.accent }}>{ecgsMese.length}</div>
+                        <div/>
+                        <div style={{ textAlign:'right', color:C.green, fontWeight:700, fontSize:16 }}>{totale.toFixed(2)}€</div>
+                      </div>
+                    </div>
+                  )}
+                  <div style={{ display:'flex', justifyContent:'flex-end', gap:8 }}>
+                    <button onClick={salvaTariffario} disabled={savingTariff}
+                      style={{ background:savingTariff?C.border:C.accent, color:'white', border:'none', borderRadius:10, padding:'9px 20px', cursor:savingTariff?'not-allowed':'pointer', fontWeight:700, fontSize:13 }}>
+                      {savingTariff ? '⏳ Salvando...' : '💾 Salva tariffario'}
+                    </button>
+                  </div>
+                  <div style={{ marginTop:12, color:C.muted, fontSize:11 }}>
+                    Le tariffe vengono salvate sul tuo profilo e usate per i calcoli futuri. Default: 10€/ECG.
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        ) : !selected ? (
           <div style={{ textAlign:"center", padding:"80px 0" }}>
             <div style={{ fontSize:56, marginBottom:12 }}>🫀</div>
             <div style={{ color:C.muted, fontSize:15 }}>Seleziona un ECG dalla lista</div>
