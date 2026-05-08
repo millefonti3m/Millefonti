@@ -465,57 +465,6 @@ const FarmaciaView = ({ ecgs, setEcgs }) => {
         )
       )}
 
-      {tab==="aziende" && (() => {
-        const clienti = {};
-        const meseCorr = new Date().getMonth(), annoCorr = new Date().getFullYear();
-        const mesePrec = meseCorr===0?11:meseCorr-1, annoPrec = meseCorr===0?annoCorr-1:annoCorr;
-        ecgs.forEach(e=>{
-          const k = e.origine_dettaglio||e.farmacia||e.azienda||'Altro';
-          if(!clienti[k]) clienti[k]={tot:0,refertati:0,meseCurr:0,mesePrec:0,origine:e.origine};
-          clienti[k].tot++;
-          if(e.stato==='refertato') clienti[k].refertati++;
-          const d=new Date(e.created_at||e.ts);
-          if(d.getMonth()===meseCorr&&d.getFullYear()===annoCorr) clienti[k].meseCurr++;
-          if(d.getMonth()===mesePrec&&d.getFullYear()===annoPrec) clienti[k].mesePrec++;
-        });
-        const sorted = Object.entries(clienti).sort((a,b)=>b[1].tot-a[1].tot);
-        const MESI=['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
-        return (
-          <div>
-            <div style={{fontWeight:700,fontSize:17,color:C.text,marginBottom:20}}>📊 Statistiche per cliente</div>
-            <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,boxShadow:C.shadow,overflow:'hidden'}}>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 80px 80px 80px 80px 70px',padding:'10px 20px',background:C.cardAlt,fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>
-                <div>Cliente</div><div style={{textAlign:'center'}}>Totale</div><div style={{textAlign:'center'}}>Ref.</div><div style={{textAlign:'center'}}>{MESI[meseCorr]}</div><div style={{textAlign:'center'}}>{MESI[mesePrec]}</div><div style={{textAlign:'center'}}>% compl.</div>
-              </div>
-              {sorted.map(([az,s])=>{
-                const pct=s.tot>0?Math.round((s.refertati/s.tot)*100):0;
-                const trend=s.meseCurr>s.mesePrec?'↑':s.meseCurr<s.mesePrec?'↓':'→';
-                const trendCol=trend==='↑'?C.green:trend==='↓'?C.red:C.muted;
-                return (
-                  <div key={az} style={{display:'grid',gridTemplateColumns:'1fr 80px 80px 80px 80px 70px',padding:'14px 20px',borderBottom:`1px solid ${C.borderLight}`,alignItems:'center'}}>
-                    <div>
-                      <div style={{fontSize:14,fontWeight:600,color:C.text}}>{az}</div>
-                      <div style={{fontSize:11,color:C.muted,marginTop:2}}>{s.origine==='azienda'?'🏢 Azienda':s.origine==='farmacia'?'💊 Farmacia':'👤 Pubblico'}</div>
-                    </div>
-                    <div style={{textAlign:'center',fontWeight:700,color:C.text}}>{s.tot}</div>
-                    <div style={{textAlign:'center',fontWeight:700,color:C.green}}>{s.refertati}</div>
-                    <div style={{textAlign:'center'}}>
-                      <span style={{fontWeight:700,color:C.accent}}>{s.meseCurr}</span>
-                      <span style={{fontSize:11,color:trendCol,marginLeft:4}}>{trend}</span>
-                    </div>
-                    <div style={{textAlign:'center',color:C.muted,fontSize:13}}>{s.mesePrec}</div>
-                    <div style={{textAlign:'center'}}>
-                      <div style={{background:pct>=80?C.greenLight:pct>=50?C.accentLight:C.orangeLight,color:pct>=80?C.green:pct>=50?C.accent:C.orange,borderRadius:8,padding:'3px 8px',fontSize:12,fontWeight:700,display:'inline-block'}}>{pct}%</div>
-                    </div>
-                  </div>
-                );
-              })}
-              {sorted.length===0&&<div style={{textAlign:'center',padding:40,color:C.muted}}>Nessun dato disponibile</div>}
-            </div>
-          </div>
-        );
-      })()}
-
       {tab==="storico" && (
         <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
           {miei.length===0 && <div style={{ textAlign:"center", padding:40, color:C.muted }}>Nessun ECG ancora caricato</div>}
@@ -751,57 +700,6 @@ const AziendaView = ({ ecgs, setEcgs }) => {
           </div>
         )
       )}
-
-      {tab==="aziende" && (() => {
-        const clienti = {};
-        const meseCorr = new Date().getMonth(), annoCorr = new Date().getFullYear();
-        const mesePrec = meseCorr===0?11:meseCorr-1, annoPrec = meseCorr===0?annoCorr-1:annoCorr;
-        ecgs.forEach(e=>{
-          const k = e.origine_dettaglio||e.farmacia||e.azienda||'Altro';
-          if(!clienti[k]) clienti[k]={tot:0,refertati:0,meseCurr:0,mesePrec:0,origine:e.origine};
-          clienti[k].tot++;
-          if(e.stato==='refertato') clienti[k].refertati++;
-          const d=new Date(e.created_at||e.ts);
-          if(d.getMonth()===meseCorr&&d.getFullYear()===annoCorr) clienti[k].meseCurr++;
-          if(d.getMonth()===mesePrec&&d.getFullYear()===annoPrec) clienti[k].mesePrec++;
-        });
-        const sorted = Object.entries(clienti).sort((a,b)=>b[1].tot-a[1].tot);
-        const MESI=['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
-        return (
-          <div>
-            <div style={{fontWeight:700,fontSize:17,color:C.text,marginBottom:20}}>📊 Statistiche per cliente</div>
-            <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,boxShadow:C.shadow,overflow:'hidden'}}>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 80px 80px 80px 80px 70px',padding:'10px 20px',background:C.cardAlt,fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>
-                <div>Cliente</div><div style={{textAlign:'center'}}>Totale</div><div style={{textAlign:'center'}}>Ref.</div><div style={{textAlign:'center'}}>{MESI[meseCorr]}</div><div style={{textAlign:'center'}}>{MESI[mesePrec]}</div><div style={{textAlign:'center'}}>% compl.</div>
-              </div>
-              {sorted.map(([az,s])=>{
-                const pct=s.tot>0?Math.round((s.refertati/s.tot)*100):0;
-                const trend=s.meseCurr>s.mesePrec?'↑':s.meseCurr<s.mesePrec?'↓':'→';
-                const trendCol=trend==='↑'?C.green:trend==='↓'?C.red:C.muted;
-                return (
-                  <div key={az} style={{display:'grid',gridTemplateColumns:'1fr 80px 80px 80px 80px 70px',padding:'14px 20px',borderBottom:`1px solid ${C.borderLight}`,alignItems:'center'}}>
-                    <div>
-                      <div style={{fontSize:14,fontWeight:600,color:C.text}}>{az}</div>
-                      <div style={{fontSize:11,color:C.muted,marginTop:2}}>{s.origine==='azienda'?'🏢 Azienda':s.origine==='farmacia'?'💊 Farmacia':'👤 Pubblico'}</div>
-                    </div>
-                    <div style={{textAlign:'center',fontWeight:700,color:C.text}}>{s.tot}</div>
-                    <div style={{textAlign:'center',fontWeight:700,color:C.green}}>{s.refertati}</div>
-                    <div style={{textAlign:'center'}}>
-                      <span style={{fontWeight:700,color:C.accent}}>{s.meseCurr}</span>
-                      <span style={{fontSize:11,color:trendCol,marginLeft:4}}>{trend}</span>
-                    </div>
-                    <div style={{textAlign:'center',color:C.muted,fontSize:13}}>{s.mesePrec}</div>
-                    <div style={{textAlign:'center'}}>
-                      <div style={{background:pct>=80?C.greenLight:pct>=50?C.accentLight:C.orangeLight,color:pct>=80?C.green:pct>=50?C.accent:C.orange,borderRadius:8,padding:'3px 8px',fontSize:12,fontWeight:700,display:'inline-block'}}>{pct}%</div>
-                    </div>
-                  </div>
-                );
-              })}
-              {sorted.length===0&&<div style={{textAlign:'center',padding:40,color:C.muted}}>Nessun dato disponibile</div>}
-            </div>
-          </div>
-        );
-      })()}
 
       {tab==="storico" && (() => {
         const batches={}, singoli=[];
@@ -1888,6 +1786,8 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs }) => {
             <div style={{ color:C.muted, fontSize:12, fontWeight:600 }}>{showCompensi ? '💰 Compensi' : 'Guadagni — mese corrente'}</div>
             <div style={{display:'flex',gap:4}}>
               <button onClick={()=>setShowCompensi(p=>!p)} style={{background:showCompensi?'#e8f9f4':'rgba(255,255,255,0.6)',border:`1px solid ${showCompensi?C.teal:C.border}`,borderRadius:8,padding:"4px 10px",cursor:"pointer",fontSize:12,color:showCompensi?C.teal:C.muted,fontWeight:600}}>💰 {showCompensi?'Chiudi':'Compensi'}</button>
+              {!pushAbilitato && 'Notification' in window && <button onClick={registraPush} style={{background:'#fff8e1',border:'1px solid #f59e0b',borderRadius:8,padding:"4px 10px",cursor:"pointer",fontSize:12,color:'#856404',fontWeight:600}} title="Abilita notifiche push">🔔</button>}
+              {pushAbilitato && <span style={{fontSize:16}} title="Notifiche attive">🔔✓</span>}
               <button onClick={()=>setShowProfilo(p=>!p)} style={{background:showProfilo?"rgba(46,124,246,0.1)":"rgba(255,255,255,0.6)",border:`1px solid ${showProfilo?C.accent:C.border}`,borderRadius:8,padding:"4px 10px",cursor:"pointer",fontSize:12,color:showProfilo?C.accent:C.muted,fontWeight:600}}>⚙️</button>
             </div>
           </div>
@@ -2215,8 +2115,6 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
   };
   const [filtroStato, setFiltroStato] = useState("tutti");
   const [filtroOrigine, setFiltroOrigine] = useState("tutti");
-  const [filtroMese, setFiltroMese] = useState("tutti");
-  const [filtroAzienda, setFiltroAzienda] = useState("tutti");
   const [assegnazioneTemp, setAssegnazioneTemp] = useState({}); // ecgId -> cardiologo selezionato
 
   const nomi = cardiologiDB.length > 0 ? cardiologiDB : Object.keys(CARDIOLOGI_DATA);
@@ -2276,6 +2174,16 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: user.email, cardiologo, count, batchNome: batchNome || null })
     }).catch(() => {});
+    // Push notification
+    fetch('/api/push-send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        cardiologo_nome: cardiologo,
+        title: '🫀 Nuovi ECG assegnati',
+        body: batchNome ? `${count} ECG del lotto "${batchNome}" da refertare` : `${count} nuovo/i ECG da refertare`,
+      })
+    }).catch(() => {});
   };
 
   const assegnaBatch = async (batchId, cardiologo) => {
@@ -2321,21 +2229,8 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
   const ecgsFiltrati = ecgs.filter(e=>{
     if (filtroStato!=="tutti" && e.stato!==filtroStato) return false;
     if (filtroOrigine!=="tutti" && e.origine!==filtroOrigine) return false;
-    if (filtroMese!=="tutti") {
-      const d = new Date(e.created_at||e.ts);
-      const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-      if (key!==filtroMese) return false;
-    }
-    if (filtroAzienda!=="tutti") {
-      const az = e.origine_dettaglio||e.azienda||e.farmacia||'Altro';
-      if (az!==filtroAzienda) return false;
-    }
     return true;
   });
-
-  // Mesi disponibili per filtro
-  const mesiDisponibili = [...new Set(ecgs.map(e=>{ const d=new Date(e.created_at||e.ts); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; }))].sort().reverse();
-  const aziendeDisponibili = [...new Set(ecgs.map(e=>e.origine_dettaglio||e.azienda||e.farmacia||'Altro').filter(Boolean))].sort();
 
   return (
     <div style={{ padding:32, maxWidth:960, margin:"0 auto" }}>
@@ -2357,7 +2252,6 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
       <div style={{ display:"flex", gap:6, marginBottom:24, background:C.bg, borderRadius:12, padding:4, width:"fit-content", flexWrap:"wrap" }}>
         {tabBtn("assegnazioni","Assegnazioni",nonAssegnati.length)}
         {tabBtn("dashboard","Dashboard",0)}
-        {tabBtn("aziende","📊 Aziende",0)}
         {tabBtn("prenotazioni","Prenotazioni",prenotazioni.length)}
         {tabBtn("storico","Storico ECG",0)}
         {tabBtn("team","Team",0)}
@@ -2592,161 +2486,45 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
       )}
 
       {/* ── TAB: STORICO ── */}
-      {tab==="aziende" && (() => {
-        const clienti = {};
-        const meseCorr = new Date().getMonth(), annoCorr = new Date().getFullYear();
-        const mesePrec = meseCorr===0?11:meseCorr-1, annoPrec = meseCorr===0?annoCorr-1:annoCorr;
-        ecgs.forEach(e=>{
-          const k = e.origine_dettaglio||e.farmacia||e.azienda||'Altro';
-          if(!clienti[k]) clienti[k]={tot:0,refertati:0,meseCurr:0,mesePrec:0,origine:e.origine};
-          clienti[k].tot++;
-          if(e.stato==='refertato') clienti[k].refertati++;
-          const d=new Date(e.created_at||e.ts);
-          if(d.getMonth()===meseCorr&&d.getFullYear()===annoCorr) clienti[k].meseCurr++;
-          if(d.getMonth()===mesePrec&&d.getFullYear()===annoPrec) clienti[k].mesePrec++;
-        });
-        const sorted = Object.entries(clienti).sort((a,b)=>b[1].tot-a[1].tot);
-        const MESI=['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
-        return (
-          <div>
-            <div style={{fontWeight:700,fontSize:17,color:C.text,marginBottom:20}}>📊 Statistiche per cliente</div>
-            <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,boxShadow:C.shadow,overflow:'hidden'}}>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 80px 80px 80px 80px 70px',padding:'10px 20px',background:C.cardAlt,fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>
-                <div>Cliente</div><div style={{textAlign:'center'}}>Totale</div><div style={{textAlign:'center'}}>Ref.</div><div style={{textAlign:'center'}}>{MESI[meseCorr]}</div><div style={{textAlign:'center'}}>{MESI[mesePrec]}</div><div style={{textAlign:'center'}}>% compl.</div>
-              </div>
-              {sorted.map(([az,s])=>{
-                const pct=s.tot>0?Math.round((s.refertati/s.tot)*100):0;
-                const trend=s.meseCurr>s.mesePrec?'↑':s.meseCurr<s.mesePrec?'↓':'→';
-                const trendCol=trend==='↑'?C.green:trend==='↓'?C.red:C.muted;
-                return (
-                  <div key={az} style={{display:'grid',gridTemplateColumns:'1fr 80px 80px 80px 80px 70px',padding:'14px 20px',borderBottom:`1px solid ${C.borderLight}`,alignItems:'center'}}>
-                    <div>
-                      <div style={{fontSize:14,fontWeight:600,color:C.text}}>{az}</div>
-                      <div style={{fontSize:11,color:C.muted,marginTop:2}}>{s.origine==='azienda'?'🏢 Azienda':s.origine==='farmacia'?'💊 Farmacia':'👤 Pubblico'}</div>
-                    </div>
-                    <div style={{textAlign:'center',fontWeight:700,color:C.text}}>{s.tot}</div>
-                    <div style={{textAlign:'center',fontWeight:700,color:C.green}}>{s.refertati}</div>
-                    <div style={{textAlign:'center'}}>
-                      <span style={{fontWeight:700,color:C.accent}}>{s.meseCurr}</span>
-                      <span style={{fontSize:11,color:trendCol,marginLeft:4}}>{trend}</span>
-                    </div>
-                    <div style={{textAlign:'center',color:C.muted,fontSize:13}}>{s.mesePrec}</div>
-                    <div style={{textAlign:'center'}}>
-                      <div style={{background:pct>=80?C.greenLight:pct>=50?C.accentLight:C.orangeLight,color:pct>=80?C.green:pct>=50?C.accent:C.orange,borderRadius:8,padding:'3px 8px',fontSize:12,fontWeight:700,display:'inline-block'}}>{pct}%</div>
-                    </div>
-                  </div>
-                );
-              })}
-              {sorted.length===0&&<div style={{textAlign:'center',padding:40,color:C.muted}}>Nessun dato disponibile</div>}
-            </div>
-          </div>
-        );
-      })()}
-
       {tab==="storico" && (
         <div>
-          {/* Grafici dashboard */}
+          {/* Statistiche mensili per azienda */}
           {(() => {
-            const MESI_LABEL = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
-            const oggi = new Date();
-            // Ultimi 6 mesi
-            const ultimi6 = Array.from({length:6},(_,i)=>{ const d=new Date(oggi); d.setMonth(d.getMonth()-5+i); return {anno:d.getFullYear(),mese:d.getMonth(),label:MESI_LABEL[d.getMonth()]}; });
-            const countPerMese = ultimi6.map(({anno,mese})=>({
-              label: MESI_LABEL[mese],
-              tot: ecgs.filter(e=>{ const d=new Date(e.created_at||e.ts); return d.getFullYear()===anno&&d.getMonth()===mese; }).length,
-              ref: ecgs.filter(e=>{ const d=new Date(e.created_at||e.ts); return d.getFullYear()===anno&&d.getMonth()===mese&&e.stato==='refertato'; }).length,
-            }));
-            const maxVal = Math.max(...countPerMese.map(m=>m.tot), 1);
-            // Per origine
-            const byOrigine = {azienda:0,farmacia:0,pubblico:0};
-            ecgs.forEach(e=>{ if(byOrigine[e.origine]!==undefined) byOrigine[e.origine]++; });
-            const totOrigine = Object.values(byOrigine).reduce((a,b)=>a+b,0)||1;
-            // Ricavi stimati mese corrente (default 10€)
-            const meseCorr = ecgs.filter(e=>{ const d=new Date(e.created_at||e.ts); return d.getMonth()===oggi.getMonth()&&d.getFullYear()===oggi.getFullYear()&&e.stato==='refertato'; });
-            const ricaviMese = meseCorr.length * 10;
+            const refertati = ecgs.filter(e => e.stato === "refertato");
+            const perAzienda = {};
+            refertati.forEach(e => {
+              const azienda = e.origine_dettaglio || e.azienda || e.farmacia || e.origine || "Altro";
+              const mese = new Date(e.created_at || e.ts).toLocaleDateString("it-IT", { month: "long", year: "numeric" });
+              if (!perAzienda[azienda]) perAzienda[azienda] = {};
+              if (!perAzienda[azienda][mese]) perAzienda[azienda][mese] = 0;
+              perAzienda[azienda][mese]++;
+            });
+            if (Object.keys(perAzienda).length === 0) return null;
             return (
-              <div style={{display:'flex',flexDirection:'column',gap:16}}>
-                {/* KPI ricavi */}
-                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:12}}>
-                  {[
-                    {label:'Ricavi stimati mese',value:`${ricaviMese}€`,color:C.green,icon:'💶',sub:'@10€/ECG default'},
-                    {label:'Ricavi stimati anno',value:`${ecgs.filter(e=>{ const d=new Date(e.created_at||e.ts); return d.getFullYear()===oggi.getFullYear()&&e.stato==='refertato';}).length*10}€`,color:C.teal,icon:'📈',sub:String(oggi.getFullYear())},
-                    {label:'ECG questo mese',value:meseCorr.length,color:C.accent,icon:'🫀',sub:'refertati'},
-                    {label:'Clienti attivi',value:new Set(ecgs.map(e=>e.origine_dettaglio||e.farmacia||'Altro').filter(Boolean)).size,color:C.purple,icon:'🏢',sub:'aziende/farmacie'},
-                  ].map(({label,value,color,icon,sub})=>(
-                    <div key={label} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,padding:'16px 18px',boxShadow:C.shadow}}>
-                      <div style={{fontSize:20,marginBottom:6}}>{icon}</div>
-                      <div style={{fontSize:24,fontWeight:700,color}}>{value}</div>
-                      <div style={{fontSize:12,fontWeight:600,color:C.text,marginTop:2}}>{label}</div>
-                      <div style={{fontSize:11,color:C.muted}}>{sub}</div>
+              <div style={{ marginBottom:24 }}>
+                <div style={{ fontWeight:700, fontSize:15, color:C.text, marginBottom:12 }}>📊 Statistiche referti completati</div>
+                <div style={{ display:"flex", flexWrap:"wrap", gap:12 }}>
+                  {Object.entries(perAzienda).map(([azienda, mesi]) => (
+                    <div key={azienda} style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:14, padding:16, minWidth:200, boxShadow:C.shadow }}>
+                      <div style={{ fontWeight:700, fontSize:13, color:C.text, marginBottom:10 }}>🏢 {azienda}</div>
+                      {Object.entries(mesi).sort().reverse().map(([mese, count]) => (
+                        <div key={mese} style={{ display:"flex", justifyContent:"space-between", fontSize:12, color:C.muted, marginBottom:4 }}>
+                          <span>{mese}</span>
+                          <span style={{ fontWeight:700, color:C.accent }}>{count} referti</span>
+                        </div>
+                      ))}
+                      <div style={{ marginTop:8, borderTop:`1px solid ${C.borderLight}`, paddingTop:6, display:"flex", justifyContent:"space-between", fontSize:12 }}>
+                        <span style={{ fontWeight:600, color:C.textSoft }}>Totale</span>
+                        <span style={{ fontWeight:700, color:C.green }}>{Object.values(mesi).reduce((a,b)=>a+b,0)} referti</span>
+                      </div>
                     </div>
                   ))}
-                </div>
-
-                {/* Grafico barre ECG per mese */}
-                <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,padding:'20px 22px',boxShadow:C.shadow}}>
-                  <div style={{fontWeight:700,fontSize:14,color:C.text,marginBottom:16}}>📊 ECG ultimi 6 mesi</div>
-                  <div style={{display:'flex',alignItems:'flex-end',gap:10,height:120}}>
-                    {countPerMese.map(({label,tot,ref})=>(
-                      <div key={label} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:4}}>
-                        <div style={{fontSize:11,fontWeight:700,color:C.accent}}>{tot||''}</div>
-                        <div style={{width:'100%',display:'flex',gap:2,alignItems:'flex-end',height:90}}>
-                          <div style={{flex:1,background:C.accentLight,borderRadius:'4px 4px 0 0',height:`${Math.round((tot/maxVal)*90)}px`,minHeight:tot>0?4:0,position:'relative'}}>
-                            <div style={{position:'absolute',bottom:0,left:0,right:0,background:C.green,borderRadius:'4px 4px 0 0',height:`${Math.round((ref/maxVal)*90)}px`}}/>
-                          </div>
-                        </div>
-                        <div style={{fontSize:11,color:C.muted}}>{label}</div>
-                      </div>
-                    ))}
-                  </div>
-                  <div style={{display:'flex',gap:16,marginTop:10}}>
-                    <div style={{display:'flex',alignItems:'center',gap:6,fontSize:11,color:C.muted}}><div style={{width:10,height:10,background:C.accentLight,borderRadius:2}}/> Totali</div>
-                    <div style={{display:'flex',alignItems:'center',gap:6,fontSize:11,color:C.muted}}><div style={{width:10,height:10,background:C.green,borderRadius:2}}/> Refertati</div>
-                  </div>
-                </div>
-
-                {/* Grafico torta origini + top aziende */}
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
-                  {/* Torta origini */}
-                  <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,padding:'20px 22px',boxShadow:C.shadow}}>
-                    <div style={{fontWeight:700,fontSize:14,color:C.text,marginBottom:16}}>🥧 Ripartizione ECG</div>
-                    {[{k:'azienda',label:'Azienda',color:C.purple},{k:'farmacia',label:'Farmacia',color:C.teal},{k:'pubblico',label:'Pubblico',color:C.pink}].map(({k,label,color})=>{
-                      const pct = Math.round((byOrigine[k]/totOrigine)*100);
-                      return (
-                        <div key={k} style={{marginBottom:10}}>
-                          <div style={{display:'flex',justifyContent:'space-between',fontSize:12,marginBottom:4}}>
-                            <span style={{color:C.textSoft,fontWeight:600}}>{label}</span>
-                            <span style={{color,fontWeight:700}}>{byOrigine[k]} ({pct}%)</span>
-                          </div>
-                          <div style={{background:C.bg,borderRadius:20,height:8}}>
-                            <div style={{height:'100%',width:`${pct}%`,background:color,borderRadius:20}}/>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {/* Top aziende */}
-                  <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,padding:'20px 22px',boxShadow:C.shadow}}>
-                    <div style={{fontWeight:700,fontSize:14,color:C.text,marginBottom:16}}>🏆 Top clienti</div>
-                    {Object.entries(
-                      ecgs.reduce((acc,e)=>{
-                        const k=e.origine_dettaglio||e.farmacia||'Altro';
-                        acc[k]=(acc[k]||0)+1; return acc;
-                      },{})
-                    ).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([az,count],i)=>(
-                      <div key={az} style={{display:'flex',alignItems:'center',gap:10,marginBottom:8}}>
-                        <div style={{width:22,height:22,background:i===0?C.yellow+'33':C.bg,border:`1px solid ${i===0?C.yellow:C.border}`,borderRadius:6,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,color:i===0?C.yellow:C.muted,flexShrink:0}}>{i+1}</div>
-                        <div style={{flex:1,fontSize:12,color:C.text,fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{az}</div>
-                        <div style={{background:C.accentLight,color:C.accent,borderRadius:8,padding:'2px 8px',fontSize:12,fontWeight:700,flexShrink:0}}>{count}</div>
-                      </div>
-                    ))}
-                  </div>
                 </div>
               </div>
             );
           })()}
 
-          <div style={{ display:"flex", gap:8, marginBottom:8, flexWrap:"wrap" }}>
+          <div style={{ display:"flex", gap:8, marginBottom:16, flexWrap:"wrap" }}>
             {[["tutti","Tutti"],["in_attesa","In attesa"],["refertato","Refertati"],["prenotato","Prenotazioni"]].map(([v,l])=>(
               <button key={v} onClick={()=>setFiltroStato(v)} style={{ background:filtroStato===v?C.accent:C.white, color:filtroStato===v?C.white:C.muted, border:`1px solid ${filtroStato===v?C.accent:C.border}`, borderRadius:20, padding:"6px 16px", cursor:"pointer", fontWeight:600, fontSize:12 }}>{l}</button>
             ))}
@@ -2754,22 +2532,6 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
             {[["tutti","Tutti"],["farmacia","💊 Farmacia"],["azienda","🏢 Azienda"],["pubblico","👤 Pubblico"]].map(([v,l])=>(
               <button key={v} onClick={()=>setFiltroOrigine(v)} style={{ background:filtroOrigine===v?C.teal:C.white, color:filtroOrigine===v?C.white:C.muted, border:`1px solid ${filtroOrigine===v?C.teal:C.border}`, borderRadius:20, padding:"6px 16px", cursor:"pointer", fontWeight:600, fontSize:12 }}>{l}</button>
             ))}
-          </div>
-          <div style={{ display:"flex", gap:8, marginBottom:16, flexWrap:"wrap", alignItems:"center" }}>
-            <span style={{fontSize:12,color:C.muted,fontWeight:600}}>Mese:</span>
-            <select value={filtroMese} onChange={e=>setFiltroMese(e.target.value)}
-              style={{border:`1px solid ${C.border}`,borderRadius:20,padding:"5px 12px",fontSize:12,color:C.text,background:C.white,cursor:"pointer"}}>
-              <option value="tutti">Tutti</option>
-              {mesiDisponibili.map(m=>{ const [a,mo]=m.split('-'); const mn=['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'][Number(mo)-1]; return <option key={m} value={m}>{mn} {a}</option>; })}
-            </select>
-            <span style={{fontSize:12,color:C.muted,fontWeight:600}}>Cliente:</span>
-            <select value={filtroAzienda} onChange={e=>setFiltroAzienda(e.target.value)}
-              style={{border:`1px solid ${C.border}`,borderRadius:20,padding:"5px 12px",fontSize:12,color:C.text,background:C.white,cursor:"pointer"}}>
-              <option value="tutti">Tutti</option>
-              {aziendeDisponibili.map(az=><option key={az} value={az}>{az}</option>)}
-            </select>
-            {(filtroMese!=="tutti"||filtroAzienda!=="tutti") && <button onClick={()=>{setFiltroMese("tutti");setFiltroAzienda("tutti");}} style={{background:C.redLight,color:C.red,border:"none",borderRadius:20,padding:"5px 12px",cursor:"pointer",fontSize:12,fontWeight:600}}>✕ Reset</button>}
-            <span style={{fontSize:12,color:C.muted,marginLeft:"auto"}}>{ecgsFiltrati.length} ECG</span>
           </div>
           <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
             {ecgsFiltrati.map(ecg=>(
@@ -3706,6 +3468,38 @@ export default function App() {
 
   // Ref per evitare doppia chiamata a caricaRuolo
   const authDoneRef = useRef(false);
+  const [pushAbilitato, setPushAbilitato] = useState(false);
+
+  // Converte VAPID public key per PushManager
+  const urlBase64ToUint8Array = (base64String) => {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = atob(base64);
+    return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
+  };
+
+  const registraPush = async () => {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    try {
+      const reg = await navigator.serviceWorker.register('/sw.js');
+      await navigator.serviceWorker.ready;
+      const permesso = await Notification.requestPermission();
+      if (permesso !== 'granted') return;
+      const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+      if (!vapidKey) return;
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidKey),
+      });
+      const { data: { session } } = await supabase.auth.getSession();
+      await fetch('/api/push-subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscription: sub.toJSON(), cardiologo_nome: meCardiologo, user_id: session.user.id }),
+      });
+      setPushAbilitato(true);
+    } catch(e) { console.error('Push registration error:', e); }
+  };
 
   const supabaseAuth = async () => {
     // Safety: se dopo 6 secondi loading è ancora true, sblocca
