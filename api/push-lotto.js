@@ -40,17 +40,24 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Legge le regole con service key
-    const { data: regole } = await supabase
-      .from('regole_assegnazione').select('*').single();
-
+    // 1. Controlla regola specifica per azienda (ha priorità)
+    const nomeAzienda = req.body?.record?.origine_dettaglio || req.body?.nomeAzienda || '';
     let dest = '';
-    if (regole) {
-      const giorni = ['domenica','lunedi','martedi','mercoledi','giovedi','venerdi','sabato'];
-      if (regole.modalita === 'unico') dest = regole.cardiologo_unico || '';
-      else if (regole.modalita === 'giorni') dest = regole[giorni[new Date().getDay()]] || '';
+    if (nomeAzienda) {
+      const { data: regAz } = await supabase.from('regole_per_azienda')
+        .select('cardiologo_nome').eq('azienda_nome', nomeAzienda).maybeSingle();
+      if (regAz?.cardiologo_nome) dest = regAz.cardiologo_nome;
     }
-    console.log('push-lotto: destinatario:', dest);
+    // 2. Fallback: regole generali
+    if (!dest) {
+      const { data: regole } = await supabase.from('regole_assegnazione').select('*').single();
+      if (regole) {
+        const giorni = ['domenica','lunedi','martedi','mercoledi','giovedi','venerdi','sabato'];
+        if (regole.modalita === 'unico') dest = regole.cardiologo_unico || '';
+        else if (regole.modalita === 'giorni') dest = regole[giorni[new Date().getDay()]] || '';
+      }
+    }
+    console.log('push-lotto: azienda="'+nomeAzienda+'" dest="'+dest+'"');
     if (!dest) return res.status(200).json({ sent: 0, msg: 'Nessun destinatario' });
 
     // Carica subscriptions

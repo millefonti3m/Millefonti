@@ -2083,12 +2083,16 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
     });
   }, []);
   const [regole, setRegole] = useState({ modalita:'manuale', cardiologo_unico:'', lunedi:'', martedi:'', mercoledi:'', giovedi:'', venerdi:'', sabato:'', domenica:'' });
+  const [regoleAziende, setRegoleAziende] = useState([]);
+  const [nuovaRegAz, setNuovaRegAz] = useState({ azienda:'', cardiologo:'' });
   const [salvandoRegole, setSalvandoRegole] = useState(false);
 
   // Carica regole assegnazione
   useEffect(() => {
     supabase.from('regole_assegnazione').select('*').single()
       .then(({ data }) => { if (data) setRegole(data); });
+    supabase.from('regole_per_azienda').select('*').order('azienda_nome')
+      .then(({ data }) => { if (data) setRegoleAziende(data); });
   }, []);
 
   const salvaRegole = async () => {
@@ -2706,6 +2710,37 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
             style={{background:C.accent,color:C.white,border:"none",borderRadius:12,padding:"13px 0",cursor:"pointer",fontWeight:700,fontSize:14,width:"100%",boxShadow:`0 4px 16px ${C.accent}44`}}>
             {salvandoRegole?"⏳ Salvataggio...":"💾 Salva regole"}
           </button>
+          
+          {/* Regole per azienda */}
+          <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,padding:20,marginTop:16,boxShadow:C.shadow}}>
+            <div style={{fontWeight:700,fontSize:14,color:C.text,marginBottom:14}}>🏢 Assegnazione per azienda</div>
+            <div style={{color:C.muted,fontSize:12,marginBottom:14}}>Queste regole hanno priorità sulle regole generali.</div>
+            {regoleAziende.map(ra => (
+              <div key={ra.id} style={{display:'flex',alignItems:'center',gap:10,marginBottom:8,padding:'10px 14px',background:C.bg,borderRadius:10}}>
+                <div style={{flex:1,fontWeight:600,fontSize:13,color:C.text}}>{ra.azienda_nome}</div>
+                <div style={{fontSize:13,color:C.accent,fontWeight:600}}>→ {ra.cardiologo_nome}</div>
+                <button onClick={async()=>{
+                  await supabase.from('regole_per_azienda').delete().eq('id',ra.id);
+                  setRegoleAziende(prev=>prev.filter(r=>r.id!==ra.id));
+                }} style={{background:'none',border:'none',cursor:'pointer',color:C.muted,fontSize:16,padding:'0 4px'}}>✕</button>
+              </div>
+            ))}
+            <div style={{display:'flex',gap:8,marginTop:12}}>
+              <input value={nuovaRegAz.azienda} onChange={e=>setNuovaRegAz(p=>({...p,azienda:e.target.value}))}
+                placeholder="Nome azienda esatto..." 
+                style={{flex:2,background:C.bg,border:`1.5px solid ${C.border}`,borderRadius:10,padding:'8px 12px',fontSize:13,color:C.text,outline:'none'}}/>
+              <select value={nuovaRegAz.cardiologo} onChange={e=>setNuovaRegAz(p=>({...p,cardiologo:e.target.value}))}
+                style={{flex:1,background:C.bg,border:`1.5px solid ${C.border}`,borderRadius:10,padding:'8px 12px',fontSize:13,color:C.text,outline:'none'}}>
+                <option value="">Cardiologo...</option>
+                {nomi.map(n=><option key={n} value={n}>{n}</option>)}
+              </select>
+              <button onClick={async()=>{
+                if(!nuovaRegAz.azienda||!nuovaRegAz.cardiologo) return;
+                const {data} = await supabase.from('regole_per_azienda').upsert({azienda_nome:nuovaRegAz.azienda,cardiologo_nome:nuovaRegAz.cardiologo},{onConflict:'azienda_nome'}).select().single();
+                if(data){setRegoleAziende(prev=>[...prev.filter(r=>r.azienda_nome!==nuovaRegAz.azienda),data].sort((a,b)=>a.azienda_nome.localeCompare(b.azienda_nome)));setNuovaRegAz({azienda:'',cardiologo:''});}
+              }} style={{background:C.accent,color:C.white,border:'none',borderRadius:10,padding:'8px 16px',cursor:'pointer',fontWeight:700,fontSize:13,whiteSpace:'nowrap'}}>+ Aggiungi</button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -3529,16 +3564,26 @@ export default function App() {
           const newEcg = payload.new;
           // Applica regole automatiche se ECG non ha cardiologo
           if (!newEcg.cardiologo_nome) {
-            const { data: regole } = await supabase.from('regole_assegnazione').select('*').single();
-            if (regole) {
-              const giorni = ['domenica','lunedi','martedi','mercoledi','giovedi','venerdi','sabato'];
-              let dest = '';
-              if (regole.modalita === 'unico') dest = regole.cardiologo_unico;
-              else if (regole.modalita === 'giorni') dest = regole[giorni[new Date(newEcg.created_at).getDay()]] || '';
-              if (dest) {
-                await supabase.from('ecgs').update({ cardiologo_nome: dest }).eq('id', newEcg.id);
-                newEcg.cardiologo_nome = dest;
+            let dest = '';
+            // 1. Controlla regola specifica per azienda
+            const nomeAz = newEcg.origine_dettaglio || newEcg.azienda || '';
+            if (nomeAz) {
+              const { data: regAz } = await supabase.from('regole_per_azienda')
+                .select('cardiologo_nome').eq('azienda_nome', nomeAz).maybeSingle();
+              if (regAz?.cardiologo_nome) dest = regAz.cardiologo_nome;
+            }
+            // 2. Fallback: regole generali
+            if (!dest) {
+              const { data: regole } = await supabase.from('regole_assegnazione').select('*').single();
+              if (regole) {
+                const giorni = ['domenica','lunedi','martedi','mercoledi','giovedi','venerdi','sabato'];
+                if (regole.modalita === 'unico') dest = regole.cardiologo_unico;
+                else if (regole.modalita === 'giorni') dest = regole[giorni[new Date(newEcg.created_at).getDay()]] || '';
               }
+            }
+            if (dest) {
+              await supabase.from('ecgs').update({ cardiologo_nome: dest }).eq('id', newEcg.id);
+              newEcg.cardiologo_nome = dest;
             }
           }
           setEcgs(prev => [mapEcg(newEcg), ...prev]);
@@ -3583,6 +3628,17 @@ export default function App() {
   // Ref per evitare doppia chiamata a caricaRuolo
   const authDoneRef = useRef(false);
   const [pushAbilitato, setPushAbilitato] = useState(false);
+
+  // Ripristina push automaticamente se già abilitato
+  useEffect(() => {
+    if (role !== 'cardiologo') return;
+    if (!('Notification' in window) || !('serviceWorker' in navigator)) return;
+    if (Notification.permission !== 'granted') return;
+    navigator.serviceWorker.ready
+      .then(reg => reg.pushManager.getSubscription())
+      .then(sub => { if (sub) setPushAbilitato(true); })
+      .catch(() => {});
+  }, [role]);
 
   const urlBase64ToUint8Array = (b64) => {
     const pad = '='.repeat((4 - b64.length % 4) % 4);
