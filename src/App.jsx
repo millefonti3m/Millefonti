@@ -2726,9 +2726,11 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
               </div>
             ))}
             <div style={{display:'flex',gap:8,marginTop:12}}>
-              <input value={nuovaRegAz.azienda} onChange={e=>setNuovaRegAz(p=>({...p,azienda:e.target.value}))}
-                placeholder="Nome azienda esatto..." 
-                style={{flex:2,background:C.bg,border:`1.5px solid ${C.border}`,borderRadius:10,padding:'8px 12px',fontSize:13,color:C.text,outline:'none'}}/>
+              <select value={nuovaRegAz.azienda} onChange={e=>setNuovaRegAz(p=>({...p,azienda:e.target.value}))}
+                style={{flex:2,background:C.bg,border:`1.5px solid ${C.border}`,borderRadius:10,padding:'8px 12px',fontSize:13,color:C.text,outline:'none',cursor:'pointer'}}>
+                <option value="">Seleziona azienda...</option>
+                {aziendeDisponibili.map(az=><option key={az} value={az}>{az}</option>)}
+              </select>
               <select value={nuovaRegAz.cardiologo} onChange={e=>setNuovaRegAz(p=>({...p,cardiologo:e.target.value}))}
                 style={{flex:1,background:C.bg,border:`1.5px solid ${C.border}`,borderRadius:10,padding:'8px 12px',fontSize:13,color:C.text,outline:'none'}}>
                 <option value="">Cardiologo...</option>
