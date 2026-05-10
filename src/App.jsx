@@ -2786,7 +2786,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
 };
 
 // ── SHELL ─────────────────────────────────────────────────────────────────
-const Shell = ({ role, onLogout, children, meCardiologo }) => {
+const Shell = ({ role, onLogout, children, meCardiologo, onCambiaRuolo }) => {
   const labels = { pubblico:"👤 Area pubblica", farmacia:`💊 ${ME_FARMACIA}`, azienda:`🏢 ${meCardiologo || ME_AZIENDA}`, cardiologo:`🫀 ${meCardiologo}`, admin:"⚙️ Admin" };
   return (
     <div style={{ minHeight:"100vh", background:C.bg, color:C.text, fontFamily:SANS }}>
@@ -2794,6 +2794,7 @@ const Shell = ({ role, onLogout, children, meCardiologo }) => {
         <Logo size={32} />
         <div style={{ flex:1 }} />
         <span style={{ color:C.muted, fontSize:13, fontWeight:500 }}>{labels[role]}</span>
+        {onCambiaRuolo && <button onClick={onCambiaRuolo} style={{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:8, padding:"7px 16px", color:C.accent, cursor:"pointer", fontWeight:500, fontSize:13 }}>⇄ Cambia ruolo</button>}
         <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onLogout(); }} style={{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:8, padding:"7px 16px", color:C.muted, cursor:"pointer", fontWeight:500, fontSize:13 }}>← Esci</button>
       </div>
       <div>{children}</div>
@@ -3753,6 +3754,11 @@ export default function App() {
     return 'Errore di connessione. Riprova.';
   };
 
+  const handleCambiaRuolo = () => {
+    localStorage.removeItem('preferito_ruolo');
+    setRole(null);
+  };
+
   const handleLogout = (cambiaProfilo = false) => {
     authDoneRef.current = false;
     if (cambiaProfilo) localStorage.removeItem('preferito_ruolo');
@@ -3814,7 +3820,7 @@ export default function App() {
   if (isMobile && role === 'admin') return <AdminMobile ecgs={ecgs} setEcgs={setEcgs} caricaEcgs={caricaEcgs} onLogout={handleLogout} />;
 
   return (
-    <Shell role={role} onLogout={handleLogout} meCardiologo={meCardiologo}>
+    <Shell role={role} onLogout={handleLogout} meCardiologo={meCardiologo} onCambiaRuolo={ruoliDisponibili.length > 1 ? handleCambiaRuolo : undefined}>
       {role==="pubblico"   && <PubblicoView setEcgs={setEcgs} />}
       {role==="farmacia"   && <FarmaciaView ecgs={ecgs} setEcgs={setEcgs} />}
       {role==="azienda"    && <AziendaView  ecgs={ecgs} setEcgs={setEcgs} />}
