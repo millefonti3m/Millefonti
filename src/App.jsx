@@ -1627,7 +1627,14 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, pushAbilitato
     });
   }, []);
 
-  const getTariffa = (orig) => parseFloat(tariffario[orig] ?? 10);
+  const getTariffa = (orig, urgenza = 'normale') => {
+    if (urgenza === 'urgente') {
+      const ku = `${orig}|urgente`;
+      if (tariffario[ku] !== undefined) return parseFloat(tariffario[ku]);
+    }
+    if (tariffario[orig] !== undefined) return parseFloat(tariffario[orig]);
+    return parseFloat(tariffario['default'] ?? 10);
+  };
 
   const salvaTariffario = async () => {
     setSavingTariff(true);
@@ -1639,57 +1646,75 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, pushAbilitato
 
   const esportaPDFCompensi = () => {
     const [anno, mese] = meseComp.split('-').map(Number);
-    const ecgsMese = refertatiMiei.filter(e => {
-      const d = new Date(e.created_at || e.ts);
-      return d.getFullYear() === anno && d.getMonth() === mese - 1;
-    });
+    const ecgsMese = refertatiMiei.filter(e => { const d=new Date(e.created_at||e.ts); return d.getFullYear()===anno && d.getMonth()===mese-1; });
     const byAz = {};
     ecgsMese.forEach(e => {
-      const k = e.origine_dettaglio || e.farmacia || e.azienda || 'Altro';
-      if (!byAz[k]) byAz[k] = [];
-      byAz[k].push(e);
+      const k = e.origine_dettaglio||e.farmacia||e.azienda||'Altro';
+      if (!byAz[k]) byAz[k] = { normale:[], urgente:[] };
+      byAz[k][e.urgenza==='urgente'?'urgente':'normale'].push(e);
     });
     const pdf = new jsPDF({ unit:'mm', format:'a4' });
-    const W = 210, mar = 18;
-    const mesiLabel = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
-    // Header
-    pdf.setFillColor(26,38,64); pdf.rect(0,0,W,32,'F');
-    pdf.setTextColor(255,255,255); pdf.setFontSize(16); pdf.setFont('helvetica','bold');
-    pdf.text('Rendiconto Mensile ECG', mar, 14);
+    const W=210, mar=18;
+    const mesiLabel=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+    // ── Header ──
+    pdf.setFillColor(26,38,64); pdf.rect(0,0,W,40,'F');
+    pdf.setTextColor(255,255,255); pdf.setFontSize(18); pdf.setFont('helvetica','bold');
+    pdf.text('RENDICONTO COMPENSI ECG', mar, 16);
     pdf.setFontSize(10); pdf.setFont('helvetica','normal');
-    pdf.text(`${mesiLabel[mese-1]} ${anno}  ·  Dott. ${meCardiologo}`, mar, 23);
-    // Corpo
-    let y = 48;
-    pdf.setTextColor(26,38,64); pdf.setFontSize(11); pdf.setFont('helvetica','bold');
-    pdf.text('Azienda / Farmacia', mar, y);
-    pdf.text('ECG', 118, y); pdf.text('Tariffa', 138, y); pdf.text('Totale', 168, y);
-    y += 4;
-    pdf.setDrawColor(200,210,230); pdf.line(mar, y, W-mar, y);
-    y += 8;
+    pdf.text(`Ambulatorio Millefonti  ·  Via Garessio 47, Torino`, mar, 25);
+    pdf.setFontSize(11); pdf.setFont('helvetica','bold');
+    pdf.text(`Dott. ${meCardiologo}`, mar, 34);
+    pdf.setFont('helvetica','normal');
+    pdf.text(`${mesiLabel[mese-1]} ${anno}`, W-mar, 34, {align:'right'});
+    // ── Info box ──
+    pdf.setFillColor(244,247,250); pdf.rect(mar, 46, W-mar*2, 14, 'F');
+    pdf.setTextColor(107,125,153); pdf.setFontSize(9);
+    pdf.text(`Periodo di riferimento: 01/${String(mese).padStart(2,'0')}/${anno} — ${new Date(anno,mese,0).getDate()}/${String(mese).padStart(2,'0')}/${anno}`, mar+4, 53);
+    pdf.text(`Totale ECG refertati: ${ecgsMese.length}`, W-mar-4, 53, {align:'right'});
+    // ── Intestazione tabella ──
+    let y = 70;
+    pdf.setFillColor(26,38,64); pdf.rect(mar, y-6, W-mar*2, 8, 'F');
+    pdf.setTextColor(255,255,255); pdf.setFontSize(9); pdf.setFont('helvetica','bold');
+    pdf.text('AZIENDA / FARMACIA', mar+2, y-0.5);
+    pdf.text('STD', 120, y-0.5, {align:'right'});
+    pdf.text('URG', 137, y-0.5, {align:'right'});
+    pdf.text('€/STD', 152, y-0.5, {align:'right'});
+    pdf.text('€/URG', 167, y-0.5, {align:'right'});
+    pdf.text('TOTALE', W-mar-2, y-0.5, {align:'right'});
+    y += 6;
     let totaleGlobale = 0;
-    Object.entries(byAz).forEach(([az, rows]) => {
-      const tariffa = getTariffa(az);
-      const tot = rows.length * tariffa;
+    Object.entries(byAz).forEach(([az, {normale, urgente}], idx) => {
+      const tNorm = getTariffa(az,'normale'), tUrg = getTariffa(az,'urgente');
+      const tot = normale.length*tNorm + urgente.length*tUrg;
       totaleGlobale += tot;
-      pdf.setFont('helvetica','normal'); pdf.setFontSize(10);
-      pdf.text(az.length > 38 ? az.substring(0,35)+'...' : az, mar, y);
-      pdf.text(String(rows.length), 122, y); 
-      pdf.text(`${tariffa}€`, 142, y); 
-      pdf.text(`${tot.toFixed(2)}€`, 165, y);
-      y += 8;
-      if (y > 265) { pdf.addPage(); y = 20; }
+      if (idx%2===0) { pdf.setFillColor(250,252,251); pdf.rect(mar,y-4,W-mar*2,9,'F'); }
+      pdf.setTextColor(26,38,64); pdf.setFontSize(9.5); pdf.setFont('helvetica','normal');
+      pdf.text(az.length>42?az.substring(0,39)+'…':az, mar+2, y);
+      pdf.setFont('helvetica','bold'); pdf.setTextColor(46,124,246);
+      pdf.text(String(normale.length), 120, y, {align:'right'});
+      pdf.setTextColor(normale.length>0&&urgente.length>0?220:46,urgente.length>0?80:124,urgente.length>0?50:246);
+      pdf.text(String(urgente.length), 137, y, {align:'right'});
+      pdf.setFont('helvetica','normal'); pdf.setTextColor(107,125,153);
+      pdf.text(`${tNorm.toFixed(2)}€`, 152, y, {align:'right'});
+      pdf.text(`${tUrg.toFixed(2)}€`, 167, y, {align:'right'});
+      pdf.setFont('helvetica','bold'); pdf.setTextColor(14,165,100);
+      pdf.text(`${tot.toFixed(2)}€`, W-mar-2, y, {align:'right'});
+      y += 9;
+      if (y > 260) { pdf.addPage(); y = 20; }
     });
-    y += 2;
+    // ── Totale ──
+    pdf.setFillColor(14,165,100); pdf.rect(mar, y, W-mar*2, 12, 'F');
+    pdf.setTextColor(255,255,255); pdf.setFont('helvetica','bold'); pdf.setFontSize(12);
+    pdf.text('TOTALE DOVUTO', mar+4, y+8);
+    pdf.setFontSize(14);
+    pdf.text(`${totaleGlobale.toFixed(2)} €`, W-mar-4, y+8, {align:'right'});
+    y += 22;
+    // ── Firma ──
     pdf.setDrawColor(200,210,230); pdf.line(mar, y, W-mar, y);
-    y += 8;
-    pdf.setFont('helvetica','bold'); pdf.setFontSize(12);
-    pdf.text(`Totale ECG: ${ecgsMese.length}`, mar, y);
-    pdf.setTextColor(14,165,160); pdf.setFontSize(14);
-    pdf.text(`${totaleGlobale.toFixed(2)} €`, 148, y);
-    pdf.setTextColor(26,38,64);
     y += 10;
     pdf.setFont('helvetica','normal'); pdf.setFontSize(9); pdf.setTextColor(120,130,150);
-    pdf.text(`Generato il ${new Date().toLocaleDateString('it-IT')} — ambulatoriomillefonti.it`, mar, y);
+    pdf.text(`Rendiconto generato il ${new Date().toLocaleDateString('it-IT')} — ambulatoriomillefonti.it`, mar, y);
+    pdf.text('Solo per riferimento interno', W-mar, y, {align:'right'});
     pdf.save(`Compensi_${mesiLabel[mese-1]}_${anno}_${meCardiologo.replace(/\s/g,'_')}.pdf`);
   };
 
@@ -1937,48 +1962,42 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, pushAbilitato
               const ecgsMese = refertatiMiei.filter(e=>{ const d=new Date(e.created_at||e.ts); return d.getFullYear()===anno && d.getMonth()===mese-1; });
               const byAz = {};
               ecgsMese.forEach(e=>{ const k=e.origine_dettaglio||e.farmacia||e.azienda||'Altro'; if(!byAz[k]) byAz[k]=[]; byAz[k].push(e); });
-              const totale = Object.entries(byAz).reduce((s,[k,rows])=>s+rows.length*getTariffa(k),0);
               return (
                 <>
                   {ecgsMese.length===0 && <div style={{textAlign:'center',padding:40,color:C.muted}}>Nessun referto questo mese</div>}
                   {Object.entries(byAz).length > 0 && (
                     <div style={{ background:C.white, borderRadius:16, boxShadow:C.shadow, overflow:'hidden', marginBottom:16 }}>
-                      <div style={{ display:'grid', gridTemplateColumns:'1fr 70px 90px 80px', padding:'10px 18px', background:C.cardAlt, fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:1 }}>
-                        <div>Azienda / Farmacia</div><div style={{textAlign:'center'}}>ECG</div><div style={{textAlign:'center'}}>Tariffa/ECG</div><div style={{textAlign:'right'}}>Totale</div>
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 55px 55px 55px 55px 80px', padding:'10px 18px', background:C.cardAlt, fontSize:10, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:0.5, gap:4 }}>
+                        <div>Azienda</div><div style={{textAlign:'center'}}>Std</div><div style={{textAlign:'center'}}>Urg</div><div style={{textAlign:'center'}}>€/Std</div><div style={{textAlign:'center'}}>€/Urg</div><div style={{textAlign:'right'}}>Totale</div>
                       </div>
                       {Object.entries(byAz).map(([az,rows])=>{
-                        const t = tariffario[az] !== undefined ? String(tariffario[az]) : '10';
+                        const norm = rows.filter(e=>e.urgenza!=='urgente').length;
+                        const urg = rows.filter(e=>e.urgenza==='urgente').length;
+                        const tot = norm*getTariffa(az,'normale') + urg*getTariffa(az,'urgente');
                         return (
-                          <div key={az} style={{ display:'grid', gridTemplateColumns:'1fr 70px 90px 80px', padding:'12px 18px', borderBottom:`1px solid ${C.borderLight}`, alignItems:'center' }}>
-                            <div style={{ color:C.text, fontSize:14, fontWeight:600 }}>{az}</div>
-                            <div style={{ textAlign:'center', color:C.accent, fontWeight:700 }}>{rows.length}</div>
-                            <div style={{ textAlign:'center' }}>
-                              <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:4 }}>
-                                <input type="number" min="0" step="0.5" value={t} onChange={ev=>setTariffario(p=>({...p,[az]:parseFloat(ev.target.value)||0}))}
-                                  style={{ width:52, border:`1px solid ${C.border}`, borderRadius:6, padding:'4px 6px', fontSize:12, textAlign:'center', color:C.text }} />
-                                <span style={{fontSize:12,color:C.muted}}>€</span>
-                              </div>
+                          <div key={az} style={{ padding:'12px 18px', borderBottom:`1px solid ${C.borderLight}` }}>
+                            <div style={{ display:'grid', gridTemplateColumns:'1fr 55px 55px 55px 55px 80px', alignItems:'center', gap:4 }}>
+                              <div style={{ color:C.text, fontSize:13, fontWeight:600 }}>{az}</div>
+                              <div style={{ textAlign:'center', color:C.accent, fontWeight:700, fontSize:13 }}>{norm}</div>
+                              <div style={{ textAlign:'center', color:C.orange||'#f59e0b', fontWeight:700, fontSize:13 }}>{urg}</div>
+                              <div style={{ textAlign:'center', fontSize:11, color:C.muted }}>{getTariffa(az,'normale').toFixed(2)}€</div>
+                              <div style={{ textAlign:'center', fontSize:11, color:C.muted }}>{getTariffa(az,'urgente').toFixed(2)}€</div>
+                              <div style={{ textAlign:'right', color:C.green, fontWeight:700 }}>{tot.toFixed(2)}€</div>
                             </div>
-                            <div style={{ textAlign:'right', color:C.green, fontWeight:700 }}>{(rows.length * getTariffa(az)).toFixed(2)}€</div>
                           </div>
                         );
                       })}
-                      <div style={{ display:'grid', gridTemplateColumns:'1fr 70px 90px 80px', padding:'14px 18px', background:C.greenLight }}>
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 55px 55px 55px 55px 80px', padding:'14px 18px', background:C.greenLight, gap:4 }}>
                         <div style={{ fontWeight:700, color:C.text }}>Totale mese</div>
-                        <div style={{ textAlign:'center', fontWeight:700, color:C.accent }}>{ecgsMese.length}</div>
-                        <div/>
-                        <div style={{ textAlign:'right', color:C.green, fontWeight:700, fontSize:16 }}>{totale.toFixed(2)}€</div>
+                        <div style={{ textAlign:'center', fontWeight:700, color:C.accent }}>{ecgsMese.filter(e=>e.urgenza!=='urgente').length}</div>
+                        <div style={{ textAlign:'center', fontWeight:700, color:C.orange||'#f59e0b' }}>{ecgsMese.filter(e=>e.urgenza==='urgente').length}</div>
+                        <div/><div/>
+                        <div style={{ textAlign:'right', color:C.green, fontWeight:700, fontSize:16 }}>{Object.entries(byAz).reduce((s,[k,rows])=>s+rows.filter(e=>e.urgenza!=='urgente').length*getTariffa(k,'normale')+rows.filter(e=>e.urgenza==='urgente').length*getTariffa(k,'urgente'),0).toFixed(2)}€</div>
                       </div>
                     </div>
                   )}
-                  <div style={{ display:'flex', justifyContent:'flex-end', gap:8 }}>
-                    <button onClick={salvaTariffario} disabled={savingTariff}
-                      style={{ background:savingTariff?C.border:C.accent, color:'white', border:'none', borderRadius:10, padding:'9px 20px', cursor:savingTariff?'not-allowed':'pointer', fontWeight:700, fontSize:13 }}>
-                      {savingTariff ? '⏳ Salvando...' : '💾 Salva tariffario'}
-                    </button>
-                  </div>
-                  <div style={{ marginTop:12, color:C.muted, fontSize:11 }}>
-                    Le tariffe vengono salvate sul tuo profilo e usate per i calcoli futuri. Default: 10€/ECG.
+                  <div style={{ marginTop:8, color:C.muted, fontSize:11 }}>
+                    Le tariffe sono impostate dall'amministratore. Default: 10€/ECG.
                   </div>
                 </>
               );
@@ -2082,6 +2101,44 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
       setCardiologiDB(unici);
     });
   }, []);
+  const [tariffariAdmin, setTariffariAdmin] = useState({}); // { userId: tariffario_obj }
+  const [cardiologoSelTariff, setCardiologoSelTariff] = useState('');
+  const [meseCompAdmin, setMeseCompAdmin] = useState(() => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; });
+  const [savingTariffAdmin, setSavingTariffAdmin] = useState(false);
+
+  // Carica tariffari di tutti i cardiologi
+  useEffect(() => {
+    if (tab !== 'tariffario') return;
+    const caricaTariffari = async () => {
+      const { data } = await supabase.from('user_profiles')
+        .select('id, nome, cognome, tariffario')
+        .or('ruolo.eq.cardiologo,ruoli.cs.{cardiologo}');
+      if (data) {
+        const t = {};
+        data.forEach(p => { t[p.id] = typeof p.tariffario === 'string' ? JSON.parse(p.tariffario||'{}') : (p.tariffario||{}); });
+        setTariffariAdmin(t);
+        if (!cardiologoSelTariff && data.length > 0) setCardiologoSelTariff(data[0].id);
+      }
+    };
+    caricaTariffari();
+  }, [tab]);
+
+  const salvaTariffarioAdmin = async () => {
+    if (!cardiologoSelTariff) return;
+    setSavingTariffAdmin(true);
+    await supabase.from('user_profiles').update({ tariffario: tariffariAdmin[cardiologoSelTariff] || {} }).eq('id', cardiologoSelTariff);
+    setSavingTariffAdmin(false);
+    alert('Tariffario salvato!');
+  };
+
+  const getTariffaAdmin = (userId, azienda, urgenza='normale') => {
+    const t = tariffariAdmin[userId] || {};
+    if (urgenza === 'urgente') { const ku=`${azienda}|urgente`; if (t[ku]!==undefined) return parseFloat(t[ku]); }
+    if (t[azienda]!==undefined) return parseFloat(t[azienda]);
+    return parseFloat(t['default']??10);
+  };
+
+  const regole_assegnazione_placeholder = null; // placeholder
   const [regole, setRegole] = useState({ modalita:'manuale', cardiologo_unico:'', lunedi:'', martedi:'', mercoledi:'', giovedi:'', venerdi:'', sabato:'', domenica:'' });
   const [regoleAziende, setRegoleAziende] = useState([]);
   const [nuovaRegAz, setNuovaRegAz] = useState({ azienda:'', cardiologo:'' });
@@ -2270,6 +2327,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
         {tabBtn("prenotazioni","Prenotazioni",prenotazioni.length)}
         {tabBtn("storico","Storico ECG",0)}
         {tabBtn("team","Team",0)}
+        {tabBtn("tariffario","💰 Tariffario",0)}
         {tabBtn("regole","⚙️ Assegnazione",0)}
         <button onClick={ricarica} style={{marginLeft:"auto",background:C.bg,border:`1px solid ${C.border}`,borderRadius:10,padding:"6px 14px",cursor:"pointer",color:C.muted,fontSize:13,fontWeight:600}}>
           {refreshing?"⏳":"🔄"} Aggiorna
@@ -2745,6 +2803,137 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
           </div>
         </div>
       )}
+
+      {tab==="tariffario" && (() => {
+        const cardiologiList = nomi.map(n => {
+          const p = cardiologiDB.find(c => `${c.nome||''} ${c.cognome||''}`.trim() === n);
+          return { id: p?.id, nome: n };
+        }).filter(c => c.id);
+        const selCard = cardiologiList.find(c => c.id === cardiologoSelTariff);
+        const tariffSel = tariffariAdmin[cardiologoSelTariff] || {};
+        const aziendeTutte = [...new Set(ecgs.map(e=>e.origine_dettaglio||e.farmacia||e.azienda||'Altro').filter(Boolean))].sort();
+        const [annoC,meseC] = meseCompAdmin.split('-').map(Number);
+        const ecgsCardio = ecgs.filter(e => {
+          if (!selCard) return false;
+          const d = new Date(e.created_at||e.ts);
+          return e.cardiologo_nome===selCard.nome && e.stato==='refertato' && d.getFullYear()===annoC && d.getMonth()===meseC-1;
+        });
+        const byAzAdmin = {};
+        ecgsCardio.forEach(e=>{ const k=e.origine_dettaglio||e.farmacia||e.azienda||'Altro'; if(!byAzAdmin[k]) byAzAdmin[k]={normale:[],urgente:[]}; byAzAdmin[k][e.urgenza==='urgente'?'urgente':'normale'].push(e); });
+        return (
+          <div style={{display:'flex',flexDirection:'column',gap:20}}>
+            {/* Selezione cardiologo */}
+            <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,padding:20,boxShadow:C.shadow}}>
+              <div style={{fontWeight:700,fontSize:15,color:C.text,marginBottom:14}}>💰 Gestione Tariffario</div>
+              <div style={{display:'flex',gap:12,alignItems:'center',flexWrap:'wrap'}}>
+                <div style={{fontWeight:600,fontSize:13,color:C.muted}}>Cardiologo:</div>
+                {cardiologiList.map(c=>(
+                  <button key={c.id} onClick={()=>setCardiologoSelTariff(c.id)}
+                    style={{background:cardiologoSelTariff===c.id?C.accent:C.bg,color:cardiologoSelTariff===c.id?C.white:C.text,border:`1.5px solid ${cardiologoSelTariff===c.id?C.accent:C.border}`,borderRadius:10,padding:'8px 16px',cursor:'pointer',fontWeight:600,fontSize:13}}>
+                    {c.nome}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* Tariffe per azienda */}
+            {selCard && (
+              <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,padding:20,boxShadow:C.shadow}}>
+                <div style={{fontWeight:700,fontSize:14,color:C.text,marginBottom:4}}>Tariffe per {selCard.nome}</div>
+                <div style={{color:C.muted,fontSize:12,marginBottom:16}}>Imposta la tariffa per ogni azienda. "Urgente" si applica agli ECG marcati urgenti.</div>
+                {/* Default */}
+                <div style={{display:'grid',gridTemplateColumns:'1fr 120px 120px',gap:12,alignItems:'center',padding:'10px 0',borderBottom:`1px solid ${C.borderLight}`}}>
+                  <div style={{fontWeight:700,color:C.text,fontSize:13}}>🔧 Default (tutte le aziende)</div>
+                  <div style={{display:'flex',alignItems:'center',gap:6}}>
+                    <input type="number" min="0" step="0.5" placeholder="10"
+                      value={tariffSel['default']??''}
+                      onChange={e=>setTariffariAdmin(p=>({...p,[cardiologoSelTariff]:{...tariffSel,default:parseFloat(e.target.value)||0}}))}
+                      style={{width:70,border:`1.5px solid ${C.border}`,borderRadius:8,padding:'6px 8px',fontSize:13,textAlign:'center'}}/>
+                    <span style={{fontSize:12,color:C.muted}}>€ std</span>
+                  </div>
+                  <div style={{display:'flex',alignItems:'center',gap:6}}>
+                    <input type="number" min="0" step="0.5" placeholder="10"
+                      value={tariffSel['default|urgente']??''}
+                      onChange={e=>setTariffariAdmin(p=>({...p,[cardiologoSelTariff]:{...tariffSel,'default|urgente':parseFloat(e.target.value)||0}}))}
+                      style={{width:70,border:`1.5px solid ${C.border}`,borderRadius:8,padding:'6px 8px',fontSize:13,textAlign:'center'}}/>
+                    <span style={{fontSize:12,color:'#f59e0b'}}>€ urg</span>
+                  </div>
+                </div>
+                {/* Per azienda */}
+                <div style={{display:'grid',gridTemplateColumns:'1fr 120px 120px',gap:12,padding:'8px 0 4px',marginBottom:8}}>
+                  <div style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>Azienda</div>
+                  <div style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>€/ECG Standard</div>
+                  <div style={{fontSize:11,fontWeight:700,color:'#f59e0b',textTransform:'uppercase',letterSpacing:1}}>€/ECG Urgente</div>
+                </div>
+                {aziendeTutte.map(az=>(
+                  <div key={az} style={{display:'grid',gridTemplateColumns:'1fr 120px 120px',gap:12,alignItems:'center',padding:'8px 0',borderBottom:`1px solid ${C.borderLight}`}}>
+                    <div style={{fontSize:13,color:C.text,fontWeight:500}}>{az}</div>
+                    <div style={{display:'flex',alignItems:'center',gap:6}}>
+                      <input type="number" min="0" step="0.5"
+                        placeholder={String(tariffSel['default']??10)}
+                        value={tariffSel[az]??''}
+                        onChange={e=>setTariffariAdmin(p=>({...p,[cardiologoSelTariff]:{...tariffSel,[az]:parseFloat(e.target.value)||0}}))}
+                        style={{width:70,border:`1.5px solid ${C.border}`,borderRadius:8,padding:'6px 8px',fontSize:13,textAlign:'center'}}/>
+                      <span style={{fontSize:12,color:C.muted}}>€</span>
+                    </div>
+                    <div style={{display:'flex',alignItems:'center',gap:6}}>
+                      <input type="number" min="0" step="0.5"
+                        placeholder={String(tariffSel['default|urgente']??tariffSel['default']??10)}
+                        value={tariffSel[`${az}|urgente`]??''}
+                        onChange={e=>setTariffariAdmin(p=>({...p,[cardiologoSelTariff]:{...tariffSel,[`${az}|urgente`]:parseFloat(e.target.value)||0}}))}
+                        style={{width:70,border:`1.5px solid ${C.border}`,borderRadius:8,padding:'6px 8px',fontSize:13,textAlign:'center'}}/>
+                      <span style={{fontSize:12,color:'#f59e0b'}}>€</span>
+                    </div>
+                  </div>
+                ))}
+                <div style={{marginTop:16,display:'flex',justifyContent:'flex-end'}}>
+                  <button onClick={salvaTariffarioAdmin} disabled={savingTariffAdmin}
+                    style={{background:savingTariffAdmin?C.border:C.accent,color:'white',border:'none',borderRadius:12,padding:'11px 24px',cursor:savingTariffAdmin?'not-allowed':'pointer',fontWeight:700,fontSize:14}}>
+                    {savingTariffAdmin?'⏳ Salvando...':'💾 Salva tariffario'}
+                  </button>
+                </div>
+              </div>
+            )}
+            {/* Compensi mese */}
+            {selCard && (
+              <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,padding:20,boxShadow:C.shadow}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16,flexWrap:'wrap',gap:8}}>
+                  <div style={{fontWeight:700,fontSize:14,color:C.text}}>📊 Compensi {selCard.nome}</div>
+                  <select value={meseCompAdmin} onChange={e=>setMeseCompAdmin(e.target.value)}
+                    style={{border:`1px solid ${C.border}`,borderRadius:10,padding:'7px 12px',fontSize:13,color:C.text,background:C.white,cursor:'pointer'}}>
+                    {Array.from({length:12},(_,i)=>{ const d=new Date(); d.setMonth(d.getMonth()-i); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; }).map(v=>{ const [a,m]=v.split('-'); const mn=['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'][Number(m)-1]; return <option key={v} value={v}>{mn} {a}</option>; })}
+                  </select>
+                </div>
+                {ecgsCardio.length===0 ? <div style={{textAlign:'center',padding:24,color:C.muted}}>Nessun ECG refertato questo mese</div> : (
+                  <div style={{borderRadius:12,overflow:'hidden',border:`1px solid ${C.border}`}}>
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 60px 60px 70px 70px 80px',padding:'8px 14px',background:C.cardAlt,fontSize:10,fontWeight:700,color:C.muted,textTransform:'uppercase',gap:4}}>
+                      <div>Azienda</div><div style={{textAlign:'center'}}>Std</div><div style={{textAlign:'center'}}>Urg</div><div style={{textAlign:'center'}}>€/Std</div><div style={{textAlign:'center'}}>€/Urg</div><div style={{textAlign:'right'}}>Totale</div>
+                    </div>
+                    {Object.entries(byAzAdmin).map(([az,{normale,urgente}])=>{
+                      const tN=getTariffaAdmin(selCard.id,az,'normale'), tU=getTariffaAdmin(selCard.id,az,'urgente');
+                      const tot=normale.length*tN+urgente.length*tU;
+                      return (<div key={az} style={{display:'grid',gridTemplateColumns:'1fr 60px 60px 70px 70px 80px',padding:'10px 14px',borderBottom:`1px solid ${C.borderLight}`,alignItems:'center',gap:4}}>
+                        <div style={{fontSize:13,fontWeight:600,color:C.text}}>{az}</div>
+                        <div style={{textAlign:'center',fontWeight:700,color:C.accent}}>{normale.length}</div>
+                        <div style={{textAlign:'center',fontWeight:700,color:'#f59e0b'}}>{urgente.length}</div>
+                        <div style={{textAlign:'center',fontSize:12,color:C.muted}}>{tN.toFixed(2)}€</div>
+                        <div style={{textAlign:'center',fontSize:12,color:C.muted}}>{tU.toFixed(2)}€</div>
+                        <div style={{textAlign:'right',fontWeight:700,color:C.green}}>{tot.toFixed(2)}€</div>
+                      </div>);
+                    })}
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 60px 60px 70px 70px 80px',padding:'12px 14px',background:C.greenLight,gap:4}}>
+                      <div style={{fontWeight:700,color:C.text}}>Totale mese</div>
+                      <div style={{textAlign:'center',fontWeight:700,color:C.accent}}>{ecgsCardio.filter(e=>e.urgenza!=='urgente').length}</div>
+                      <div style={{textAlign:'center',fontWeight:700,color:'#f59e0b'}}>{ecgsCardio.filter(e=>e.urgenza==='urgente').length}</div>
+                      <div/><div/>
+                      <div style={{textAlign:'right',fontWeight:700,color:C.green,fontSize:15}}>{Object.entries(byAzAdmin).reduce((s,[k,{normale,urgente}])=>s+normale.length*getTariffaAdmin(selCard.id,k,'normale')+urgente.length*getTariffaAdmin(selCard.id,k,'urgente'),0).toFixed(2)}€</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {tab==="team" && (
         <div>
