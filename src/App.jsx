@@ -564,8 +564,7 @@ const AziendaView = ({ ecgs, setEcgs }) => {
     setSent(true);
     setCaricando(false);
     fetch('/api/notify', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ paziente:`Lotto ${batchNome} — ${filesLotto.length} ECG`, origine:"azienda", urgenza:"normale", note:`Azienda: ${nomeAzienda||ME_AZIENDA} | Email referto: ${emailLotto}` }) }).catch(()=>{});
-    // Push via endpoint server-side (ha accesso a regole_assegnazione con service key)
-    fetch('/api/push-lotto', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ batchNome, count: filesLotto.length }) }).catch(()=>{});
+    // Push gestito dal webhook Supabase (INSERT su ecgs) — nessuna chiamata esplicita
   };
 
   const scaricaBatchAzienda = async (batchId, bNome) => {
