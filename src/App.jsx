@@ -3338,50 +3338,48 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
       ctx.fillStyle = '#fff'; ctx.fillRect(0,0,cv.width,cv.height);
       await page.render({ canvasContext: ctx, viewport: vp }).promise;
 
-      // Overlay identico al desktop (stessa disegnaOverlay)
+      // Overlay identico al desktop
       const W = cv.width, H = cv.height;
-      const rX = Math.round(W*0.21), rY = Math.round(H*0.082), rW = Math.round(W*0.78), rH = Math.round(H*0.162);
-      ctx.fillStyle = '#ffffff'; ctx.fillRect(rX,rY,rW,rH);
-      ctx.strokeStyle = '#1a2640'; ctx.lineWidth = 2; ctx.strokeRect(rX,rY,rW,rH);
-      const headerH = Math.round(rH*0.18);
-      const crocetteH = Math.round(rH*0.40);
-      const bottomH = rH - headerH - crocetteH;
-      const pad = Math.round(rH*0.06);
-      const fsTitle = Math.round(rH*0.14);
-      const fsCr = Math.round(rH*0.063);
-      const boxSz = Math.round(fsCr*1.1);
-      const fsCommento = Math.round(rH*0.092);
-      const fsFirma = Math.round(rH*0.105);
+      const rX=Math.round(W*0.21),rY=Math.round(H*0.082),rW=Math.round(W*0.78),rH=Math.round(H*0.148);
+      ctx.fillStyle='#ffffff';ctx.fillRect(rX,rY,rW,rH);
+      ctx.strokeStyle='#1a2640';ctx.lineWidth=2;ctx.strokeRect(rX,rY,rW,rH);
+      const headerH=Math.round(rH*0.18),crocetteH=Math.round(rH*0.42);
+      const pad=Math.round(rH*0.06),fsTitle=Math.round(rH*0.14),fsCr=Math.round(rH*0.066);
+      const boxSz=Math.round(fsCr*1.1),fsCommento=Math.round(rH*0.092),fsFirma=Math.round(rH*0.110),fsStampM=Math.round(fsFirma*0.62);
+      const firmaColX=rX+Math.round(rW*0.70),firmaColW=rW-Math.round(rW*0.70)-Math.round(rW*0.015);
       // Header
-      ctx.fillStyle = '#1a2640'; ctx.font = `bold ${fsTitle}px Arial`;
-      ctx.fillText('REFERTO ECG', rX+pad, rY+headerH*0.78);
-      ctx.strokeStyle = '#1a2640'; ctx.lineWidth = 1.2;
-      ctx.beginPath(); ctx.moveTo(rX+pad, rY+headerH); ctx.lineTo(rX+rW-pad, rY+headerH); ctx.stroke();
-      // Crocette in 2 colonne
-      const voci = [
+      ctx.fillStyle='#1a2640';ctx.font=`bold ${fsTitle}px Arial`;ctx.fillText('REFERTO ECG',rX+pad,rY+headerH*0.78);
+      ctx.strokeStyle='#1a2640';ctx.lineWidth=1.2;
+      ctx.beginPath();ctx.moveTo(rX+pad,rY+headerH);ctx.lineTo(rX+rW-pad,rY+headerH);ctx.stroke();
+      // Crocette sinistra 70%
+      const voci=[
         [crocette.limiti,'ECG nei limiti della norma'],
         [crocette.correlare,'ECG da correlare con la clinica'],
         [crocette.approfondire,'ECG da approfondire con medico Curante'],
         [crocette.visita,'ECG da approfondire con visita cardiologica'],
         [crocette.urgente,'Se nuova sintomatologia: visita cardiologica urgente / accesso in PS'],
       ];
-      const crocetteY = rY+headerH;
-      const colW = (rW-pad*2)/2;
-      const rowH = Math.round(crocetteH/3);
-      voci.forEach(([checked,label],i) => {
-        const col=i%2, row=Math.floor(i/2);
-        const cx2=rX+pad+col*colW, cy2=crocetteY+row*rowH+rowH*0.65;
-        ctx.strokeStyle='#1a2640'; ctx.lineWidth=1.2;
-        ctx.strokeRect(cx2,cy2-boxSz+2,boxSz,boxSz);
-        if(checked){ctx.fillStyle='#1aaa6e';ctx.font=`bold ${Math.round(boxSz*1.05)}px Arial`;ctx.fillText('✓',cx2+1,cy2+1);}
-        ctx.fillStyle='#1a2640'; ctx.font=`${fsCr}px Arial`;
-        const maxLW=colW-boxSz-12;
-        const words=label.split(' ');let line='';const lns=[];
+      const crocetteY=rY+headerH,crocColW=(Math.round(rW*0.68)-pad*2)/2,rowH=Math.round(crocetteH/3);
+      voci.forEach(([checked,label],i)=>{
+        const col=i%2,row=Math.floor(i/2),cx=rX+pad+col*crocColW,cy=crocetteY+row*rowH+rowH*0.65;
+        ctx.strokeStyle='#1a2640';ctx.lineWidth=1.2;ctx.strokeRect(cx,cy-boxSz+2,boxSz,boxSz);
+        if(checked){ctx.fillStyle='#1aaa6e';ctx.font=`bold ${Math.round(boxSz*1.05)}px Arial`;ctx.fillText('✓',cx+1,cy+1);}
+        ctx.fillStyle='#1a2640';ctx.font=`${fsCr}px Arial`;
+        const maxLW=crocColW-boxSz-12,words=label.split(' ');let line='';const lns=[];
         words.forEach(w=>{const t=line+w+' ';if(ctx.measureText(t).width>maxLW&&line){lns.push(line.trim());line=w+' ';}else line=t;});
         if(line.trim())lns.push(line.trim());
-        let lY=cy2;if(lns.length>1)lY-=(lns.length-1)*fsCr*0.6;
-        lns.forEach((ln,idx)=>ctx.fillText(ln,cx2+boxSz+8,lY+idx*fsCr*1.15));
+        let lY=cy;if(lns.length>1)lY-=(lns.length-1)*fsCr*0.6;
+        lns.forEach((ln,idx)=>ctx.fillText(ln,cx+boxSz+8,lY+idx*fsCr*1.15));
       });
+      // Firma scannerizzata destra (nella sezione crocette)
+      const nbM=meCardiologo.replace(/^Dott\.\s*Dr\.?/i,'').replace(/^Dr\.?\s*/i,'').replace(/^Dott\.?\s*/i,'').trim();
+      const nomeFirmaM='Dott. '+nbM;
+      if(window.__millefonti_firma){
+        const img2=window.__millefonti_firma;
+        const maxW=firmaColW*0.92,maxH=crocetteH-pad*2,r2=img2.width/img2.height;
+        const dW=Math.min(maxW,maxH*r2),dH=dW/r2;
+        ctx.drawImage(img2,firmaColX+(firmaColW-dW)/2,crocetteY+(crocetteH-dH)/2,dW,dH);
+      }
       // Separatore
       const sepY=crocetteY+crocetteH;
       ctx.strokeStyle='#cccccc';ctx.lineWidth=0.8;
@@ -3390,32 +3388,22 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
       if(commento&&commento.trim()){
         ctx.fillStyle='#1a2640';ctx.font=`${fsCommento}px Arial`;
         const wds=commento.split(' ');let ln2='';const lns2=[];
-        const maxCW=Math.round(rW*0.55);
-        wds.forEach(w=>{const t=ln2+w+' ';if(ctx.measureText(t).width>maxCW&&ln2){lns2.push(ln2.trim());ln2=w+' ';}else ln2=t;});
+        wds.forEach(w=>{const t=ln2+w+' ';if(ctx.measureText(t).width>Math.round(rW*0.63)&&ln2){lns2.push(ln2.trim());ln2=w+' ';}else ln2=t;});
         if(ln2.trim())lns2.push(ln2.trim());
-        lns2.slice(0,3).forEach((l,idx)=>ctx.fillText(l,rX+pad,sepY+fsCommento*1.0+idx*fsCommento*1.2));
+        lns2.slice(0,3).forEach((l,idx)=>ctx.fillText(l,rX+pad,sepY+fsCommento*1.1+idx*fsCommento*1.2));
       }
-      // Firma (basso destra con timbro) - identico al desktop
-      const nbM = meCardiologo.replace(/^Dott\.\s*Dr\.?/i,'').replace(/^Dr\.?\s*/i,'').replace(/^Dott\.?\s*/i,'').trim();
-      const nomeFirmaM = 'Dott. '+nbM;
-      const fsStampM = Math.round(fsFirma*0.62);
-      const firmaSW=Math.round(rW*0.38);
-      const firmaSX=rX+rW-firmaSW-Math.round(rW*0.02);
-      const firmaYm=rY+rH-fsStampM*4.2-fsFirma*1.1;
-      if(window.__millefonti_firma){
-        const img2=window.__millefonti_firma;
-        const mW=firmaSW*0.85,mH=fsFirma*1.8,r2=img2.width/img2.height;
-        const dW=Math.min(mW,mH*r2),dH=dW/r2;
-        ctx.drawImage(img2,firmaSX,firmaYm-fsFirma*0.5-dH,dW,dH);
-      }
-      ctx.fillStyle='#1a2640';ctx.font=`bold ${fsFirma}px Arial`;ctx.fillText(nomeFirmaM,firmaSX,firmaYm);
+      // Firma testo agganciata al fondo
+      const bPad=Math.round(rH*0.05);
+      const lineDate=rY+rH-bPad,lineVia=lineDate-Math.round(fsStampM*1.35),lineAmb=lineVia-Math.round(fsStampM*1.35);
+      const lineNome=lineAmb-Math.round(fsFirma*0.40)-Math.round(fsFirma*0.15),lineSepF=lineNome+Math.round(fsFirma*0.25);
+      ctx.fillStyle='#1a2640';ctx.font=`bold ${fsFirma}px Arial`;ctx.fillText(nomeFirmaM,firmaColX,lineNome);
       ctx.strokeStyle='#1a2640';ctx.lineWidth=0.5;
-      ctx.beginPath();ctx.moveTo(firmaSX,firmaYm+fsFirma*0.3);ctx.lineTo(firmaSX+firmaSW*0.9,firmaYm+fsFirma*0.3);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(firmaColX,lineSepF);ctx.lineTo(firmaColX+firmaColW*0.95,lineSepF);ctx.stroke();
       ctx.fillStyle='#1a2640';ctx.font=`${fsStampM}px Arial`;
-      ctx.fillText('Ambulatorio Millefonti',firmaSX,firmaYm+fsFirma*0.3+fsStampM*1.1);
-      ctx.fillText('Via Garessio 47 - Torino',firmaSX,firmaYm+fsFirma*0.3+fsStampM*2.3);
-      ctx.font=`${Math.round(fsFirma*0.72)}px Arial`;ctx.fillStyle='#6b7d99';
-      ctx.fillText(new Date().toLocaleDateString('it-IT'),firmaSX,firmaYm+fsFirma*0.3+fsStampM*3.6);
+      ctx.fillText('Ambulatorio Millefonti',firmaColX,lineAmb);
+      ctx.fillText('Via Garessio 47 - Torino',firmaColX,lineVia);
+      ctx.fillStyle='#6b7d99';ctx.font=`${Math.round(fsFirma*0.72)}px Arial`;
+      ctx.fillText(new Date().toLocaleDateString('it-IT'),firmaColX,lineDate);
 
       const ratio = W/H, isLandscape = ratio>1;
       const pdfW = isLandscape?297:210, pdfH = isLandscape?pdfW/ratio:pdfW*ratio;
