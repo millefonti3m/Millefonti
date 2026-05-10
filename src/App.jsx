@@ -1260,19 +1260,28 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
             pdf.text(lines, 10, cy);
           }
 
-          // Firma
+          // Firma con timbro
           const nomeFirmaBase = meCardiologo.replace(/^Dott\.\s*Dr\.?/i,"").replace(/^Dr\.?\s*/i,"").replace(/^Dott\.?\s*/i,"").trim();
           const nomeFirma = "Dott. " + nomeFirmaBase;
-          pdf.setFontSize(13);
-          pdf.setFont("helvetica", "bold");
-          pdf.setTextColor(26, 38, 64);
-          pdf.text(nomeFirma, pw - 10, ph - 22, { align: "right" });
-          pdf.setFontSize(9);
-          pdf.setFont("helvetica", "normal");
+          if (window.__millefonti_firma) {
+            const fImg = window.__millefonti_firma;
+            const fCvs = document.createElement("canvas");
+            fCvs.width = fImg.width; fCvs.height = fImg.height;
+            fCvs.getContext("2d").drawImage(fImg, 0, 0);
+            const fW = 35, fH = fW / (fImg.width / fImg.height);
+            pdf.addImage(fCvs.toDataURL("image/png"), "PNG", pw - 10 - fW, ph - 38 - fH, fW, fH);
+          }
+          pdf.setFontSize(13); pdf.setFont("helvetica", "bold"); pdf.setTextColor(26, 38, 64);
+          pdf.text(nomeFirma, pw - 10, ph - 36, { align: "right" });
+          pdf.setDrawColor(26, 38, 64); pdf.setLineWidth(0.3);
+          pdf.line(pw - 65, ph - 33, pw - 10, ph - 33);
+          pdf.setFontSize(8); pdf.setFont("helvetica", "normal"); pdf.setTextColor(26, 38, 64);
+          pdf.text("Ambulatorio Millefonti", pw - 10, ph - 28, { align: "right" });
+          pdf.text("Via Garessio 47 - Torino", pw - 10, ph - 23, { align: "right" });
           pdf.setTextColor(107, 125, 153);
-          pdf.text(new Date().toLocaleDateString("it-IT"), pw - 10, ph - 15, { align: "right" });
+          pdf.text(new Date().toLocaleDateString("it-IT"), pw - 10, ph - 17, { align: "right" });
 
-          // Footer
+                    // Footer
           pdf.setFillColor(26, 38, 64);
           pdf.rect(0, ph - 8, pw, 8, "F");
           pdf.setTextColor(255, 255, 255);
