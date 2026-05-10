@@ -2107,23 +2107,23 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
   const [meseCompAdmin, setMeseCompAdmin] = useState(() => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; });
   const [savingTariffAdmin, setSavingTariffAdmin] = useState(false);
 
-  // Carica tariffari di tutti i cardiologi
+  // Carica tariffari di tutti i cardiologi al mount
   useEffect(() => {
-    if (tab !== 'tariffario') return;
     const caricaTariffari = async () => {
-      const { data } = await supabase.from('user_profiles')
+      const { data, error } = await supabase.from('user_profiles')
         .select('id, nome, cognome, tariffario')
         .or('ruolo.eq.cardiologo,ruoli.cs.{cardiologo}');
-      if (data) {
+      if (error) { console.error('caricaTariffari error:', error); return; }
+      if (data && data.length > 0) {
         const t = {};
         data.forEach(p => { t[p.id] = typeof p.tariffario === 'string' ? JSON.parse(p.tariffario||'{}') : (p.tariffario||{}); });
         setTariffariAdmin(t);
         setCardiologiTariffList(data.map(p => ({ id: p.id, nome: `${p.nome||''} ${p.cognome||''}`.trim() })));
-        if (!cardiologoSelTariff && data.length > 0) setCardiologoSelTariff(data[0].id);
+        setCardiologoSelTariff(prev => prev || data[0].id);
       }
     };
     caricaTariffari();
-  }, [tab]);
+  }, []);
 
   const salvaTariffarioAdmin = async () => {
     if (!cardiologoSelTariff) return;
