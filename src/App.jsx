@@ -2206,10 +2206,46 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
     });
   }, []);
   const [tariffariAdmin, setTariffariAdmin] = useState({});
+  const [registroEcgs, setRegistroEcgs] = useState([]);
+  const [registroLoading, setRegistroLoading] = useState(false);
+  const [registroDal, setRegistroDal] = useState(() => { const d=new Date(); d.setMonth(d.getMonth()-1); d.setDate(1); return d.toISOString().split('T')[0]; });
+  const [registroAl, setRegistroAl] = useState(() => new Date().toISOString().split('T')[0]);
+  const [registroFiltroAz, setRegistroFiltroAz] = useState('tutti');
+  const [registroFiltroCard, setRegistroFiltroCard] = useState('tutti');
   const [cardiologiTariffList, setCardiologiTariffList] = useState([]); // { userId: tariffario_obj }
   const [cardiologoSelTariff, setCardiologoSelTariff] = useState('');
   const [meseCompAdmin, setMeseCompAdmin] = useState(() => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; });
   const [savingTariffAdmin, setSavingTariffAdmin] = useState(false);
+
+  // Carica registro ECG quando tab attivo
+  useEffect(() => {
+    if (tab !== 'registro') return;
+    const carica = async () => {
+      setRegistroLoading(true);
+      const { data } = await supabase.from('ecgs')
+        .select('id, paziente_nome, created_at, origine_dettaglio, cardiologo_nome, urgenza, stato, email_destinatario, batch_nome')
+        .eq('stato', 'refertato')
+        .order('created_at', { ascending: false });
+      setRegistroEcgs(data || []);
+      setRegistroLoading(false);
+    };
+    carica();
+  }, [tab]);
+
+  // Carica registro ECG quando tab attivo
+  useEffect(() => {
+    if (tab !== 'registro') return;
+    const carica = async () => {
+      setRegistroLoading(true);
+      const { data } = await supabase.from('ecgs')
+        .select('id, paziente_nome, created_at, origine_dettaglio, cardiologo_nome, urgenza, stato, email_destinatario, batch_nome')
+        .eq('stato', 'refertato')
+        .order('created_at', { ascending: false });
+      setRegistroEcgs(data || []);
+      setRegistroLoading(false);
+    };
+    carica();
+  }, [tab]);
 
   // Carica tariffari di tutti i cardiologi al mount
   useEffect(() => {
@@ -2434,6 +2470,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
         {tabBtn("storico","Storico ECG",0)}
         {tabBtn("team","Team",0)}
         {tabBtn("tariffario","💰 Tariffario",0)}
+        {tabBtn("registro","📋 Registro",0)}
         {tabBtn("regole","⚙️ Assegnazione",0)}
         <button onClick={ricarica} style={{marginLeft:"auto",background:C.bg,border:`1px solid ${C.border}`,borderRadius:10,padding:"6px 14px",cursor:"pointer",color:C.muted,fontSize:13,fontWeight:600}}>
           {refreshing?"⏳":"🔄"} Aggiorna
@@ -2825,6 +2862,150 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
       )}
 
       {/* ── TAB: TEAM ── */}
+      {tab==="registro" && (() => {
+        const aziendeReg = ['tutti', ...new Set(registroEcgs.map(e=>e.origine_dettaglio||'Altro').filter(Boolean))].sort();
+        const cardioReg  = ['tutti', ...new Set(registroEcgs.map(e=>e.cardiologo_nome||'').filter(Boolean))].sort();
+        const filtrati = registroEcgs.filter(e => {
+          const d = new Date(e.created_at);
+          const dal = new Date(registroDal); dal.setHours(0,0,0,0);
+          const al  = new Date(registroAl);  al.setHours(23,59,59,999);
+          if (d < dal || d > al) return false;
+          if (registroFiltroAz !== 'tutti' && (e.origine_dettaglio||'') !== registroFiltroAz) return false;
+          if (registroFiltroCard !== 'tutti' && (e.cardiologo_nome||'') !== registroFiltroCard) return false;
+          return true;
+        });
+
+        const esportaRegistroPDF = () => {
+          const pdf = new jsPDF({ unit:'mm', format:'a4', orientation:'landscape' });
+          const W=297, mar=14;
+          // Header
+          pdf.setFillColor(26,38,64); pdf.rect(0,0,W,18,'F');
+          pdf.setTextColor(255,255,255); pdf.setFontSize(14); pdf.setFont('helvetica','bold');
+          pdf.text('REGISTRO ECG REFERTATI — Ambulatorio Millefonti', mar, 12);
+          pdf.setFontSize(8); pdf.setFont('helvetica','normal');
+          pdf.text(`Generato il ${new Date().toLocaleDateString('it-IT')} · Periodo: ${registroDal} → ${registroAl}`, W-mar, 12, {align:'right'});
+          // Filtri applicati
+          pdf.setFillColor(244,247,250); pdf.rect(0,18,W,10,'F');
+          pdf.setTextColor(107,125,153); pdf.setFontSize(8);
+          pdf.text(`Azienda: ${registroFiltroAz==='tutti'?'Tutte':registroFiltroAz}   Cardiologo: ${registroFiltroCard==='tutti'?'Tutti':registroFiltroCard}   Totale: ${filtrati.length} ECG`, mar, 25);
+          // Intestazione tabella
+          let y = 34;
+          pdf.setFillColor(26,38,64); pdf.rect(mar,y-6,W-mar*2,8,'F');
+          pdf.setTextColor(255,255,255); pdf.setFontSize(8); pdf.setFont('helvetica','bold');
+          pdf.text('PAZIENTE', mar+2, y-0.5);
+          pdf.text('DATA', 68, y-0.5);
+          pdf.text('AZIENDA', 84, y-0.5);
+          pdf.text('CARDIOLOGO', 148, y-0.5);
+          pdf.text('LOTTO', 180, y-0.5);
+          pdf.text('TIPO', 232, y-0.5);
+          pdf.text('EMAIL DEST.', 244, y-0.5);
+          y += 6;
+          // Righe ECG
+          filtrati.forEach((e, idx) => {
+            if (y > 190) { pdf.addPage('landscape'); y = 20; }
+            if (idx%2===0) { pdf.setFillColor(248,250,252); pdf.rect(mar,y-4,W-mar*2,8,'F'); }
+            pdf.setTextColor(26,38,64); pdf.setFontSize(8); pdf.setFont('helvetica','normal');
+            const nome = (e.paziente_nome||'—').substring(0,22);
+            const data = new Date(e.created_at).toLocaleDateString('it-IT');
+            const az   = (e.origine_dettaglio||'—').substring(0,28);
+            const card = (e.cardiologo_nome||'—').substring(0,18);
+            const lotto= (e.batch_nome||'—').substring(0,18);
+            const mail = (e.email_destinatario||'—').substring(0,20);
+            const isUrg= e.urgenza==='urgente';
+            pdf.text(nome, mar+2, y);
+            pdf.text(data, 68, y);
+            pdf.text(az, 84, y);
+            pdf.text(card, 148, y);
+            pdf.text(lotto, 180, y);
+            pdf.setTextColor(isUrg?200:46, isUrg?100:124, isUrg?20:246);
+            pdf.setFont('helvetica','bold');
+            pdf.text(isUrg?'URG':'STD', 232, y);
+            pdf.setTextColor(107,125,153); pdf.setFont('helvetica','normal');
+            pdf.text(mail, 244, y);
+            y += 8;
+          });
+          // Footer
+          pdf.setFillColor(26,38,64); pdf.rect(0,200,W,10,'F');
+          pdf.setTextColor(255,255,255); pdf.setFontSize(7);
+          pdf.text('Ambulatorio Millefonti — Registro permanente ECG refertati — dati non contenenti allegati sanitari', W/2, 206, {align:'center'});
+          pdf.save(`Registro_ECG_${registroDal}_${registroAl}.pdf`);
+        };
+
+        return (
+          <div style={{display:'flex',flexDirection:'column',gap:16}}>
+            {/* Header */}
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:12}}>
+              <div>
+                <div style={{fontWeight:700,fontSize:18,color:C.text}}>📋 Registro ECG Refertati</div>
+                <div style={{color:C.muted,fontSize:13,marginTop:2}}>Registro permanente — sopravvive all'eliminazione dei file allegati</div>
+              </div>
+              <button onClick={esportaRegistroPDF} disabled={filtrati.length===0}
+                style={{background:filtrati.length===0?C.border:'linear-gradient(135deg,#1a2640,#2d4a8a)',color:'white',border:'none',borderRadius:12,padding:'10px 20px',cursor:filtrati.length===0?'not-allowed':'pointer',fontWeight:700,fontSize:13}}>
+                📄 Esporta PDF Registro
+              </button>
+            </div>
+            {/* Filtri */}
+            <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,padding:18,boxShadow:C.shadow}}>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:12,alignItems:'end'}}>
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,color:C.muted,marginBottom:6,textTransform:'uppercase'}}>Dal</div>
+                  <input type="date" value={registroDal} onChange={e=>setRegistroDal(e.target.value)}
+                    style={{width:'100%',border:`1.5px solid ${C.border}`,borderRadius:10,padding:'8px 10px',fontSize:13,color:C.text}}/>
+                </div>
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,color:C.muted,marginBottom:6,textTransform:'uppercase'}}>Al</div>
+                  <input type="date" value={registroAl} onChange={e=>setRegistroAl(e.target.value)}
+                    style={{width:'100%',border:`1.5px solid ${C.border}`,borderRadius:10,padding:'8px 10px',fontSize:13,color:C.text}}/>
+                </div>
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,color:C.muted,marginBottom:6,textTransform:'uppercase'}}>Azienda</div>
+                  <select value={registroFiltroAz} onChange={e=>setRegistroFiltroAz(e.target.value)}
+                    style={{width:'100%',border:`1.5px solid ${C.border}`,borderRadius:10,padding:'8px 10px',fontSize:13,color:C.text,background:C.white,cursor:'pointer'}}>
+                    {aziendeReg.map(a=><option key={a} value={a}>{a==='tutti'?'Tutte le aziende':a}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,color:C.muted,marginBottom:6,textTransform:'uppercase'}}>Cardiologo</div>
+                  <select value={registroFiltroCard} onChange={e=>setRegistroFiltroCard(e.target.value)}
+                    style={{width:'100%',border:`1.5px solid ${C.border}`,borderRadius:10,padding:'8px 10px',fontSize:13,color:C.text,background:C.white,cursor:'pointer'}}>
+                    {cardioReg.map(c=><option key={c} value={c}>{c==='tutti'?'Tutti i cardiologi':c}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div style={{marginTop:10,color:C.muted,fontSize:12}}>{filtrati.length} ECG trovati nel periodo selezionato</div>
+            </div>
+            {/* Tabella */}
+            {registroLoading ? (
+              <div style={{textAlign:'center',padding:40,color:C.muted}}>⏳ Caricamento...</div>
+            ) : filtrati.length === 0 ? (
+              <div style={{textAlign:'center',padding:40,color:C.muted,background:C.white,borderRadius:16,boxShadow:C.shadow}}>Nessun ECG trovato con i filtri selezionati</div>
+            ) : (
+              <div style={{background:C.white,borderRadius:16,boxShadow:C.shadow,overflow:'hidden'}}>
+                <div style={{display:'grid',gridTemplateColumns:'1.2fr 80px 1.4fr 100px 100px 55px',padding:'9px 16px',background:C.cardAlt,fontSize:10,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:0.5,gap:8}}>
+                  <div>Paziente</div><div>Data</div><div>Azienda</div><div>Cardiologo</div><div>Email dest.</div><div style={{textAlign:'center'}}>Tipo</div>
+                </div>
+                {filtrati.map((e,idx)=>(
+                  <div key={e.id} style={{display:'grid',gridTemplateColumns:'1.2fr 80px 1.4fr 100px 100px 55px',padding:'10px 16px',borderBottom:`1px solid ${C.borderLight}`,alignItems:'center',gap:8,background:idx%2===0?C.white:'#f9fbff'}}>
+                    <div style={{fontSize:13,fontWeight:600,color:C.text}}>{e.paziente_nome||'—'}</div>
+                    <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap'}}>{new Date(e.created_at).toLocaleDateString('it-IT')}</div>
+                    <div style={{fontSize:12,color:C.text}}>{e.origine_dettaglio||'—'}</div>
+                    <div style={{fontSize:12,color:C.accent,fontWeight:600}}>{e.cardiologo_nome||'—'}</div>
+                    <div style={{fontSize:11,color:C.muted,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{e.email_destinatario||'—'}</div>
+                    <div style={{textAlign:'center'}}>
+                      <span style={{fontSize:9,fontWeight:700,padding:'2px 6px',borderRadius:6,
+                        background:e.urgenza==='urgente'?'#fef3c7':'#eff6ff',
+                        color:e.urgenza==='urgente'?'#d97706':'#2563eb'}}>
+                        {e.urgenza==='urgente'?'URG':'STD'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {tab==="regole" && (
         <div>
           <div style={{fontWeight:700,fontSize:17,color:C.text,marginBottom:20}}>⚙️ Regole assegnazione automatica</div>
