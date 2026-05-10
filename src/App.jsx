@@ -3173,42 +3173,82 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
       ctx.fillStyle = '#fff'; ctx.fillRect(0,0,cv.width,cv.height);
       await page.render({ canvasContext: ctx, viewport: vp }).promise;
 
-      // Overlay semplice per mobile
+      // Overlay identico al desktop (stessa disegnaOverlay)
       const W = cv.width, H = cv.height;
       const rX = Math.round(W*0.21), rY = Math.round(H*0.082), rW = Math.round(W*0.78), rH = Math.round(H*0.162);
-      ctx.fillStyle = '#fff'; ctx.fillRect(rX,rY,rW,rH);
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(rX,rY,rW,rH);
       ctx.strokeStyle = '#1a2640'; ctx.lineWidth = 2; ctx.strokeRect(rX,rY,rW,rH);
-      ctx.fillStyle = '#1a2640'; ctx.font = `bold ${Math.round(rH*0.14)}px Arial`;
-      ctx.fillText('REFERTO ECG', rX+10, rY+rH*0.2);
+      const headerH = Math.round(rH*0.18);
+      const crocetteH = Math.round(rH*0.40);
+      const bottomH = rH - headerH - crocetteH;
+      const pad = Math.round(rH*0.06);
+      const fsTitle = Math.round(rH*0.14);
+      const fsCr = Math.round(rH*0.063);
+      const boxSz = Math.round(fsCr*1.1);
+      const fsCommento = Math.round(rH*0.092);
+      const fsFirma = Math.round(rH*0.105);
+      // Header
+      ctx.fillStyle = '#1a2640'; ctx.font = `bold ${fsTitle}px Arial`;
+      ctx.fillText('REFERTO ECG', rX+pad, rY+headerH*0.78);
+      ctx.strokeStyle = '#1a2640'; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(rX+pad, rY+headerH); ctx.lineTo(rX+rW-pad, rY+headerH); ctx.stroke();
+      // Crocette in 2 colonne
       const voci = [
         [crocette.limiti,'ECG nei limiti della norma'],
         [crocette.correlare,'ECG da correlare con la clinica'],
         [crocette.approfondire,'ECG da approfondire con medico Curante'],
         [crocette.visita,'ECG da approfondire con visita cardiologica'],
-        [crocette.urgente,'Se nuova sintomatologia: visita cardiologica urgente'],
+        [crocette.urgente,'Se nuova sintomatologia: visita cardiologica urgente / accesso in PS'],
       ];
-      let cy = rY + rH*0.28;
-      const fs = Math.round(rH*0.063);
-      voci.forEach(([checked, label]) => {
-        ctx.fillStyle = checked ? '#1aaa6e' : '#1a2640';
-        ctx.font = `${checked?'bold ':' '}${fs}px Arial`;
-        ctx.fillText((checked?'✓ ':' ')+label, rX+10, cy);
-        cy += fs*1.8;
+      const crocetteY = rY+headerH;
+      const colW = (rW-pad*2)/2;
+      const rowH = Math.round(crocetteH/3);
+      voci.forEach(([checked,label],i) => {
+        const col=i%2, row=Math.floor(i/2);
+        const cx2=rX+pad+col*colW, cy2=crocetteY+row*rowH+rowH*0.65;
+        ctx.strokeStyle='#1a2640'; ctx.lineWidth=1.2;
+        ctx.strokeRect(cx2,cy2-boxSz+2,boxSz,boxSz);
+        if(checked){ctx.fillStyle='#1aaa6e';ctx.font=`bold ${Math.round(boxSz*1.05)}px Arial`;ctx.fillText('✓',cx2+1,cy2+1);}
+        ctx.fillStyle='#1a2640'; ctx.font=`${fsCr}px Arial`;
+        const maxLW=colW-boxSz-12;
+        const words=label.split(' ');let line='';const lns=[];
+        words.forEach(w=>{const t=line+w+' ';if(ctx.measureText(t).width>maxLW&&line){lns.push(line.trim());line=w+' ';}else line=t;});
+        if(line.trim())lns.push(line.trim());
+        let lY=cy2;if(lns.length>1)lY-=(lns.length-1)*fsCr*0.6;
+        lns.forEach((ln,idx)=>ctx.fillText(ln,cx2+boxSz+8,lY+idx*fsCr*1.15));
       });
-      if (commento) {
-        ctx.fillStyle = '#1a2640'; ctx.font = `${fs}px Arial`;
-        ctx.fillText(commento.substring(0,80), rX+10, cy+fs);
+      // Separatore
+      const sepY=crocetteY+crocetteH;
+      ctx.strokeStyle='#cccccc';ctx.lineWidth=0.8;
+      ctx.beginPath();ctx.moveTo(rX+pad,sepY);ctx.lineTo(rX+rW-pad,sepY);ctx.stroke();
+      // Commento
+      if(commento&&commento.trim()){
+        ctx.fillStyle='#1a2640';ctx.font=`${fsCommento}px Arial`;
+        const wds=commento.split(' ');let ln2='';const lns2=[];
+        const maxCW=Math.round(rW*0.55);
+        wds.forEach(w=>{const t=ln2+w+' ';if(ctx.measureText(t).width>maxCW&&ln2){lns2.push(ln2.trim());ln2=w+' ';}else ln2=t;});
+        if(ln2.trim())lns2.push(ln2.trim());
+        lns2.slice(0,3).forEach((l,idx)=>ctx.fillText(l,rX+pad,sepY+fsCommento*1.0+idx*fsCommento*1.2));
       }
-      const nb = meCardiologo.replace(/^Dott\.\s*Dr\.?/i,'').replace(/^Dr\.?\s*/i,'').replace(/^Dott\.?\s*/i,'').trim();
-      ctx.fillStyle = '#1a2640'; ctx.font = `bold ${Math.round(rH*0.1)}px Arial`;
-      ctx.fillText('Dott. '+nb, rX+rW*0.45, rY+rH*0.88);
-      ctx.font = `${Math.round(rH*0.075)}px Arial`; ctx.fillStyle = '#6b7d99';
-      ctx.fillText(new Date().toLocaleDateString('it-IT'), rX+rW*0.45, rY+rH*0.98);
+      // Firma
+      const nbM = meCardiologo.replace(/^Dott\.\s*Dr\.?/i,'').replace(/^Dr\.?\s*/i,'').replace(/^Dott\.?\s*/i,'').trim();
+      const nomeFirmaM = 'Dott. '+nbM;
+      const firmaSX=rX+Math.round(rW*0.45), firmaSW=Math.round(rW*0.30);
+      const firmaYm=sepY+bottomH-fsFirma*1.3;
+      if(window.__millefonti_firma){
+        const img2=window.__millefonti_firma;
+        const mW=firmaSW*0.85,mH=fsFirma*1.8,r2=img2.width/img2.height;
+        const dW=Math.min(mW,mH*r2),dH=dW/r2;
+        ctx.drawImage(img2,firmaSX,firmaYm-fsFirma*0.5-dH,dW,dH);
+      }
+      ctx.fillStyle='#1a2640';ctx.font=`bold ${fsFirma}px Arial`;ctx.fillText(nomeFirmaM,firmaSX,firmaYm);
+      ctx.font=`${Math.round(fsFirma*0.75)}px Arial`;ctx.fillStyle='#6b7d99';
+      ctx.fillText(new Date().toLocaleDateString('it-IT'),firmaSX,firmaYm+fsFirma*1.05);
 
       const ratio = W/H, isLandscape = ratio>1;
-      const pdfW = isLandscape?297:210, pdfH = pdfW/ratio;
-      const pdf = new jsPDF({ orientation:isLandscape?'landscape':'portrait', unit:'mm', format:[pdfW,pdfH] });
-      pdf.addImage(cv.toDataURL('image/jpeg',0.78),'JPEG',0,0,pdfW,pdfH);
+      const pdfW = isLandscape?297:210, pdfH = isLandscape?pdfW/ratio:pdfW*ratio;
+      const pdf = new jsPDF({ orientation:isLandscape?'landscape':'portrait', unit:'mm', format:[pdfW,Math.min(pdfH,420)] });
+      pdf.addImage(cv.toDataURL('image/jpeg',0.78),'JPEG',0,0,pdfW,Math.min(pdfH,420));
       const pdfBlob = pdf.output('blob');
 
       // Salva su Storage
