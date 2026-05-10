@@ -234,14 +234,14 @@ export default async function handler(req, res) {
       await markAsRead(accessToken, msg.id);
     }
 
-    // Pulizia automatica referti più vecchi di 60 giorni
-    const sessantaGiorniFa = new Date();
-    sessantaGiorniFa.setDate(sessantaGiorniFa.getDate() - 60);
+    // Pulizia automatica referti più vecchi di 7 giorni (dati sanitari sensibili)
+    const settaGiorniFa = new Date();
+    settaGiorniFa.setDate(settaGiorniFa.getDate() - 7);
     const { data: vecchi } = await supabase
       .from('ecgs')
       .select('id, file_referto_url, file_ecg_url')
       .eq('stato', 'refertato')
-      .lt('created_at', sessantaGiorniFa.toISOString());
+      .lt('created_at', settaGiorniFa.toISOString());
     
     if (vecchi && vecchi.length > 0) {
       const filesDaEliminare = vecchi
@@ -256,7 +256,7 @@ export default async function handler(req, res) {
         .update({ file_referto_url: null, file_ecg_url: null })
         .in('id', vecchi.map(e => e.id));
       
-      console.log(`Pulizia: eliminati ${filesDaEliminare.length} file vecchi di 60+ giorni`);
+      console.log(`Pulizia: eliminati ${filesDaEliminare.length} file vecchi di 7+ giorni`);
     }
 
     return res.status(200).json({ message: `Processate ${processed} email`, processed, cleaned: vecchi?.length || 0 });
