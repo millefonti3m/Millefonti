@@ -898,7 +898,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
     const rX = Math.round(W * 0.21);
     const rY = Math.round(H * 0.082);
     const rW = Math.round(W * 0.78);
-    const rH = Math.round(H * 0.162);
+    const rH = Math.round(H * 0.148); // ridotto per non toccare tracciato ECG
 
     // Sfondo bianco
     ctx.fillStyle = "#ffffff";
@@ -915,15 +915,18 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
     // - Commento + Firma + Logo (40% altezza)
 
     const headerH = Math.round(rH * 0.18);
-    const crocetteH = Math.round(rH * 0.40);
+    const crocetteH = Math.round(rH * 0.42);
     const bottomH = rH - headerH - crocetteH;
 
     const pad = Math.round(rH * 0.06);
     const fsTitle = Math.round(rH * 0.14);
-    const fsCr = Math.round(rH * 0.063);
+    const fsCr = Math.round(rH * 0.066);
     const boxSz = Math.round(fsCr * 1.1);
     const fsCommento = Math.round(rH * 0.092);
-    const fsFirma = Math.round(rH * 0.105);
+    const fsFirma = Math.round(rH * 0.110);
+    const fsStamp = Math.round(fsFirma * 0.62);
+    const firmaColX = rX + Math.round(rW * 0.70);
+    const firmaColW = rW - Math.round(rW * 0.70) - Math.round(rW * 0.015);
 
     // ── HEADER ──
     ctx.fillStyle = "#1a2640";
@@ -948,13 +951,13 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
     ];
 
     const crocetteY = rY + headerH;
-    const colW = (rW - pad * 2) / 2;
+    const crocColW = (Math.round(rW * 0.68) - pad * 2) / 2;
     const rowH = Math.round(crocetteH / 3);
 
     voci.forEach(([checked, label], i) => {
       const col = i % 2;
       const row = Math.floor(i / 2);
-      const cx = rX + pad + col * colW;
+      const cx = rX + pad + col * crocColW;
       const cy = crocetteY + row * rowH + rowH * 0.65;
 
       // Box
@@ -969,7 +972,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
       // Label - può andare a capo se troppo lunga
       ctx.fillStyle = "#1a2640";
       ctx.font = `${fsCr}px Arial`;
-      const maxLabelW = colW - boxSz - 12;
+      const maxLabelW = crocColW - boxSz - 12;
       const words = label.split(" ");
       let line = "";
       let labelY = cy;
@@ -989,82 +992,51 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
       });
     });
 
-    // ── BOTTOM: linea separatore ──
-    const sepY = crocetteY + crocetteH;
-    ctx.strokeStyle = "#cccccc";
-    ctx.lineWidth = 0.8;
-    ctx.beginPath();
-    ctx.moveTo(rX + pad, sepY);
-    ctx.lineTo(rX + rW - pad, sepY);
-    ctx.stroke();
-
-    // Calcola spazio per logo a destra
-    const lSize = Math.round(bottomH * 1.05);
-    const logoX = rX + rW - lSize - pad;
-    const logoY = sepY + (bottomH - lSize) / 2;
-
-    // ── COMMENTO (a sinistra, sopra firma) ──
-    const commentoX = rX + pad;
-    const commentoMaxW = Math.round(rW * 0.55);
-    let commentoY = sepY + fsCr * 1.0;
-
-    if (commento.trim()) {
-      ctx.fillStyle = "#1a2640";
-      ctx.font = `${fsCommento}px Arial`;
-      const words = commento.split(" ");
-      let line = "";
-      const linesC = [];
-      words.forEach(word => {
-        const test = line + word + " ";
-        if (ctx.measureText(test).width > commentoMaxW && line) {
-          linesC.push(line.trim()); line = word + " ";
-        } else line = test;
-      });
-      if (line.trim()) linesC.push(line.trim());
-      // Massimo 2 righe per il commento
-      linesC.slice(0, 3).forEach((ln, idx) => {
-        ctx.fillText(ln, commentoX, commentoY + idx * fsCommento * 1.2);
-      });
-    }
-
-    // ── FIRMA (basso destra con timbro) ──
+    // Firma scannerizzata nella colonna destra (zona crocette)
     const nomeFirmaBase = meCardiologo.replace(/^Dott\.\s*Dr\.?/i, "").replace(/^Dr\.?\s*/i, "").replace(/^Dott\.?\s*/i, "").trim();
     const nomeFirma = "Dott. " + nomeFirmaBase;
-    const fsStamp = Math.round(fsFirma * 0.62);
-    const firmaSectionW = Math.round(rW * 0.38);
-    const firmaSectionX = rX + rW - firmaSectionW - Math.round(rW * 0.02);
-    // Calcola firmaY lasciando spazio per nome + 2 righe timbro + data
-    const firmaY = rY + rH - fsStamp * 4.2 - fsFirma * 1.1;
-
-    // Firma scannerizzata sopra il nome
     if (window.__millefonti_firma) {
       const img = window.__millefonti_firma;
-      const maxW = firmaSectionW * 0.85;
-      const maxH = fsFirma * 1.8;
+      const maxW = firmaColW * 0.92, maxH = crocetteH - pad * 2;
       const ratio = img.width / img.height;
-      const drawW = Math.min(maxW, maxH * ratio);
-      const drawH = drawW / ratio;
-      ctx.drawImage(img, firmaSectionX, firmaY - fsFirma * 0.5 - drawH, drawW, drawH);
-    } else {
-      ctx.strokeStyle = "#cccccc"; ctx.lineWidth = 0.6;
-      ctx.beginPath();
-      ctx.moveTo(firmaSectionX, firmaY - fsFirma * 0.4);
-      ctx.lineTo(firmaSectionX + firmaSectionW * 0.85, firmaY - fsFirma * 0.4);
-      ctx.stroke();
+      const drawW = Math.min(maxW, maxH * ratio), drawH = drawW / ratio;
+      ctx.drawImage(img, firmaColX + (firmaColW - drawW) / 2, crocetteY + (crocetteH - drawH) / 2, drawW, drawH);
     }
-    // Nome
+    // ── SEPARATORE ──
+    const sepY = crocetteY + crocetteH;
+    ctx.strokeStyle = "#cccccc"; ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.moveTo(rX + pad, sepY); ctx.lineTo(rX + rW - pad, sepY); ctx.stroke();
+    // ── COMMENTO (sinistra bottom) ──
+    if (commento.trim()) {
+      ctx.fillStyle = "#1a2640"; ctx.font = `${fsCommento}px Arial`;
+      const commentoMaxW = Math.round(rW * 0.63);
+      const words = commento.split(" "); let line = ""; const linesC = [];
+      words.forEach(word => {
+        const test = line + word + " ";
+        if (ctx.measureText(test).width > commentoMaxW && line) { linesC.push(line.trim()); line = word + " "; }
+        else line = test;
+      });
+      if (line.trim()) linesC.push(line.trim());
+      linesC.slice(0, 3).forEach((ln, idx) =>
+        ctx.fillText(ln, rX + pad, sepY + fsCommento * 1.1 + idx * fsCommento * 1.2));
+    }
+
+    // ── FIRMA TESTO (basso destra, agganciata al fondo) ──
+    const bPad     = Math.round(rH * 0.05);
+    const lineDate = rY + rH - bPad;
+    const lineVia  = lineDate - Math.round(fsStamp * 1.35);
+    const lineAmb  = lineVia  - Math.round(fsStamp * 1.35);
+    const lineNome = lineAmb  - Math.round(fsFirma * 0.40) - Math.round(fsFirma * 0.15);
+    const lineSepF = lineNome + Math.round(fsFirma * 0.25);
     ctx.fillStyle = "#1a2640"; ctx.font = `bold ${fsFirma}px Arial`;
-    ctx.fillText(nomeFirma, firmaSectionX, firmaY);
-    // Linea sottile timbro
+    ctx.fillText(nomeFirma, firmaColX, lineNome);
     ctx.strokeStyle = "#1a2640"; ctx.lineWidth = 0.5;
-    ctx.beginPath(); ctx.moveTo(firmaSectionX, firmaY + fsFirma * 0.3); ctx.lineTo(firmaSectionX + firmaSectionW * 0.9, firmaY + fsFirma * 0.3); ctx.stroke();
-    // Timbro
+    ctx.beginPath(); ctx.moveTo(firmaColX, lineSepF); ctx.lineTo(firmaColX + firmaColW * 0.95, lineSepF); ctx.stroke();
     ctx.fillStyle = "#1a2640"; ctx.font = `${fsStamp}px Arial`;
-    ctx.fillText("Ambulatorio Millefonti", firmaSectionX, firmaY + fsFirma * 0.3 + fsStamp * 1.1);
-    ctx.fillText("Via Garessio 47 - Torino", firmaSectionX, firmaY + fsFirma * 0.3 + fsStamp * 2.3);
-    // Data
-    ctx.font = `${Math.round(fsFirma * 0.72)}px Arial`; ctx.fillStyle = "#6b7d99";
-    ctx.fillText(new Date().toLocaleDateString("it-IT"), firmaSectionX, firmaY + fsFirma * 0.3 + fsStamp * 3.6);
+    ctx.fillText("Ambulatorio Millefonti", firmaColX, lineAmb);
+    ctx.fillText("Via Garessio 47 - Torino", firmaColX, lineVia);
+    ctx.fillStyle = "#6b7d99"; ctx.font = `${Math.round(fsFirma * 0.72)}px Arial`;
+    ctx.fillText(new Date().toLocaleDateString("it-IT"), firmaColX, lineDate);
 
     // ── LOGO (basso destra) ──
     // Usa l'immagine già pre-caricata dal cache del browser
