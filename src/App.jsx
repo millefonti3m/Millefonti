@@ -1591,6 +1591,10 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, pushAbilitato
   const [showCompensi, setShowCompensi] = useState(false);
   const [tariffario, setTariffario] = useState({});
   const [meseComp, setMeseComp] = useState(() => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; });
+  const [filtroTipo, setFiltroTipo] = useState('mese');
+  const [dataDal, setDataDal] = useState(() => { const d=new Date(); d.setDate(1); return d.toISOString().split('T')[0]; });
+  const [dataAl, setDataAl] = useState(() => new Date().toISOString().split('T')[0]);
+  const [azExpanded, setAzExpanded] = useState(new Set());
   const [savingTariff, setSavingTariff] = useState(false);
 
   // Carica firma esistente all'avvio
@@ -1631,8 +1635,17 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, pushAbilitato
   };
 
   const esportaPDFCompensi = () => {
+    const ecgsMese = refertatiMiei.filter(e => {
+      const d = new Date(e.created_at||e.ts);
+      if (filtroTipo === 'mese') { const [anno,mese]=meseComp.split('-').map(Number); return d.getFullYear()===anno && d.getMonth()===mese-1; }
+      const dal=new Date(dataDal); dal.setHours(0,0,0,0);
+      const al=new Date(dataAl); al.setHours(23,59,59,999);
+      return d>=dal && d<=al;
+    });
+    const periodoLabel = filtroTipo==='mese'
+      ? (() => { const [a,m]=meseComp.split('-'); return ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'][Number(m)-1]+' '+a; })()
+      : `${dataDal} → ${dataAl}`;
     const [anno, mese] = meseComp.split('-').map(Number);
-    const ecgsMese = refertatiMiei.filter(e => { const d=new Date(e.created_at||e.ts); return d.getFullYear()===anno && d.getMonth()===mese-1; });
     const byAz = {};
     ecgsMese.forEach(e => {
       const k = e.origine_dettaglio||e.farmacia||e.azienda||'Altro';
@@ -1701,7 +1714,44 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, pushAbilitato
     pdf.setFont('helvetica','normal'); pdf.setFontSize(9); pdf.setTextColor(120,130,150);
     pdf.text(`Rendiconto generato il ${new Date().toLocaleDateString('it-IT')} — ambulatoriomillefonti.it`, mar, y);
     pdf.text('Solo per riferimento interno', W-mar, y, {align:'right'});
-    pdf.save(`Compensi_${mesiLabel[mese-1]}_${anno}_${meCardiologo.replace(/\s/g,'_')}.pdf`);
+    // ── DETTAGLIO ECG ──
+    y += 8;
+    pdf.setFontSize(11); pdf.setFont('helvetica','bold'); pdf.setTextColor(26,38,64);
+    pdf.text('DETTAGLIO ECG REFERTATI', mar, y); y += 6;
+    pdf.setFillColor(26,38,64); pdf.rect(mar, y-5, W-mar*2, 7, 'F');
+    pdf.setTextColor(255,255,255); pdf.setFontSize(8); pdf.setFont('helvetica','bold');
+    pdf.text('PAZIENTE', mar+2, y-0.5);
+    pdf.text('DATA', 90, y-0.5);
+    pdf.text('AZIENDA', 115, y-0.5);
+    pdf.text('EMAIL', 155, y-0.5);
+    pdf.text('TIPO', 185, y-0.5);
+    pdf.text('€', W-mar-2, y-0.5, {align:'right'});
+    y += 5;
+    ecgsMese.sort((a,b)=>new Date(a.created_at||a.ts)-new Date(b.created_at||b.ts)).forEach((e, idx) => {
+      if (y > 268) { pdf.addPage(); y = 20; }
+      const az = e.origine_dettaglio||e.farmacia||e.azienda||'Altro';
+      const isUrg = e.urgenza==='urgente';
+      const importo = getTariffa(az, isUrg?'urgente':'normale');
+      if (idx%2===0) { pdf.setFillColor(248,250,252); pdf.rect(mar,y-4,W-mar*2,8,'F'); }
+      pdf.setTextColor(26,38,64); pdf.setFontSize(8.5); pdf.setFont('helvetica','normal');
+      const nome = (e.paziente_nome||e.paziente||'—').substring(0,22);
+      const data = new Date(e.created_at||e.ts).toLocaleDateString('it-IT');
+      const azS = az.substring(0,20);
+      const mail = (e.email_destinatario||'—').substring(0,22);
+      pdf.text(nome, mar+2, y);
+      pdf.text(data, 90, y);
+      pdf.text(azS, 115, y);
+      pdf.text(mail, 155, y);
+      pdf.setTextColor(isUrg?200:46, isUrg?100:124, isUrg?20:246);
+      pdf.text(isUrg?'URG':'STD', 185, y);
+      pdf.setTextColor(14,165,100); pdf.setFont('helvetica','bold');
+      pdf.text(`${importo.toFixed(2)}€`, W-mar-2, y, {align:'right'});
+      y += 8;
+    });
+    const fn = filtroTipo==='mese'
+      ? `Compensi_${mesiLabel[mese-1]}_${anno}_${meCardiologo.replace(/\s/g,'_')}.pdf`
+      : `Compensi_${dataDal}_${dataAl}_${meCardiologo.replace(/\s/g,'_')}.pdf`;
+    pdf.save(fn);
   };
 
   const scaricaBatch = async (batchId) => {
@@ -1924,66 +1974,134 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, pushAbilitato
       {/* Detail */}
       <div style={{ flex:1, overflowY:"auto", padding:32, background:C.bg }}>
         {showCompensi ? (
-          <div style={{ maxWidth:680 }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:24, flexWrap:'wrap', gap:12 }}>
+          <div style={{ maxWidth:760 }}>
+            {/* Header + filtri */}
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:20, flexWrap:'wrap', gap:12 }}>
               <div>
                 <h2 style={{ color:C.text, fontSize:20, fontWeight:700, marginBottom:4 }}>💰 Compensi</h2>
-                <div style={{ color:C.muted, fontSize:13 }}>Riepilogo mensile per azienda/farmacia</div>
+                <div style={{ color:C.muted, fontSize:13 }}>Riepilogo per azienda/farmacia con dettaglio ECG</div>
               </div>
-              <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+              <button onClick={esportaPDFCompensi} style={{ background:`linear-gradient(135deg,${C.accent},${C.teal})`, color:'white', border:'none', borderRadius:10, padding:'8px 18px', cursor:'pointer', fontWeight:700, fontSize:13, whiteSpace:'nowrap' }}>
+                📄 Esporta PDF
+              </button>
+            </div>
+            {/* Selezione filtro */}
+            <div style={{ background:C.white, borderRadius:14, boxShadow:C.shadow, padding:16, marginBottom:16 }}>
+              <div style={{ display:'flex', gap:8, marginBottom:12 }}>
+                {[['mese','📅 Per mese'],['intervallo','📆 Intervallo date']].map(([v,l])=>(
+                  <button key={v} onClick={()=>setFiltroTipo(v)}
+                    style={{ flex:1, padding:'8px 12px', borderRadius:8, cursor:'pointer', fontWeight:600, fontSize:12,
+                      border:`2px solid ${filtroTipo===v?C.accent:C.border}`,
+                      background:filtroTipo===v?C.accentLight:C.bg,
+                      color:filtroTipo===v?C.accent:C.muted }}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+              {filtroTipo==='mese' ? (
                 <select value={meseComp} onChange={e=>setMeseComp(e.target.value)}
-                  style={{ border:`1px solid ${C.border}`, borderRadius:10, padding:'8px 12px', fontSize:13, color:C.text, background:C.white, cursor:'pointer' }}>
-                  {Array.from({length:12},(_,i)=>{ const d=new Date(); d.setMonth(d.getMonth()-i); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; }).map(v=>{
+                  style={{ width:'100%', border:`1px solid ${C.border}`, borderRadius:10, padding:'8px 12px', fontSize:13, color:C.text, background:C.white, cursor:'pointer' }}>
+                  {Array.from({length:24},(_,i)=>{ const d=new Date(); d.setMonth(d.getMonth()-i); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; }).map(v=>{
                     const [a,m]=v.split('-'); const mn=['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'][Number(m)-1];
                     return <option key={v} value={v}>{mn} {a}</option>;
                   })}
                 </select>
-                <button onClick={esportaPDFCompensi} style={{ background:`linear-gradient(135deg,${C.accent},${C.teal})`, color:'white', border:'none', borderRadius:10, padding:'8px 18px', cursor:'pointer', fontWeight:700, fontSize:13 }}>
-                  📄 Esporta PDF
-                </button>
-              </div>
+              ) : (
+                <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:11, color:C.muted, marginBottom:4, fontWeight:600 }}>DAL</div>
+                    <input type="date" value={dataDal} onChange={e=>setDataDal(e.target.value)}
+                      style={{ width:'100%', border:`1px solid ${C.border}`, borderRadius:10, padding:'8px 12px', fontSize:13, color:C.text, background:C.white }} />
+                  </div>
+                  <div style={{ color:C.muted, marginTop:16 }}>→</div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:11, color:C.muted, marginBottom:4, fontWeight:600 }}>AL</div>
+                    <input type="date" value={dataAl} onChange={e=>setDataAl(e.target.value)}
+                      style={{ width:'100%', border:`1px solid ${C.border}`, borderRadius:10, padding:'8px 12px', fontSize:13, color:C.text, background:C.white }} />
+                  </div>
+                </div>
+              )}
             </div>
             {(() => {
-              const [anno,mese] = meseComp.split('-').map(Number);
-              const ecgsMese = refertatiMiei.filter(e=>{ const d=new Date(e.created_at||e.ts); return d.getFullYear()===anno && d.getMonth()===mese-1; });
+              const ecgsFiltrati = refertatiMiei.filter(e => {
+                const d = new Date(e.created_at||e.ts);
+                if (filtroTipo==='mese') { const [anno,mese]=meseComp.split('-').map(Number); return d.getFullYear()===anno && d.getMonth()===mese-1; }
+                const dal=new Date(dataDal); dal.setHours(0,0,0,0);
+                const al=new Date(dataAl); al.setHours(23,59,59,999);
+                return d>=dal && d<=al;
+              });
               const byAz = {};
-              ecgsMese.forEach(e=>{ const k=e.origine_dettaglio||e.farmacia||e.azienda||'Altro'; if(!byAz[k]) byAz[k]=[]; byAz[k].push(e); });
+              ecgsFiltrati.forEach(e=>{ const k=e.origine_dettaglio||e.farmacia||e.azienda||'Altro'; if(!byAz[k]) byAz[k]=[]; byAz[k].push(e); });
+              const totaleGlobale = Object.entries(byAz).reduce((s,[k,rows])=>
+                s+rows.filter(e=>e.urgenza!=='urgente').length*getTariffa(k,'normale')+rows.filter(e=>e.urgenza==='urgente').length*getTariffa(k,'urgente'),0);
               return (
                 <>
-                  {ecgsMese.length===0 && <div style={{textAlign:'center',padding:40,color:C.muted}}>Nessun referto questo mese</div>}
+                  {ecgsFiltrati.length===0 && <div style={{textAlign:'center',padding:40,color:C.muted,background:C.white,borderRadius:16,boxShadow:C.shadow}}>Nessun referto nel periodo selezionato</div>}
                   {Object.entries(byAz).length > 0 && (
                     <div style={{ background:C.white, borderRadius:16, boxShadow:C.shadow, overflow:'hidden', marginBottom:16 }}>
-                      <div style={{ display:'grid', gridTemplateColumns:'1fr 55px 55px 55px 55px 80px', padding:'10px 18px', background:C.cardAlt, fontSize:10, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:0.5, gap:4 }}>
-                        <div>Azienda</div><div style={{textAlign:'center'}}>Std</div><div style={{textAlign:'center'}}>Urg</div><div style={{textAlign:'center'}}>€/Std</div><div style={{textAlign:'center'}}>€/Urg</div><div style={{textAlign:'right'}}>Totale</div>
+                      {/* Intestazione */}
+                      <div style={{ display:'grid', gridTemplateColumns:'24px 1fr 55px 55px 55px 55px 80px', padding:'10px 14px', background:C.cardAlt, fontSize:10, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:0.5, gap:4 }}>
+                        <div/><div>Azienda</div><div style={{textAlign:'center'}}>Std</div><div style={{textAlign:'center'}}>Urg</div><div style={{textAlign:'center'}}>€/Std</div><div style={{textAlign:'center'}}>€/Urg</div><div style={{textAlign:'right'}}>Totale</div>
                       </div>
                       {Object.entries(byAz).map(([az,rows])=>{
                         const norm = rows.filter(e=>e.urgenza!=='urgente').length;
                         const urg = rows.filter(e=>e.urgenza==='urgente').length;
                         const tot = norm*getTariffa(az,'normale') + urg*getTariffa(az,'urgente');
+                        const expanded = azExpanded.has(az);
                         return (
-                          <div key={az} style={{ padding:'12px 18px', borderBottom:`1px solid ${C.borderLight}` }}>
-                            <div style={{ display:'grid', gridTemplateColumns:'1fr 55px 55px 55px 55px 80px', alignItems:'center', gap:4 }}>
+                          <div key={az} style={{ borderBottom:`1px solid ${C.borderLight}` }}>
+                            {/* Riga azienda */}
+                            <div onClick={()=>setAzExpanded(p=>{ const n=new Set(p); n.has(az)?n.delete(az):n.add(az); return n; })}
+                              style={{ display:'grid', gridTemplateColumns:'24px 1fr 55px 55px 55px 55px 80px', padding:'12px 14px', alignItems:'center', gap:4, cursor:'pointer', background:expanded?C.accentLight:'transparent' }}>
+                              <div style={{ color:C.accent, fontWeight:700, fontSize:14, textAlign:'center' }}>{expanded?'▾':'▸'}</div>
                               <div style={{ color:C.text, fontSize:13, fontWeight:600 }}>{az}</div>
                               <div style={{ textAlign:'center', color:C.accent, fontWeight:700, fontSize:13 }}>{norm}</div>
-                              <div style={{ textAlign:'center', color:C.orange||'#f59e0b', fontWeight:700, fontSize:13 }}>{urg}</div>
+                              <div style={{ textAlign:'center', color:'#f59e0b', fontWeight:700, fontSize:13 }}>{urg}</div>
                               <div style={{ textAlign:'center', fontSize:11, color:C.muted }}>{getTariffa(az,'normale').toFixed(2)}€</div>
                               <div style={{ textAlign:'center', fontSize:11, color:C.muted }}>{getTariffa(az,'urgente').toFixed(2)}€</div>
                               <div style={{ textAlign:'right', color:C.green, fontWeight:700 }}>{tot.toFixed(2)}€</div>
                             </div>
+                            {/* Dettaglio ECG espanso */}
+                            {expanded && (
+                              <div style={{ background:'#f8fafc', borderTop:`1px solid ${C.borderLight}` }}>
+                                <div style={{ display:'grid', gridTemplateColumns:'1fr 90px 140px 60px 55px', padding:'6px 38px', fontSize:10, fontWeight:700, color:C.muted, textTransform:'uppercase', gap:4 }}>
+                                  <div>Paziente</div><div>Data</div><div>Email</div><div style={{textAlign:'center'}}>Tipo</div><div style={{textAlign:'right'}}>€</div>
+                                </div>
+                                {rows.sort((a,b)=>new Date(a.created_at||a.ts)-new Date(b.created_at||b.ts)).map((e,i)=>{
+                                  const isUrg = e.urgenza==='urgente';
+                                  const imp = getTariffa(az, isUrg?'urgente':'normale');
+                                  return (
+                                    <div key={e.id||i} style={{ display:'grid', gridTemplateColumns:'1fr 90px 140px 60px 55px', padding:'7px 38px', borderTop:`1px solid ${C.borderLight}`, gap:4, alignItems:'center', background:i%2===0?'#f0f7ff':'transparent' }}>
+                                      <div style={{ fontSize:12, color:C.text, fontWeight:500 }}>{e.paziente_nome||e.paziente||'—'}</div>
+                                      <div style={{ fontSize:11, color:C.muted }}>{new Date(e.created_at||e.ts).toLocaleDateString('it-IT')}</div>
+                                      <div style={{ fontSize:10, color:C.muted, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.email_destinatario||'—'}</div>
+                                      <div style={{ textAlign:'center' }}>
+                                        <span style={{ fontSize:9, fontWeight:700, padding:'2px 6px', borderRadius:6,
+                                          background:isUrg?'#fef3c7':'#eff6ff', color:isUrg?'#d97706':'#2563eb' }}>
+                                          {isUrg?'URG':'STD'}
+                                        </span>
+                                      </div>
+                                      <div style={{ textAlign:'right', fontSize:12, fontWeight:600, color:C.green }}>{imp.toFixed(2)}€</div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
-                      <div style={{ display:'grid', gridTemplateColumns:'1fr 55px 55px 55px 55px 80px', padding:'14px 18px', background:C.greenLight, gap:4 }}>
-                        <div style={{ fontWeight:700, color:C.text }}>Totale mese</div>
-                        <div style={{ textAlign:'center', fontWeight:700, color:C.accent }}>{ecgsMese.filter(e=>e.urgenza!=='urgente').length}</div>
-                        <div style={{ textAlign:'center', fontWeight:700, color:C.orange||'#f59e0b' }}>{ecgsMese.filter(e=>e.urgenza==='urgente').length}</div>
+                      {/* Totale */}
+                      <div style={{ display:'grid', gridTemplateColumns:'24px 1fr 55px 55px 55px 55px 80px', padding:'14px 14px', background:C.greenLight, gap:4 }}>
+                        <div/><div style={{ fontWeight:700, color:C.text }}>Totale periodo</div>
+                        <div style={{ textAlign:'center', fontWeight:700, color:C.accent }}>{ecgsFiltrati.filter(e=>e.urgenza!=='urgente').length}</div>
+                        <div style={{ textAlign:'center', fontWeight:700, color:'#f59e0b' }}>{ecgsFiltrati.filter(e=>e.urgenza==='urgente').length}</div>
                         <div/><div/>
-                        <div style={{ textAlign:'right', color:C.green, fontWeight:700, fontSize:16 }}>{Object.entries(byAz).reduce((s,[k,rows])=>s+rows.filter(e=>e.urgenza!=='urgente').length*getTariffa(k,'normale')+rows.filter(e=>e.urgenza==='urgente').length*getTariffa(k,'urgente'),0).toFixed(2)}€</div>
+                        <div style={{ textAlign:'right', color:C.green, fontWeight:700, fontSize:16 }}>{totaleGlobale.toFixed(2)}€</div>
                       </div>
                     </div>
                   )}
                   <div style={{ marginTop:8, color:C.muted, fontSize:11 }}>
-                    Le tariffe sono impostate dall'amministratore. Default: 10€/ECG.
+                    Le tariffe sono impostate dall'amministratore. Default: 10€/ECG. Clicca su un'azienda per vedere il dettaglio ECG.
                   </div>
                 </>
               );
