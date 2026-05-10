@@ -2101,7 +2101,8 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
       setCardiologiDB(unici);
     });
   }, []);
-  const [tariffariAdmin, setTariffariAdmin] = useState({}); // { userId: tariffario_obj }
+  const [tariffariAdmin, setTariffariAdmin] = useState({});
+  const [cardiologiTariffList, setCardiologiTariffList] = useState([]); // { userId: tariffario_obj }
   const [cardiologoSelTariff, setCardiologoSelTariff] = useState('');
   const [meseCompAdmin, setMeseCompAdmin] = useState(() => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; });
   const [savingTariffAdmin, setSavingTariffAdmin] = useState(false);
@@ -2117,6 +2118,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
         const t = {};
         data.forEach(p => { t[p.id] = typeof p.tariffario === 'string' ? JSON.parse(p.tariffario||'{}') : (p.tariffario||{}); });
         setTariffariAdmin(t);
+        setCardiologiTariffList(data.map(p => ({ id: p.id, nome: `${p.nome||''} ${p.cognome||''}`.trim() })));
         if (!cardiologoSelTariff && data.length > 0) setCardiologoSelTariff(data[0].id);
       }
     };
@@ -2805,10 +2807,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
       )}
 
       {tab==="tariffario" && (() => {
-        const cardiologiList = nomi.map(n => {
-          const p = cardiologiDB.find(c => `${c.nome||''} ${c.cognome||''}`.trim() === n);
-          return { id: p?.id, nome: n };
-        }).filter(c => c.id);
+        const cardiologiList = cardiologiTariffList;
         const selCard = cardiologiList.find(c => c.id === cardiologoSelTariff);
         const tariffSel = tariffariAdmin[cardiologoSelTariff] || {};
         const aziendeTutte = [...new Set(ecgs.map(e=>e.origine_dettaglio||e.farmacia||e.azienda||'Altro').filter(Boolean))].sort();
