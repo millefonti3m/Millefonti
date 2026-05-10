@@ -3539,8 +3539,8 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
       const pdfBlob = pdf.output('blob');
 
       // Salva su Storage
-      const nomePaziente = (selectedEcg.file_ecg_url||'').split('/').pop().replace(/\.[^.]+$/,'');
-      const refertoFileName = `referti/${nomePaziente}_refertato.pdf`;
+      const nomeFileOrigMobile = (selectedEcg.file_ecg_url||'').split('/').pop().replace(/\.[^.]+$/,'');
+      const refertoFileName = `referti/_${nomeFileOrigMobile}.pdf`;
       (async () => {
         await supabase.storage.from('ecg-files').upload(refertoFileName, pdfBlob, { contentType:'application/pdf', upsert:true });
         await supabase.from('ecgs').update({ stato:'refertato', file_referto_url:refertoFileName }).eq('id', selectedEcg.id);
