@@ -3760,11 +3760,10 @@ export default function App() {
       }
       if (data?.ruoli && data.ruoli.length > 1) {
         const savedRole = localStorage.getItem('preferito_ruolo');
+        setRuoliDisponibili(data.ruoli); // sempre popolato per il bottone "Cambia ruolo"
         if (savedRole && data.ruoli.includes(savedRole)) {
-          // Usa il ruolo salvato — niente selettore
           setRole(savedRole);
         } else {
-          setRuoliDisponibili(data.ruoli);
           setRole(null);
         }
       } else if (data?.ruolo) {
