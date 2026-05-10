@@ -897,7 +897,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
     const rX = Math.round(W * 0.21);
     const rY = Math.round(H * 0.082);
     const rW = Math.round(W * 0.78);
-    const rH = Math.round(H * 0.148); // ridotto per non toccare tracciato ECG
+    const rH = Math.round(H * 0.142); // ridotto per non toccare tracciato ECG
 
     // Sfondo bianco
     ctx.fillStyle = "#ffffff";
@@ -1025,8 +1025,8 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
     const lineDate = rY + rH - bPad;
     const lineVia  = lineDate - Math.round(fsStamp * 1.35);
     const lineAmb  = lineVia  - Math.round(fsStamp * 1.35);
-    const lineNome = lineAmb  - Math.round(fsFirma * 0.40) - Math.round(fsFirma * 0.15);
-    const lineSepF = lineNome + Math.round(fsFirma * 0.25);
+    const lineNome = lineAmb  - fsFirma - Math.round(fsStamp * 0.5);
+    const lineSepF = lineNome + Math.round(fsFirma * 0.4);
     ctx.fillStyle = "#1a2640"; ctx.font = `bold ${fsFirma}px Arial`;
     ctx.fillText(nomeFirma, firmaColX, lineNome);
     ctx.strokeStyle = "#1a2640"; ctx.lineWidth = 0.5;
@@ -3349,7 +3349,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
 
       // Overlay identico al desktop
       const W = cv.width, H = cv.height;
-      const rX=Math.round(W*0.21),rY=Math.round(H*0.082),rW=Math.round(W*0.78),rH=Math.round(H*0.148);
+      const rX=Math.round(W*0.21),rY=Math.round(H*0.082),rW=Math.round(W*0.78),rH=Math.round(H*0.142);
       ctx.fillStyle='#ffffff';ctx.fillRect(rX,rY,rW,rH);
       ctx.strokeStyle='#1a2640';ctx.lineWidth=2;ctx.strokeRect(rX,rY,rW,rH);
       const headerH=Math.round(rH*0.18),crocetteH=Math.round(rH*0.42);
@@ -3404,7 +3404,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
       // Firma testo agganciata al fondo
       const bPad=Math.round(rH*0.05);
       const lineDate=rY+rH-bPad,lineVia=lineDate-Math.round(fsStampM*1.35),lineAmb=lineVia-Math.round(fsStampM*1.35);
-      const lineNome=lineAmb-Math.round(fsFirma*0.40)-Math.round(fsFirma*0.15),lineSepF=lineNome+Math.round(fsFirma*0.25);
+      const lineNome=lineAmb-fsFirma-Math.round(fsStampM*0.5),lineSepF=lineNome+Math.round(fsFirma*0.4);
       ctx.fillStyle='#1a2640';ctx.font=`bold ${fsFirma}px Arial`;ctx.fillText(nomeFirmaM,firmaColX,lineNome);
       ctx.strokeStyle='#1a2640';ctx.lineWidth=0.5;
       ctx.beginPath();ctx.moveTo(firmaColX,lineSepF);ctx.lineTo(firmaColX+firmaColW*0.95,lineSepF);ctx.stroke();
