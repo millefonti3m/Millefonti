@@ -1027,13 +1027,15 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
       });
     }
 
-    // ── FIRMA (centrale, con spazio per firma scannerizzata sopra il nome) ──
+    // ── FIRMA (basso destra con timbro) ──
     const nomeFirmaBase = meCardiologo.replace(/^Dott\.\s*Dr\.?/i, "").replace(/^Dr\.?\s*/i, "").replace(/^Dott\.?\s*/i, "").trim();
     const nomeFirma = "Dott. " + nomeFirmaBase;
-    const firmaSectionX = rX + Math.round(rW * 0.45);
-    const firmaSectionW = Math.round(rW * 0.30);
-    const firmaY = sepY + bottomH - fsFirma * 1.3;
-    
+    const fsStamp = Math.round(fsFirma * 0.62);
+    const firmaSectionW = Math.round(rW * 0.38);
+    const firmaSectionX = rX + rW - firmaSectionW - Math.round(rW * 0.02);
+    // Calcola firmaY lasciando spazio per nome + 2 righe timbro + data
+    const firmaY = rY + rH - fsStamp * 4.2 - fsFirma * 1.1;
+
     // Firma scannerizzata sopra il nome
     if (window.__millefonti_firma) {
       const img = window.__millefonti_firma;
@@ -1044,21 +1046,25 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
       const drawH = drawW / ratio;
       ctx.drawImage(img, firmaSectionX, firmaY - fsFirma * 0.5 - drawH, drawW, drawH);
     } else {
-      // Linea placeholder se non c'è firma
-      ctx.strokeStyle = "#cccccc";
-      ctx.lineWidth = 0.6;
+      ctx.strokeStyle = "#cccccc"; ctx.lineWidth = 0.6;
       ctx.beginPath();
       ctx.moveTo(firmaSectionX, firmaY - fsFirma * 0.4);
       ctx.lineTo(firmaSectionX + firmaSectionW * 0.85, firmaY - fsFirma * 0.4);
       ctx.stroke();
     }
-    
-    ctx.fillStyle = "#1a2640";
-    ctx.font = `bold ${fsFirma}px Arial`;
+    // Nome
+    ctx.fillStyle = "#1a2640"; ctx.font = `bold ${fsFirma}px Arial`;
     ctx.fillText(nomeFirma, firmaSectionX, firmaY);
-    ctx.font = `${Math.round(fsFirma * 0.75)}px Arial`;
-    ctx.fillStyle = "#6b7d99";
-    ctx.fillText(new Date().toLocaleDateString("it-IT"), firmaSectionX, firmaY + fsFirma * 1.05);
+    // Linea sottile timbro
+    ctx.strokeStyle = "#1a2640"; ctx.lineWidth = 0.5;
+    ctx.beginPath(); ctx.moveTo(firmaSectionX, firmaY + fsFirma * 0.3); ctx.lineTo(firmaSectionX + firmaSectionW * 0.9, firmaY + fsFirma * 0.3); ctx.stroke();
+    // Timbro
+    ctx.fillStyle = "#1a2640"; ctx.font = `${fsStamp}px Arial`;
+    ctx.fillText("Ambulatorio Millefonti", firmaSectionX, firmaY + fsFirma * 0.3 + fsStamp * 1.1);
+    ctx.fillText("Via Garessio 47 - Torino", firmaSectionX, firmaY + fsFirma * 0.3 + fsStamp * 2.3);
+    // Data
+    ctx.font = `${Math.round(fsFirma * 0.72)}px Arial`; ctx.fillStyle = "#6b7d99";
+    ctx.fillText(new Date().toLocaleDateString("it-IT"), firmaSectionX, firmaY + fsFirma * 0.3 + fsStamp * 3.6);
 
     // ── LOGO (basso destra) ──
     // Usa l'immagine già pre-caricata dal cache del browser
@@ -3418,11 +3424,13 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
         if(ln2.trim())lns2.push(ln2.trim());
         lns2.slice(0,3).forEach((l,idx)=>ctx.fillText(l,rX+pad,sepY+fsCommento*1.0+idx*fsCommento*1.2));
       }
-      // Firma
+      // Firma (basso destra con timbro) - identico al desktop
       const nbM = meCardiologo.replace(/^Dott\.\s*Dr\.?/i,'').replace(/^Dr\.?\s*/i,'').replace(/^Dott\.?\s*/i,'').trim();
       const nomeFirmaM = 'Dott. '+nbM;
-      const firmaSX=rX+Math.round(rW*0.45), firmaSW=Math.round(rW*0.30);
-      const firmaYm=sepY+bottomH-fsFirma*1.3;
+      const fsStampM = Math.round(fsFirma*0.62);
+      const firmaSW=Math.round(rW*0.38);
+      const firmaSX=rX+rW-firmaSW-Math.round(rW*0.02);
+      const firmaYm=rY+rH-fsStampM*4.2-fsFirma*1.1;
       if(window.__millefonti_firma){
         const img2=window.__millefonti_firma;
         const mW=firmaSW*0.85,mH=fsFirma*1.8,r2=img2.width/img2.height;
@@ -3430,8 +3438,13 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
         ctx.drawImage(img2,firmaSX,firmaYm-fsFirma*0.5-dH,dW,dH);
       }
       ctx.fillStyle='#1a2640';ctx.font=`bold ${fsFirma}px Arial`;ctx.fillText(nomeFirmaM,firmaSX,firmaYm);
-      ctx.font=`${Math.round(fsFirma*0.75)}px Arial`;ctx.fillStyle='#6b7d99';
-      ctx.fillText(new Date().toLocaleDateString('it-IT'),firmaSX,firmaYm+fsFirma*1.05);
+      ctx.strokeStyle='#1a2640';ctx.lineWidth=0.5;
+      ctx.beginPath();ctx.moveTo(firmaSX,firmaYm+fsFirma*0.3);ctx.lineTo(firmaSX+firmaSW*0.9,firmaYm+fsFirma*0.3);ctx.stroke();
+      ctx.fillStyle='#1a2640';ctx.font=`${fsStampM}px Arial`;
+      ctx.fillText('Ambulatorio Millefonti',firmaSX,firmaYm+fsFirma*0.3+fsStampM*1.1);
+      ctx.fillText('Via Garessio 47 - Torino',firmaSX,firmaYm+fsFirma*0.3+fsStampM*2.3);
+      ctx.font=`${Math.round(fsFirma*0.72)}px Arial`;ctx.fillStyle='#6b7d99';
+      ctx.fillText(new Date().toLocaleDateString('it-IT'),firmaSX,firmaYm+fsFirma*0.3+fsStampM*3.6);
 
       const ratio = W/H, isLandscape = ratio>1;
       const pdfW = isLandscape?297:210, pdfH = isLandscape?pdfW/ratio:pdfW*ratio;
