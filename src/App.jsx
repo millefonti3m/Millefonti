@@ -564,11 +564,12 @@ const AziendaView = ({ ecgs, setEcgs }) => {
     setSent(true);
     setCaricando(false);
     fetch('/api/notify', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ paziente:`Lotto ${batchNome} — ${filesLotto.length} ECG`, origine:"azienda", urgenza:"normale", note:`Azienda: ${nomeAzienda||ME_AZIENDA} | Email referto: ${emailLotto}` }) }).catch(()=>{});
-    // Email conferma ricezione — usa emailAccount ottenuto da getUser() in cima alla funzione
-    if (emailAccount) {
-      fetch('/api/notify-ricezione', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email: emailAccount, nomeAzienda: nomeAzienda||ME_AZIENDA, batchNome, count: filesLotto.length, data: new Date().toLocaleDateString('it-IT') }) }).catch(()=>{});
+    // Email conferma ricezione — legge email_destinatario dal record inserito (identico a notify-referto)
+    const emailRicezione = data?.[0]?.email_destinatario;
+    if (emailRicezione) {
+      fetch('/api/notify-ricezione', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email: emailRicezione, nomeAzienda: nomeAzienda||ME_AZIENDA, batchNome, count: filesLotto.length, data: new Date().toLocaleDateString('it-IT') }) }).catch(()=>{});
     }
-    // Push gestito dal webhook Supabase (INSERT su ecgs) — nessuna chiamata esplicita
+        // Push gestito dal webhook Supabase (INSERT su ecgs) — nessuna chiamata esplicita
   };
 
   const scaricaBatchAzienda = async (batchId, bNome) => {
