@@ -1078,13 +1078,14 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
         return;
       }
       const preloadLogo = new Image();
+      preloadLogo.crossOrigin = 'anonymous';
       preloadLogo.onload = () => {
         window.__millefonti_logo = preloadLogo;
         resolve();
       };
       preloadLogo.onerror = () => resolve();
-      preloadLogo.src = "/logo-squared.png";
-      setTimeout(resolve, 2000);
+      preloadLogo.src = 'https://weearnnmglyjufhpycju.supabase.co/storage/v1/object/public/assets/logo%20definitivo.png';
+      setTimeout(resolve, 3000);
     });
     try {
       const { jsPDF } = await import("jspdf");
