@@ -3963,6 +3963,19 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
         </div>
       </div>
 
+      {/* Modalità referto */}
+      <div style={{display:'flex',gap:8,margin:'0 12px 8px'}}>
+        {[['overlay','🫀 Sul tracciato'],['pagina-separata','📄 Pagina separata']].map(([v,l])=>(
+          <button key={v} onClick={()=>setPosizioneMobile(v)}
+            style={{flex:1,padding:'9px 4px',borderRadius:10,cursor:'pointer',fontWeight:600,fontSize:12,
+              border:`2px solid ${posizioneMobile===v?C.accent:C.border}`,
+              background:posizioneMobile===v?C.accentLight:C.bg,
+              color:posizioneMobile===v?C.accent:C.muted}}>
+            {l}
+          </button>
+        ))}
+      </div>
+
       {/* Anteprima ECG */}
       <div style={{ margin:12, background:'white', borderRadius:14, overflow:'hidden', boxShadow:'0 2px 12px rgba(0,0,0,0.06)' }}>
         <div style={{ padding:'10px 14px', display:'flex', justifyContent:'space-between', alignItems:'center', borderBottom:`1px solid ${C.borderLight}` }}>
