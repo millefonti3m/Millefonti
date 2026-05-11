@@ -52,7 +52,7 @@ async function getAttachment(accessToken, messageId, attachmentId) {
 }
 
 async function markAsRead(accessToken, messageId) {
-  await fetch(
+  const res = await fetch(
     `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}/modify`,
     {
       method: 'POST',
@@ -60,6 +60,7 @@ async function markAsRead(accessToken, messageId) {
       body: JSON.stringify({ removeLabelIds: ['UNREAD'] }),
     }
   );
+  if (!res.ok) console.warn(`markAsRead ${messageId}: HTTP ${res.status} (token potrebbe non avere permessi di scrittura Gmail)`);
 }
 
 // ── LOGO DETECTION ─────────────────────────────────────────────────────────
@@ -273,16 +274,18 @@ export default async function handler(req, res) {
     }
 
     // Pulizia automatica referti più vecchi di 7 giorni (dati sanitari sensibili)
+    let vecchi = null;
     try {
       const settaGiorniFa = new Date();
       settaGiorniFa.setDate(settaGiorniFa.getDate() - 7);
-      const { data: vecchi, error: queryErr } = await supabase
+      const { data: vecchiData, error: queryErr } = await supabase
         .from('ecgs')
         .select('id, file_referto_url, file_ecg_url')
         .eq('stato', 'refertato')
         .lt('created_at', settaGiorniFa.toISOString());
 
       if (queryErr) throw new Error('Query pulizia fallita: ' + queryErr.message);
+      vecchi = vecchiData;
 
       if (vecchi && vecchi.length > 0) {
         const filesDaEliminare = vecchi
