@@ -94,10 +94,22 @@ function filtraLogoEmail(allFileParts) {
 }
 // ───────────────────────────────────────────────────────────────────────────
 
+// Helper per inviare alert al team
+async function sendAlert(tipo, dettagli = '', contesto = '') {
+  fetch('https://ambulatoriomillefonti.it/api/notify-breach', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tipo, dettagli, contesto }),
+  }).catch(e => console.error('sendAlert error:', e.message));
+}
+
 export default async function handler(req, res) {
   try {
     const accessToken = await getAccessToken();
-    if (!accessToken) return res.status(500).json({ error: 'Token non ottenuto' });
+    if (!accessToken) {
+      await sendAlert('gmail_token', 'Token Gmail non ottenuto — access_token è null', 'Verifica le variabili GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN su Vercel');
+      return res.status(500).json({ error: 'Token non ottenuto' });
+    }
     
     const messages = await getUnreadEmails(accessToken);
     if (messages.length === 0) {
@@ -199,7 +211,13 @@ export default async function handler(req, res) {
           .from('ecg-files')
           .upload(storageFileName, buffer, { contentType: part.mimeType || 'application/pdf' });
 
-        if (!uploadError) {
+        if (uploadError) {
+          await sendAlert(
+            'upload_ecg',
+            uploadError.message || JSON.stringify(uploadError),
+            `File: ${part.filename} | Azienda: ${nomeAzienda} | Email: ${fromEmail} | Lotto: ${batchNome}`
+          );
+        } else {
           ecgs.push({
             origine: 'azienda',
             paziente_nome: part.filename.replace(/\.[^.]+$/, ''),
@@ -218,8 +236,15 @@ export default async function handler(req, res) {
       }
 
       if (ecgs.length > 0) {
-        await supabase.from('ecgs').insert(ecgs);
-        processed++;
+        const { error: insertErr } = await supabase.from('ecgs').insert(ecgs);
+        if (insertErr) {
+          await sendAlert(
+            'insert_db',
+            insertErr.message || JSON.stringify(insertErr),
+            `Azienda: ${nomeAzienda} | Email: ${fromEmail} | Lotto: ${batchNome} | ECG: ${ecgs.length}`
+          );
+        } else {
+          processed++;
         console.log(`Processata email da ${fromEmail}: ${ecgs.length} ECG lotto "${batchNome}"`);
         // Push gestito dal Supabase webhook — niente duplicati
         // Email di conferma ricezione al mittente
@@ -234,6 +259,7 @@ export default async function handler(req, res) {
             data: new Date().toLocaleDateString('it-IT'),
           }),
         }).catch(e => console.error('notify-ricezione error:', e.message));
+        } // end else insertErr
       }
 
       // Segna come processata nel DB PRIMA di marcare come letta
@@ -247,33 +273,51 @@ export default async function handler(req, res) {
     }
 
     // Pulizia automatica referti più vecchi di 7 giorni (dati sanitari sensibili)
-    const settaGiorniFa = new Date();
-    settaGiorniFa.setDate(settaGiorniFa.getDate() - 7);
-    const { data: vecchi } = await supabase
-      .from('ecgs')
-      .select('id, file_referto_url, file_ecg_url')
-      .eq('stato', 'refertato')
-      .lt('created_at', settaGiorniFa.toISOString());
-    
-    if (vecchi && vecchi.length > 0) {
-      const filesDaEliminare = vecchi
-        .flatMap(e => [e.file_referto_url, e.file_ecg_url])
-        .filter(Boolean);
-      
-      if (filesDaEliminare.length > 0) {
-        await supabase.storage.from('ecg-files').remove(filesDaEliminare);
+    try {
+      const settaGiorniFa = new Date();
+      settaGiorniFa.setDate(settaGiorniFa.getDate() - 7);
+      const { data: vecchi, error: queryErr } = await supabase
+        .from('ecgs')
+        .select('id, file_referto_url, file_ecg_url')
+        .eq('stato', 'refertato')
+        .lt('created_at', settaGiorniFa.toISOString());
+
+      if (queryErr) throw new Error('Query pulizia fallita: ' + queryErr.message);
+
+      if (vecchi && vecchi.length > 0) {
+        const filesDaEliminare = vecchi
+          .flatMap(e => [e.file_referto_url, e.file_ecg_url])
+          .filter(Boolean);
+
+        if (filesDaEliminare.length > 0) {
+          const { error: removeErr } = await supabase.storage.from('ecg-files').remove(filesDaEliminare);
+          if (removeErr) throw new Error('Rimozione file Storage fallita: ' + removeErr.message);
+        }
+
+        const { error: updateErr } = await supabase.from('ecgs')
+          .update({ file_referto_url: null, file_ecg_url: null })
+          .in('id', vecchi.map(e => e.id));
+        if (updateErr) throw new Error('Aggiornamento DB dopo pulizia fallito: ' + updateErr.message);
+
+        console.log(`Pulizia: eliminati ${filesDaEliminare.length} file vecchi di 7+ giorni`);
       }
-      
-      await supabase.from('ecgs')
-        .update({ file_referto_url: null, file_ecg_url: null })
-        .in('id', vecchi.map(e => e.id));
-      
-      console.log(`Pulizia: eliminati ${filesDaEliminare.length} file vecchi di 7+ giorni`);
+    } catch (puliziErr) {
+      console.error('Errore pulizia file:', puliziErr.message);
+      await sendAlert(
+        'pulizia_file',
+        puliziErr.message,
+        `Errore rilevato il ${new Date().toLocaleString('it-IT')} — i file sanitari potrebbero non essere stati eliminati nei termini previsti (7 giorni)`
+      );
     }
 
     return res.status(200).json({ message: `Processate ${processed} email`, processed, cleaned: vecchi?.length || 0 });
   } catch (error) {
     console.error('Gmail fetch error:', error);
+    await sendAlert(
+      'gmail_token',
+      error.message || String(error),
+      `Errore critico nel polling Gmail — ${new Date().toLocaleString('it-IT')}`
+    );
     return res.status(500).json({ error: error.message });
   }
 }
