@@ -656,7 +656,7 @@ const AziendaView = ({ ecgs, setEcgs }) => {
             <div style={{ fontSize:48, marginBottom:16 }}>✅</div>
             <h3 style={{ color:C.green, fontSize:22, fontWeight:700, marginBottom:6 }}>Lotto inviato!</h3>
             <p style={{ color:C.muted, fontSize:14, marginBottom:20 }}>{filesLotto.length} ECG del lotto <strong>{batchNome}</strong> ricevuti. Refertazione entro 24 ore.</p>
-            <button onClick={()=>{setSent(false);setBatchNome("");setLavoratori([{ paziente:"", eta:"", sesso:"M", mansione:"", note:"", file:null }])}} style={{ background:C.purple, color:C.white, border:"none", borderRadius:10, padding:"12px 28px", cursor:"pointer", fontWeight:700, fontSize:14 }}>Carica un altro lotto →</button>
+            <button onClick={()=>{setSent(false);setBatchNome("");setFilesLotto([])}} style={{ background:C.purple, color:C.white, border:"none", borderRadius:10, padding:"12px 28px", cursor:"pointer", fontWeight:700, fontSize:14 }}>Carica un altro lotto →</button>
           </div>
         ) : (
           <div style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:20, padding:28, boxShadow:C.shadow }}>
@@ -3552,14 +3552,14 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
   const [posizioneMobile, setPosizioneMobile] = useState('overlay');
 
   // Preload logo per pagina separata
-  React.useEffect(() => {
+  useEffect(() => {
     if (!window.__millefonti_logo || !window.__millefonti_logo.complete) {
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.src = 'https://weearnnmglyjufhpycju.supabase.co/storage/v1/object/public/assets/logo%20definitivo.png';
       window.__millefonti_logo = img;
     }
-  }, []); // overlay | pagina-separata
+  }, []);
 
   const mieiEcgs = ecgs.filter(e => e.cardiologo === meCardiologo);
   const almenoCrocetta = Object.values(crocette).some(Boolean);
