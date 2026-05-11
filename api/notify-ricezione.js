@@ -2,6 +2,13 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   const { email, nomeAzienda, batchNome, count, data } = req.body;
 
+  console.log('notify-ricezione: email ricevuta =', email, '| batchNome =', batchNome);
+
+  if (!email || !email.includes('@')) {
+    console.error('notify-ricezione: email mancante o non valida:', email);
+    return res.status(400).json({ error: 'Email destinatario mancante o non valida' });
+  }
+
   const LOGO = 'https://weearnnmglyjufhpycju.supabase.co/storage/v1/object/public/assets/logo%20definitivo.png';
 
   try {
