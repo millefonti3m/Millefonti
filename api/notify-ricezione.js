@@ -2,9 +2,10 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   const { email, nomeAzienda, batchNome, count, data } = req.body;
 
-  console.log('notify-ricezione: email ricevuta =', email, '| batchNome =', batchNome);
+  console.log('notify-ricezione: body =', JSON.stringify(req.body));
+  console.log('notify-ricezione: email =', email, '| batchNome =', batchNome);
 
-  if (!email || !email.includes('@')) {
+  if (!email || typeof email !== 'string' || !email.includes('@')) {
     console.error('notify-ricezione: email mancante o non valida:', email);
     return res.status(400).json({ error: 'Email destinatario mancante o non valida' });
   }
@@ -61,8 +62,10 @@ export default async function handler(req, res) {
     });
     if (response.ok) return res.status(200).json({ success: true });
     const err = await response.text();
+    console.error('notify-ricezione: Brevo error =', err);
     return res.status(500).json({ error: err });
   } catch (error) {
+    console.error('notify-ricezione: exception =', error.message);
     return res.status(500).json({ error: error.message });
   }
 }

@@ -565,7 +565,11 @@ const AziendaView = ({ ecgs, setEcgs }) => {
     setCaricando(false);
     fetch('/api/notify', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ paziente:`Lotto ${batchNome} — ${filesLotto.length} ECG`, origine:"azienda", urgenza:"normale", note:`Azienda: ${nomeAzienda||ME_AZIENDA} | Email referto: ${emailLotto}` }) }).catch(()=>{});
     // Email conferma ricezione al cliente
-    fetch('/api/notify-ricezione', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email: meEmail||emailAccount, nomeAzienda: nomeAzienda||ME_AZIENDA, batchNome, count: filesLotto.length, data: new Date().toLocaleDateString('it-IT') }) }).catch(()=>{});
+    const emailRicezione = meEmail || emailAccount || emailLotto || '';
+    console.log('[notify-ricezione] meEmail:', meEmail, 'emailAccount:', emailAccount, 'emailLotto:', emailLotto, '→ uso:', emailRicezione);
+    if (emailRicezione) {
+      fetch('/api/notify-ricezione', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email: emailRicezione, nomeAzienda: nomeAzienda||ME_AZIENDA, batchNome, count: filesLotto.length, data: new Date().toLocaleDateString('it-IT') }) }).catch(()=>{});
+    }
     // Push gestito dal webhook Supabase (INSERT su ecgs) — nessuna chiamata esplicita
   };
 
