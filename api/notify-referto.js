@@ -37,14 +37,14 @@ export default async function handler(req, res) {
         subject,
         htmlContent: `
           <div style="font-family: Arial, sans-serif; max-width: 620px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
-            <div style="background: linear-gradient(135deg, #1a2640, #2e7cf6); padding: 28px 32px;">
+            <div style="background: linear-gradient(135deg, #255736, #437953); padding: 28px 32px;">
               <h1 style="color: white; margin: 0; font-size: 20px; font-weight: 600;">Ambulatorio Millefonti</h1>
               <p style="color: rgba(255,255,255,0.75); margin: 6px 0 0; font-size: 13px;">Piattaforma di Refertazione ECG</p>
             </div>
             <div style="padding: 32px;">
               ${bodyContent}
               <div style="text-align: center; margin-bottom: 28px;">
-                <a href="${downloadUrl}" style="display: inline-block; background: linear-gradient(135deg, #2e7cf6, #0ea5a0); color: white; padding: 14px 36px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px; letter-spacing: 0.3px;">
+                <a href="${downloadUrl}" style="display: inline-block; background: linear-gradient(135deg, #255736, #437953); color: white; padding: 14px 36px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px; letter-spacing: 0.3px;">
                   ${btnLabel}
                 </a>
               </div>
@@ -55,8 +55,8 @@ export default async function handler(req, res) {
               <p style="color: #a0aec0; font-size: 11px; margin: 0; line-height: 1.6;">
                 Questo è un messaggio automatico generato dalla piattaforma Ambulatorio Millefonti. 
                 Si prega di non rispondere a questa email.<br/>
-                Per assistenza: <a href="mailto:ecg.millefonti@gmail.com" style="color: #2e7cf6;">ecg.millefonti@gmail.com</a> — 
-                <a href="https://ambulatoriomillefonti.it" style="color: #2e7cf6;">ambulatoriomillefonti.it</a>
+                Per assistenza: <a href="mailto:ecg.millefonti@gmail.com" style="color: #255736;">ecg.millefonti@gmail.com</a> — 
+                <a href="https://ambulatoriomillefonti.it" style="color: #255736;">ambulatoriomillefonti.it</a>
               </p>
               <div style="text-align: center; padding: 28px 0 8px;">
                 <img src="https://weearnnmglyjufhpycju.supabase.co/storage/v1/object/public/assets/logo%20definitivo.png" alt="Ambulatorio Millefonti" width="140"

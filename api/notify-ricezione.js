@@ -25,7 +25,7 @@ export default async function handler(req, res) {
         subject: `Ricezione lotto ECG confermata — ${batchNome}`,
         htmlContent: `
           <div style="font-family: Arial, sans-serif; max-width: 620px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
-            <div style="background: linear-gradient(135deg, #1a2640, #2e7cf6); padding: 28px 32px;">
+            <div style="background: linear-gradient(135deg, #255736, #437953); padding: 28px 32px;">
               <h1 style="color: white; margin: 0; font-size: 20px; font-weight: 600;">Ambulatorio Millefonti</h1>
               <p style="color: rgba(255,255,255,0.75); margin: 6px 0 0; font-size: 13px;">Piattaforma di Refertazione ECG</p>
             </div>
@@ -38,7 +38,7 @@ export default async function handler(req, res) {
               </p>
               <p style="color: #4a5568; font-size: 14px; line-height: 1.6; margin: 0 0 28px;">
                 Il materiale è stato acquisito correttamente dalla nostra piattaforma e sarà preso in carico 
-                dal cardiologo nelle prossime ore. Riceverà una notifica via email non appena i referti 
+                nelle prossime ore. Riceverà una notifica via email non appena i referti 
                 saranno pronti per il download.
               </p>
               <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />

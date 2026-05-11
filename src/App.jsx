@@ -1185,7 +1185,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
           pdf.rect(0, 0, pw, ph, "F");
 
           // Header blu
-          pdf.setFillColor(26, 38, 64);
+          pdf.setFillColor(37, 87, 54);
           pdf.rect(0, 0, pw, 18, "F");
           pdf.setTextColor(255, 255, 255);
           pdf.setFontSize(14);
@@ -1196,7 +1196,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
           pdf.text("Referto ECG", pw - 10, 12, { align: "right" });
 
           // Info paziente
-          pdf.setTextColor(26, 38, 64);
+          pdf.setTextColor(37, 87, 54);
           pdf.setFontSize(13);
           pdf.setFont("helvetica", "bold");
           pdf.text(ecg.paziente_nome || ecg.paziente || "", 10, 30);
@@ -1213,7 +1213,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
           // Titolo referto
           pdf.setFontSize(18);
           pdf.setFont("helvetica", "bold");
-          pdf.setTextColor(26, 38, 64);
+          pdf.setTextColor(37, 87, 54);
           pdf.text("REFERTO ECG", 10, 56);
 
           // Crocette
@@ -1258,7 +1258,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
             pdf.text("COMMENTO DEL CARDIOLOGO", 10, cy);
             cy += 7;
             pdf.setFont("helvetica", "normal");
-            pdf.setTextColor(26, 38, 64);
+            pdf.setTextColor(37, 87, 54);
             pdf.setFontSize(11);
             const lines = pdf.splitTextToSize(commento, pw - 20);
             pdf.text(lines, 10, cy);
@@ -1275,18 +1275,18 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
             const fW = 35, fH = fW / (fImg.width / fImg.height);
             pdf.addImage(fCvs.toDataURL("image/png"), "PNG", pw - 10 - fW, ph - 38 - fH, fW, fH);
           }
-          pdf.setFontSize(13); pdf.setFont("helvetica", "bold"); pdf.setTextColor(26, 38, 64);
+          pdf.setFontSize(13); pdf.setFont("helvetica", "bold"); pdf.setTextColor(37, 87, 54);
           pdf.text(nomeFirma, pw - 10, ph - 36, { align: "right" });
           pdf.setDrawColor(26, 38, 64); pdf.setLineWidth(0.3);
           pdf.line(pw - 65, ph - 33, pw - 10, ph - 33);
-          pdf.setFontSize(8); pdf.setFont("helvetica", "normal"); pdf.setTextColor(26, 38, 64);
+          pdf.setFontSize(8); pdf.setFont("helvetica", "normal"); pdf.setTextColor(37, 87, 54);
           pdf.text("Ambulatorio Millefonti", pw - 10, ph - 28, { align: "right" });
           pdf.text("Via Garessio 47 - Torino", pw - 10, ph - 23, { align: "right" });
           pdf.setTextColor(107, 125, 153);
           pdf.text(new Date().toLocaleDateString("it-IT"), pw - 10, ph - 17, { align: "right" });
 
                     // Footer
-          pdf.setFillColor(26, 38, 64);
+          pdf.setFillColor(37, 87, 54);
           pdf.rect(0, ph - 8, pw, 8, "F");
           pdf.setTextColor(255, 255, 255);
           pdf.setFontSize(8);
@@ -1361,7 +1361,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
           const refertoPdf = new jsPDF({ orientation: "landscape", unit: "mm", format: [297, 210] });
           const pw = 297; const ph = 210;
           refertoPdf.setFillColor(255,255,255); refertoPdf.rect(0,0,pw,ph,"F");
-          refertoPdf.setFillColor(26,38,64); refertoPdf.rect(0,0,pw,18,"F");
+          refertoPdf.setFillColor(37,87,54); refertoPdf.rect(0,0,pw,18,"F");
           refertoPdf.setTextColor(255,255,255); refertoPdf.setFontSize(14); refertoPdf.setFont("helvetica","bold");
           refertoPdf.text("AMBULATORIO MILLEFONTI", 10, 12);
           refertoPdf.setFontSize(10); refertoPdf.setFont("helvetica","normal");
@@ -1384,7 +1384,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
           const nb2 = meCardiologo.replace(/^Dott\.\s*Dr\.?/i,"").replace(/^Dr\.?\s*/i,"").replace(/^Dott\.?\s*/i,"").trim();
           refertoPdf.setFontSize(13);refertoPdf.setFont("helvetica","bold");refertoPdf.setTextColor(26,38,64);refertoPdf.text("Dott. "+nb2,pw-10,ph-22,{align:"right"});
           refertoPdf.setFontSize(9);refertoPdf.setFont("helvetica","normal");refertoPdf.setTextColor(107,125,153);refertoPdf.text(new Date().toLocaleDateString("it-IT"),pw-10,ph-15,{align:"right"});
-          refertoPdf.setFillColor(26,38,64);refertoPdf.rect(0,ph-8,pw,8,"F");refertoPdf.setTextColor(255,255,255);refertoPdf.setFontSize(8);refertoPdf.text("Ambulatorio Millefonti — ambulatoriomillefonti.it",pw/2,ph-3,{align:"center"});
+          refertoPdf.setFillColor(37,87,54);refertoPdf.rect(0,ph-8,pw,8,"F");refertoPdf.setTextColor(255,255,255);refertoPdf.setFontSize(8);refertoPdf.text("Ambulatorio Millefonti — ambulatoriomillefonti.it",pw/2,ph-3,{align:"center"});
           // Aggiungi ECG come seconda pagina
           refertoPdf.addPage(isLandscape2?"landscape":"portrait");
           refertoPdf.addImage(imgData,"JPEG",0,0,pdfW,pdfH);
@@ -1660,7 +1660,7 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, pushAbilitato
     const W=210, mar=18;
     const mesiLabel=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
     // ── Header ──
-    pdf.setFillColor(26,38,64); pdf.rect(0,0,W,40,'F');
+    pdf.setFillColor(37,87,54); pdf.rect(0,0,W,40,'F');
     pdf.setTextColor(255,255,255); pdf.setFontSize(18); pdf.setFont('helvetica','bold');
     pdf.text('RENDICONTO COMPENSI ECG', mar, 16);
     pdf.setFontSize(10); pdf.setFont('helvetica','normal');
@@ -1676,7 +1676,7 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, pushAbilitato
     pdf.text(`Totale ECG refertati: ${ecgsMese.length}`, W-mar-4, 53, {align:'right'});
     // ── Intestazione tabella ──
     let y = 70;
-    pdf.setFillColor(26,38,64); pdf.rect(mar, y-6, W-mar*2, 8, 'F');
+    pdf.setFillColor(37,87,54); pdf.rect(mar, y-6, W-mar*2, 8, 'F');
     pdf.setTextColor(255,255,255); pdf.setFontSize(9); pdf.setFont('helvetica','bold');
     pdf.text('AZIENDA / FARMACIA', mar+2, y-0.5);
     pdf.text('STD', 120, y-0.5, {align:'right'});
@@ -1722,7 +1722,7 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, pushAbilitato
     y += 8;
     pdf.setFontSize(11); pdf.setFont('helvetica','bold'); pdf.setTextColor(26,38,64);
     pdf.text('DETTAGLIO ECG REFERTATI', mar, y); y += 6;
-    pdf.setFillColor(26,38,64); pdf.rect(mar, y-5, W-mar*2, 7, 'F');
+    pdf.setFillColor(37,87,54); pdf.rect(mar, y-5, W-mar*2, 7, 'F');
     pdf.setTextColor(255,255,255); pdf.setFontSize(8); pdf.setFont('helvetica','bold');
     pdf.text('PAZIENTE', mar+2, y-0.5);
     pdf.text('DATA', 90, y-0.5);
@@ -2883,7 +2883,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
           const pdf = new jsPDF({ unit:'mm', format:'a4', orientation:'landscape' });
           const W=297, mar=14;
           // Header
-          pdf.setFillColor(26,38,64); pdf.rect(0,0,W,18,'F');
+          pdf.setFillColor(37,87,54); pdf.rect(0,0,W,18,'F');
           pdf.setTextColor(255,255,255); pdf.setFontSize(14); pdf.setFont('helvetica','bold');
           pdf.text('REGISTRO ECG REFERTATI — Ambulatorio Millefonti', mar, 12);
           pdf.setFontSize(8); pdf.setFont('helvetica','normal');
@@ -2894,7 +2894,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
           pdf.text(`Azienda: ${registroFiltroAz==='tutti'?'Tutte':registroFiltroAz}   Cardiologo: ${registroFiltroCard==='tutti'?'Tutti':registroFiltroCard}   Totale: ${filtrati.length} ECG`, mar, 25);
           // Intestazione tabella
           let y = 34;
-          pdf.setFillColor(26,38,64); pdf.rect(mar,y-6,W-mar*2,8,'F');
+          pdf.setFillColor(37,87,54); pdf.rect(mar,y-6,W-mar*2,8,'F');
           pdf.setTextColor(255,255,255); pdf.setFontSize(8); pdf.setFont('helvetica','bold');
           pdf.text('PAZIENTE', mar+2, y-0.5);
           pdf.text('DATA', 68, y-0.5);
@@ -2929,7 +2929,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
             y += 8;
           });
           // Footer
-          pdf.setFillColor(26,38,64); pdf.rect(0,200,W,10,'F');
+          pdf.setFillColor(37,87,54); pdf.rect(0,200,W,10,'F');
           pdf.setTextColor(255,255,255); pdf.setFontSize(7);
           pdf.text('Ambulatorio Millefonti — Registro permanente ECG refertati — dati non contenenti allegati sanitari', W/2, 206, {align:'center'});
           pdf.save(`Registro_ECG_${registroDal}_${registroAl}.pdf`);
