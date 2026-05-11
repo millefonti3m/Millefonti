@@ -1473,18 +1473,6 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
             }
           </div>
         </div>
-        {/* Modalità referto */}
-      <div style={{display:'flex',gap:8,marginBottom:12}}>
-        {[['overlay','🫀 Sul tracciato'],['pagina-separata','📄 Pagina separata']].map(([v,l])=>(
-          <button key={v} onClick={()=>setPosizioneMobile(v)}
-            style={{flex:1,padding:'8px 4px',borderRadius:10,cursor:'pointer',fontWeight:600,fontSize:12,
-              border:`2px solid ${posizioneMobile===v?C.accent:C.border}`,
-              background:posizioneMobile===v?C.accentLight:C.bg,
-              color:posizioneMobile===v?C.accent:C.muted}}>
-            {l}
-          </button>
-        ))}
-      </div>
       {/* Anteprima */}
         {ecgUrl && (
           <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,padding:16,flex:1,boxShadow:C.shadow,overflow:"hidden"}}>
