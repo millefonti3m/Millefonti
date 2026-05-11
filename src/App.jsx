@@ -532,8 +532,8 @@ const AziendaView = ({ ecgs, setEcgs }) => {
     if (!batchNome||filesLotto.length===0||caricando) return;
     setCaricando(true);
     const batchId = `BATCH-${Date.now()}`;
-    const { data: { session } } = await supabase.auth.getSession();
-    const emailAccount = session?.user?.email || '';
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    const emailAccount = authUser?.email || '';
     const nuovi = await Promise.all(Array.from(filesLotto).map(async (file, i) => {
       // Nome paziente = nome file senza estensione
       const nomePaziente = file.name.replace(/\.[^.]+$/, '');
@@ -564,11 +564,9 @@ const AziendaView = ({ ecgs, setEcgs }) => {
     setSent(true);
     setCaricando(false);
     fetch('/api/notify', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ paziente:`Lotto ${batchNome} — ${filesLotto.length} ECG`, origine:"azienda", urgenza:"normale", note:`Azienda: ${nomeAzienda||ME_AZIENDA} | Email referto: ${emailLotto}` }) }).catch(()=>{});
-    // Email conferma ricezione al cliente
-    const emailRicezione = meEmail || emailAccount || emailLotto || '';
-    console.log('[notify-ricezione] meEmail:', meEmail, 'emailAccount:', emailAccount, 'emailLotto:', emailLotto, '→ uso:', emailRicezione);
-    if (emailRicezione) {
-      fetch('/api/notify-ricezione', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email: emailRicezione, nomeAzienda: nomeAzienda||ME_AZIENDA, batchNome, count: filesLotto.length, data: new Date().toLocaleDateString('it-IT') }) }).catch(()=>{});
+    // Email conferma ricezione — usa emailAccount ottenuto da getUser() in cima alla funzione
+    if (emailAccount) {
+      fetch('/api/notify-ricezione', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email: emailAccount, nomeAzienda: nomeAzienda||ME_AZIENDA, batchNome, count: filesLotto.length, data: new Date().toLocaleDateString('it-IT') }) }).catch(()=>{});
     }
     // Push gestito dal webhook Supabase (INSERT su ecgs) — nessuna chiamata esplicita
   };
