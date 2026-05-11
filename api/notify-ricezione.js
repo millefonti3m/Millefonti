@@ -1,6 +1,9 @@
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  const { email, cardiologo, count, batchNome } = req.body;
+  const { email, nomeAzienda, batchNome, count, data } = req.body;
+
+  const LOGO = 'https://weearnnmglyjufhpycju.supabase.co/storage/v1/object/public/assets/logo%20definitivo.png';
+
   try {
     const response = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
@@ -11,7 +14,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         sender: { name: 'Ambulatorio Millefonti', email: 'noreply@ambulatoriomillefonti.it' },
         to: [{ email }],
-        subject: `Nuovi ECG da refertare — ${count} documento${count > 1 ? 'i' : 'o'}`,
+        subject: `Ricezione lotto ECG confermata — ${batchNome}`,
         htmlContent: `
           <div style="font-family: Arial, sans-serif; max-width: 620px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
             <div style="background: linear-gradient(135deg, #1a2640, #2e7cf6); padding: 28px 32px;">
@@ -19,27 +22,29 @@ export default async function handler(req, res) {
               <p style="color: rgba(255,255,255,0.75); margin: 6px 0 0; font-size: 13px;">Piattaforma di Refertazione ECG</p>
             </div>
             <div style="padding: 32px;">
-              <p style="color: #1a2640; font-size: 15px; margin: 0 0 8px;">Gentile Dott. ${cardiologo},</p>
-              <p style="color: #4a5568; font-size: 14px; line-height: 1.6; margin: 0 0 24px;">
-                ${batchNome 
-                  ? `le sono stati assegnati <strong style="color: #1a2640;">${count} ECG</strong> del lotto <strong style="color: #1a2640;">${batchNome}</strong> da refertare.`
-                  : `le ${count > 1 ? 'sono stati assegnati' : 'è stato assegnato'} <strong style="color: #1a2640;">${count} ECG</strong> da refertare.`
-                }
+              <p style="color: #1a2640; font-size: 15px; margin: 0 0 8px;">Gentile Cliente,</p>
+              <p style="color: #4a5568; font-size: 14px; line-height: 1.6; margin: 0 0 20px;">
+                confermiamo la ricezione del lotto <strong style="color: #1a2640;">${batchNome}</strong>, 
+                composto da <strong style="color: #1a2640;">${count} ECG</strong>, 
+                pervenuto in data <strong style="color: #1a2640;">${data}</strong>.
               </p>
-
-              <div style="text-align: center; margin-bottom: 28px;">
-                <a href="https://ambulatoriomillefonti.it" style="display: inline-block; background: linear-gradient(135deg, #2e7cf6, #0ea5a0); color: white; padding: 14px 36px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">
-                  Accedi alla piattaforma →
-                </a>
-              </div>
-
+              <p style="color: #4a5568; font-size: 14px; line-height: 1.6; margin: 0 0 28px;">
+                Il materiale è stato acquisito correttamente dalla nostra piattaforma e sarà preso in carico 
+                dal cardiologo nelle prossime ore. Riceverà una notifica via email non appena i referti 
+                saranno pronti per il download.
+              </p>
               <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
-              <p style="color: #a0aec0; font-size: 11px; margin: 0; line-height: 1.6;">
-                Questo è un messaggio automatico. Si prega di non rispondere a questa email.<br/>
-                Per assistenza: <a href="mailto:ecg.millefonti@gmail.com" style="color: #2e7cf6;">ecg.millefonti@gmail.com</a>
+              <p style="color: #a0aec0; font-size: 11px; margin: 0 0 4px; line-height: 1.6;">
+                Questa è una notifica automatica — si prega di non rispondere a questa email.
+              </p>
+              <p style="color: #1a2640; font-size: 12px; font-weight: 600; margin: 0;">
+                Ambulatorio Millefonti
+              </p>
+              <p style="color: #6b7d99; font-size: 12px; margin: 2px 0 0;">
+                Via Garessio 47 — Torino
               </p>
               <div style="text-align: center; padding: 28px 0 8px;">
-                <img src="https://weearnnmglyjufhpycju.supabase.co/storage/v1/object/public/assets/logo%20definitivo.png" alt="Ambulatorio Millefonti" width="140"
+                <img src="${LOGO}" alt="Ambulatorio Millefonti" width="140"
                      style="display: block; margin: 0 auto;" />
               </div>
             </div>

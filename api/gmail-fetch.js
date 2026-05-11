@@ -222,6 +222,18 @@ export default async function handler(req, res) {
         processed++;
         console.log(`Processata email da ${fromEmail}: ${ecgs.length} ECG lotto "${batchNome}"`);
         // Push gestito dal Supabase webhook — niente duplicati
+        // Email di conferma ricezione al mittente
+        fetch('https://ambulatoriomillefonti.it/api/notify-ricezione', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: fromEmail,
+            nomeAzienda,
+            batchNome,
+            count: ecgs.length,
+            data: new Date().toLocaleDateString('it-IT'),
+          }),
+        }).catch(e => console.error('notify-ricezione error:', e.message));
       }
 
       // Segna come processata nel DB PRIMA di marcare come letta

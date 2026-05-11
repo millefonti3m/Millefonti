@@ -58,6 +58,10 @@ export default async function handler(req, res) {
                 Per assistenza: <a href="mailto:ecg.millefonti@gmail.com" style="color: #2e7cf6;">ecg.millefonti@gmail.com</a> — 
                 <a href="https://ambulatoriomillefonti.it" style="color: #2e7cf6;">ambulatoriomillefonti.it</a>
               </p>
+              <div style="text-align: center; padding: 28px 0 8px;">
+                <img src="https://weearnnmglyjufhpycju.supabase.co/storage/v1/object/public/assets/logo%20definitivo.png" alt="Ambulatorio Millefonti" width="140"
+                     style="display: block; margin: 0 auto;" />
+              </div>
             </div>
           </div>
         `,

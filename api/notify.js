@@ -30,6 +30,10 @@ export default async function handler(req, res) {
               <div style="margin-top: 20px; text-align: center;">
                 <a href="https://ambulatoriomillefonti.it" style="background: #2e7cf6; color: white; padding: 12px 28px; border-radius: 8px; text-decoration: none; font-weight: bold;">Vai alla piattaforma →</a>
               </div>
+              <div style="text-align: center; padding: 28px 0 8px;">
+                <img src="https://weearnnmglyjufhpycju.supabase.co/storage/v1/object/public/assets/logo%20definitivo.png" alt="Ambulatorio Millefonti" width="140"
+                     style="display: block; margin: 0 auto;" />
+              </div>
             </div>
           </div>
         `,
