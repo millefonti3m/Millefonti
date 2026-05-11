@@ -532,8 +532,7 @@ const AziendaView = ({ ecgs, setEcgs }) => {
     if (!batchNome||filesLotto.length===0||caricando) return;
     setCaricando(true);
     const batchId = `BATCH-${Date.now()}`;
-    const { data: { user: authUser } } = await supabase.auth.getUser();
-    const emailAccount = authUser?.email || '';
+    const emailAccount = meEmail;
     const nuovi = await Promise.all(Array.from(filesLotto).map(async (file, i) => {
       // Nome paziente = nome file senza estensione
       const nomePaziente = file.name.replace(/\.[^.]+$/, '');
