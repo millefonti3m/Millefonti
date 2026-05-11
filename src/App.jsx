@@ -1192,7 +1192,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
           pdf.setTextColor(37,87,54); pdf.setFontSize(16); pdf.setFont('helvetica','bold');
           pdf.text('AMBULATORIO MILLEFONTI', 40, 14);
           pdf.setFontSize(9); pdf.setFont('helvetica','normal'); pdf.setTextColor(107,125,153);
-          pdf.text('Via Garessio 47 — Torino', 40, 21);
+          pdf.text('Via Garessio 47 — Torino  |  ambulatoriomillefonti.it', 40, 21);
           pdf.setTextColor(107,125,153); pdf.setFontSize(9);
           pdf.text(new Date().toLocaleDateString('it-IT'), pw-10, 14, {align:'right'});
 
@@ -1252,7 +1252,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
             pdf.setFontSize(10);
             pdf.setFont("helvetica", "bold");
             pdf.setTextColor(107, 125, 153);
-            pdf.text("DESCRIZIONE", 10, cy);
+            pdf.text("COMMENTO DEL CARDIOLOGO", 10, cy);
             cy += 7;
             pdf.setFont("helvetica", "normal");
             pdf.setTextColor(37, 87, 54);
@@ -1287,7 +1287,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
           pdf.rect(0, ph - 8, pw, 8, "F");
           pdf.setTextColor(255, 255, 255);
           pdf.setFontSize(8);
-          pdf.text("Ambulatorio Millefonti — ambulatoriomillefonti.it — Solo per riferimento clinico", pw / 2, ph - 3, { align: "center" });
+          pdf.text("Ambulatorio Millefonti — ambulatoriomillefonti.it", pw / 2, ph - 3, { align: "center" });
 
           // ── PAGINA 2: ECG ORIGINALE ──
           pdf.addPage(isLandscape ? "landscape" : "portrait");
@@ -1365,7 +1365,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
           refertoPdf.setTextColor(37,87,54); refertoPdf.setFontSize(16); refertoPdf.setFont('helvetica','bold');
           refertoPdf.text('AMBULATORIO MILLEFONTI',40,14);
           refertoPdf.setFontSize(9); refertoPdf.setFont('helvetica','normal'); refertoPdf.setTextColor(107,125,153);
-          refertoPdf.text('Via Garessio 47 — Torino',40,21);
+          refertoPdf.text('Via Garessio 47 — Torino  |  ambulatoriomillefonti.it',40,21);
           refertoPdf.text(new Date().toLocaleDateString('it-IT'),pw-10,14,{align:'right'});
           refertoPdf.setFillColor(37,87,54); refertoPdf.rect(0,36,pw,1.5,'F');
           refertoPdf.setFontSize(11); refertoPdf.setFont('helvetica','bold'); refertoPdf.setTextColor(37,87,54);
@@ -1383,7 +1383,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
             refertoPdf.setTextColor(checked?26:107,checked?38:125,checked?64:153);
             refertoPdf.setFontSize(11);refertoPdf.setFont('helvetica',checked?'bold':'normal');refertoPdf.text(label,17,cy2-1);cy2+=10;
           });
-          if(commento.trim()){cy2+=4;refertoPdf.setDrawColor(220,229,240);refertoPdf.setLineWidth(0.5);refertoPdf.line(10,cy2,pw-10,cy2);cy2+=8;refertoPdf.setFontSize(10);refertoPdf.setFont('helvetica','bold');refertoPdf.setTextColor(107,125,153);refertoPdf.text('DESCRIZIONE',10,cy2);cy2+=7;refertoPdf.setFont('helvetica','normal');refertoPdf.setTextColor(37,87,54);refertoPdf.setFontSize(11);refertoPdf.text(refertoPdf.splitTextToSize(commento,pw-20),10,cy2);}
+          if(commento.trim()){cy2+=4;refertoPdf.setDrawColor(220,229,240);refertoPdf.setLineWidth(0.5);refertoPdf.line(10,cy2,pw-10,cy2);cy2+=8;refertoPdf.setFontSize(10);refertoPdf.setFont('helvetica','bold');refertoPdf.setTextColor(107,125,153);refertoPdf.text('COMMENTO DEL CARDIOLOGO',10,cy2);cy2+=7;refertoPdf.setFont('helvetica','normal');refertoPdf.setTextColor(37,87,54);refertoPdf.setFontSize(11);refertoPdf.text(refertoPdf.splitTextToSize(commento,pw-20),10,cy2);}
           const nb2=meCardiologo.replace(/^Dott\.\s*Dr\.?/i,'').replace(/^Dr\.?\s*/i,'').replace(/^Dott\.?\s*/i,'').trim();
           if(window.__millefonti_firma){const fCR=document.createElement('canvas');fCR.width=window.__millefonti_firma.width;fCR.height=window.__millefonti_firma.height;fCR.getContext('2d').drawImage(window.__millefonti_firma,0,0);const fW2=35,fH2=fW2/(window.__millefonti_firma.width/window.__millefonti_firma.height);refertoPdf.addImage(fCR.toDataURL('image/png'),'PNG',pw-10-fW2,ph-38-fH2,fW2,fH2);}
           refertoPdf.setFontSize(13);refertoPdf.setFont('helvetica','bold');refertoPdf.setTextColor(37,87,54);refertoPdf.text('Dott. '+nb2,pw-10,ph-36,{align:'right'});
@@ -1393,7 +1393,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
           refertoPdf.text('Via Garessio 47 - Torino',pw-10,ph-23,{align:'right'});
           refertoPdf.setTextColor(107,125,153);refertoPdf.text(new Date().toLocaleDateString('it-IT'),pw-10,ph-17,{align:'right'});
           refertoPdf.setFillColor(37,87,54);refertoPdf.rect(0,ph-8,pw,8,'F');refertoPdf.setTextColor(255,255,255);refertoPdf.setFontSize(8);
-          refertoPdf.text('Ambulatorio Millefonti — ambulatoriomillefonti.it — Solo per riferimento clinico',pw/2,ph-3,{align:'center'});
+          refertoPdf.text('Ambulatorio Millefonti — ambulatoriomillefonti.it',pw/2,ph-3,{align:'center'});
           refertoPdf.addPage(isLandscape2?'landscape':'portrait');
           refertoPdf.addImage(imgData,'JPEG',0,0,pdfW,pdfH);
           if(ecg.batch_id){setPdfBlob(refertoPdf.output('blob'));}else{refertoPdf.save(`Referto_${ecg.paziente.replace(/[^a-zA-Z]/g,'_')}_${new Date().toISOString().slice(0,10)}.pdf`);}
@@ -3677,7 +3677,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
         pdf2.setTextColor(37,87,54); pdf2.setFontSize(16); pdf2.setFont('helvetica','bold');
         pdf2.text('AMBULATORIO MILLEFONTI',40,14);
         pdf2.setFontSize(9); pdf2.setFont('helvetica','normal'); pdf2.setTextColor(107,125,153);
-        pdf2.text('Via Garessio 47 — Torino',40,21);
+        pdf2.text('Via Garessio 47 — Torino  |  ambulatoriomillefonti.it',40,21);
         pdf2.text(new Date().toLocaleDateString('it-IT'),pw2-10,14,{align:'right'});
         pdf2.setFillColor(37,87,54); pdf2.rect(0,36,pw2,1.5,'F');
         pdf2.setFontSize(11); pdf2.setFont('helvetica','bold'); pdf2.setTextColor(37,87,54);
@@ -3698,7 +3698,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
         });
         if(commento&&commento.trim()){
           cy2+=4;pdf2.setDrawColor(220,229,240);pdf2.setLineWidth(0.5);pdf2.line(10,cy2,pw2-10,cy2);cy2+=8;
-          pdf2.setFontSize(10);pdf2.setFont('helvetica','bold');pdf2.setTextColor(107,125,153);pdf2.text('DESCRIZIONE',10,cy2);cy2+=7;
+          pdf2.setFontSize(10);pdf2.setFont('helvetica','bold');pdf2.setTextColor(107,125,153);pdf2.text('COMMENTO DEL CARDIOLOGO',10,cy2);cy2+=7;
           pdf2.setFont('helvetica','normal');pdf2.setTextColor(37,87,54);pdf2.setFontSize(11);
           pdf2.text(pdf2.splitTextToSize(commento,pw2-20),10,cy2);
         }
@@ -3718,7 +3718,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
         pdf2.setTextColor(107,125,153);pdf2.text(new Date().toLocaleDateString('it-IT'),pw2-10,ph2-17,{align:'right'});
         pdf2.setFillColor(37,87,54);pdf2.rect(0,ph2-8,pw2,8,'F');
         pdf2.setTextColor(255,255,255);pdf2.setFontSize(8);
-        pdf2.text('Ambulatorio Millefonti — ambulatoriomillefonti.it — Solo per riferimento clinico',pw2/2,ph2-3,{align:'center'});
+        pdf2.text('Ambulatorio Millefonti — ambulatoriomillefonti.it',pw2/2,ph2-3,{align:'center'});
         // Pagina 2: ECG
         pdf2.addPage(isLandscape?'landscape':'portrait');
         const p2w2=isLandscape?297:210, p2h2=isLandscape?210:297;
