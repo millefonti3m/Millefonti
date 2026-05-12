@@ -822,7 +822,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
         const ab = await f.arrayBuffer();
         const pdfDoc = await pdfjsLib.getDocument({ data: ab }).promise;
         const page = await pdfDoc.getPage(1);
-        const vp = page.getViewport({ scale: 1.2, rotation: page.rotate });
+        const vp = page.getViewport({ scale: 1.2 });
         const cv = document.createElement('canvas');
         cv.width = vp.width; cv.height = vp.height;
         const ctx2 = cv.getContext('2d');
@@ -875,7 +875,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
               const ab = await data.arrayBuffer();
               const pdfDoc = await pdfjsLib.getDocument({ data: ab }).promise;
               const page = await pdfDoc.getPage(1);
-              const vp = page.getViewport({ scale: 1.2, rotation: page.rotate });
+              const vp = page.getViewport({ scale: 1.2 });
               const cv = document.createElement('canvas');
               cv.width = vp.width; cv.height = vp.height;
               const ctx2 = cv.getContext('2d');
@@ -1334,7 +1334,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
         const arrayBuffer = await ecgFile.arrayBuffer();
         const pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
         const page = await pdfDoc.getPage(1);
-        const viewport = page.getViewport({ scale: 2.0, rotation: page.rotate });
+        const viewport = page.getViewport({ scale: 2.0 });
         const cvs = document.createElement("canvas");
         cvs.width = viewport.width; cvs.height = viewport.height;
         const ctx = cvs.getContext("2d");
@@ -1346,12 +1346,28 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
           disegnaOverlay(ctx, cvs.width, cvs.height);
         }
         // Salva come PDF
-        const ratio = cvs.width / cvs.height;
+        // Applica rotazione utente (bottoni ↺ ↻) al canvas per pagina-separata
+        let finalCvs = cvs;
+        if (rotation !== 0 && posizione === "pagina-separata") {
+          const rad = (rotation * Math.PI) / 180;
+          const rotCvs = document.createElement("canvas");
+          if (rotation === 90 || rotation === 270) {
+            rotCvs.width = cvs.height; rotCvs.height = cvs.width;
+          } else {
+            rotCvs.width = cvs.width; rotCvs.height = cvs.height;
+          }
+          const rCtx = rotCvs.getContext("2d");
+          rCtx.translate(rotCvs.width/2, rotCvs.height/2);
+          rCtx.rotate(rad);
+          rCtx.drawImage(cvs, -cvs.width/2, -cvs.height/2);
+          finalCvs = rotCvs;
+        }
+        const ratio = finalCvs.width / finalCvs.height;
         const isLandscape2 = ratio > 1;
         const pdfW = isLandscape2 ? 297 : 210;
         const pdfH = pdfW / ratio;
         const finalPdf = new jsPDF({ orientation: isLandscape2?"landscape":"portrait", unit:"mm", format:[pdfW, pdfH] });
-        const imgData = cvs.toDataURL("image/jpeg", 0.78);
+        const imgData = finalCvs.toDataURL("image/jpeg", 0.78);
         finalPdf.addImage(imgData, "JPEG", 0, 0, pdfW, pdfH);
         if (posizione === "pagina-separata") {
           const refertoPdf = new jsPDF({ orientation: "landscape", unit: "mm", format: [297, 210] });
@@ -3592,7 +3608,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
               const ab = await data.arrayBuffer();
               const pdfDoc = await pdfjsLib.getDocument({ data: ab }).promise;
               const page = await pdfDoc.getPage(1);
-              const vp = page.getViewport({ scale: 1.5, rotation: page.rotate });
+              const vp = page.getViewport({ scale: 1.5 });
               const cv = document.createElement('canvas');
               cv.width = vp.width; cv.height = vp.height;
               const ctx2 = cv.getContext('2d');
@@ -3666,7 +3682,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
       const ab = await ecgFile.arrayBuffer();
       const pdfDoc = await pdfjsLib.getDocument({ data: ab }).promise;
       const page = await pdfDoc.getPage(1);
-      const vp = page.getViewport({ scale: 2.0, rotation: page.rotate });
+      const vp = page.getViewport({ scale: 2.0 });
       const cv = document.createElement('canvas');
       cv.width = vp.width; cv.height = vp.height;
       const ctx = cv.getContext('2d');
