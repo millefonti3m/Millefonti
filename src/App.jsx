@@ -3691,10 +3691,26 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
       await page.render({ canvasContext: ctx, viewport: vp }).promise;
 
       // Biforca in base alla posizione scelta
+      // Applica rotazione utente (↺↻) al canvas
+      let finalCvMobile = cv;
+      if (rotationMobile !== 0) {
+        const rad = (rotationMobile * Math.PI) / 180;
+        const rotCv = document.createElement('canvas');
+        if (rotationMobile === 90 || rotationMobile === 270) {
+          rotCv.width = cv.height; rotCv.height = cv.width;
+        } else {
+          rotCv.width = cv.width; rotCv.height = cv.height;
+        }
+        const rCtx2 = rotCv.getContext('2d');
+        rCtx2.translate(rotCv.width/2, rotCv.height/2);
+        rCtx2.rotate(rad);
+        rCtx2.drawImage(cv, -cv.width/2, -cv.height/2);
+        finalCvMobile = rotCv;
+      }
       let pdfBlob2 = null;
       if (posizioneMobile === 'pagina-separata') {
-        // ── PAGINA SEPARATA MOBILE (identica al desktop) ──
-        const W = cv.width, H = cv.height;
+        // ── PAGINA SEPARATA MOBILE ──
+        const W = finalCvMobile.width, H = finalCvMobile.height;
         const ratio = W/H, isLandscape = ratio > 1;
         const pdf2 = new jsPDF({ orientation:'landscape', unit:'mm', format:[297,210] });
         const pw2=297, ph2=210;
@@ -3754,7 +3770,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
         pdf2.addPage(isLandscape?'landscape':'portrait');
         const p2w2=isLandscape?297:210, p2h2=isLandscape?210:297;
         let dW2=p2w2, dH2=dW2/ratio; if(dH2>p2h2){dH2=p2h2;dW2=dH2*ratio;}
-        pdf2.addImage(cv.toDataURL('image/jpeg',0.78),'JPEG',(p2w2-dW2)/2,(p2h2-dH2)/2,dW2,dH2);
+        pdf2.addImage(finalCvMobile.toDataURL('image/jpeg',0.78),'JPEG',(p2w2-dW2)/2,(p2h2-dH2)/2,dW2,dH2);
         pdfBlob2 = pdf2.output('blob');
       } else {
 
