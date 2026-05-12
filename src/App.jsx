@@ -1334,7 +1334,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
         const arrayBuffer = await ecgFile.arrayBuffer();
         const pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
         const page = await pdfDoc.getPage(1);
-        const viewport = page.getViewport({ scale: 2.0 });
+        const viewport = page.getViewport({ scale: 2.0, rotation: page.rotate });
         const cvs = document.createElement("canvas");
         cvs.width = viewport.width; cvs.height = viewport.height;
         const ctx = cvs.getContext("2d");
@@ -3666,7 +3666,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
       const ab = await ecgFile.arrayBuffer();
       const pdfDoc = await pdfjsLib.getDocument({ data: ab }).promise;
       const page = await pdfDoc.getPage(1);
-      const vp = page.getViewport({ scale: 2.0 });
+      const vp = page.getViewport({ scale: 2.0, rotation: page.rotate });
       const cv = document.createElement('canvas');
       cv.width = vp.width; cv.height = vp.height;
       const ctx = cv.getContext('2d');
