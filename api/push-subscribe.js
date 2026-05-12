@@ -11,9 +11,15 @@ export default async function handler(req, res) {
   if (!subscription || !user_id) return res.status(400).json({ error: 'Dati mancanti' });
 
   try {
-    // Rimuovi vecchie subscription per questo utente e inserisci la nuova
-    await supabase.from('push_subscriptions').delete().eq('user_id', user_id);
-    await supabase.from('push_subscriptions').insert({ user_id, cardiologo_nome, subscription });
+    // UPSERT atomico: aggiorna se esiste, inserisce se non esiste
+    // onConflict: 'user_id' richiede unique constraint su user_id nella tabella
+    const { error } = await supabase
+      .from('push_subscriptions')
+      .upsert(
+        { user_id, cardiologo_nome, subscription },
+        { onConflict: 'user_id' }
+      );
+    if (error) throw error;
     return res.status(200).json({ success: true });
   } catch(e) {
     return res.status(500).json({ error: e.message });
