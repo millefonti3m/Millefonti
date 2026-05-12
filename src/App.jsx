@@ -1346,7 +1346,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
           disegnaOverlay(ctx, cvs.width, cvs.height);
         }
         // Salva come PDF
-        // Applica rotazione utente (bottoni ↺ ↻) al canvas per pagina-separata
+        // Applica rotazione utente (↺↻) al canvas per pagina-separata
         let finalCvs = cvs;
         if (rotation !== 0 && posizione === "pagina-separata") {
           const rad = (rotation * Math.PI) / 180;
@@ -3568,6 +3568,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
   const [generating, setGenerating] = useState(false);
   const [previewDataUrl, setPreviewDataUrl] = useState(null);
   const [zoom, setZoom] = useState(1);
+  const [rotationMobile, setRotationMobile] = useState(0);
   const [chiudendo, setChiudendo] = useState(false);
   const [posizioneMobile, setPosizioneMobile] = useState('overlay');
 
@@ -3624,7 +3625,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
 
   const resetReferta = () => {
     setCrocette({ limiti:false, correlare:false, approfondire:false, visita:false, urgente:false });
-    setCommento(''); setEcgFile(null); setEcgUrl(null); setPreviewDataUrl(null); setZoom(1);
+    setCommento(''); setEcgFile(null); setEcgUrl(null); setPreviewDataUrl(null); setZoom(1); setRotationMobile(0);
   };
 
   const apriEcg = (ecg) => {
@@ -4013,11 +4014,13 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
           <div style={{ display:'flex', gap:6 }}>
             <button onClick={()=>setZoom(z=>Math.max(0.5,z-0.25))} style={{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:8, padding:'4px 10px', cursor:'pointer', fontWeight:700 }}>−</button>
             <button onClick={()=>setZoom(z=>Math.min(3,z+0.25))} style={{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:8, padding:'4px 10px', cursor:'pointer', fontWeight:700 }}>+</button>
+            <button onClick={()=>setRotationMobile(r=>(r-90+360)%360)} style={{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:8, padding:'4px 10px', cursor:'pointer', fontSize:14 }}>↺</button>
+            <button onClick={()=>setRotationMobile(r=>(r+90)%360)} style={{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:8, padding:'4px 10px', cursor:'pointer', fontSize:14 }}>↻</button>
           </div>
         </div>
         <div style={{ overflow:'auto', maxHeight:'38vh', background:'#f5f5f5' }}>
           {previewDataUrl
-            ? <img src={previewDataUrl} alt="ECG" style={{ width:`${zoom*100}%`, display:'block' }} />
+            ? <img src={previewDataUrl} alt="ECG" style={{ width:rotationMobile===90||rotationMobile===270?`${zoom*60}%`:`${zoom*100}%`, display:'block', transform:`rotate(${rotationMobile}deg)`, transformOrigin:'center center', margin:rotationMobile===90||rotationMobile===270?'15% auto':'0' }} />
             : <div style={{ padding:40, textAlign:'center', color:C.muted }}>⏳ Caricamento...</div>
           }
         </div>
