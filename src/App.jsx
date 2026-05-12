@@ -1395,7 +1395,11 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
           refertoPdf.setFillColor(37,87,54);refertoPdf.rect(0,ph-8,pw,8,'F');refertoPdf.setTextColor(255,255,255);refertoPdf.setFontSize(8);
           refertoPdf.text('Ambulatorio Millefonti — ambulatoriomillefonti.it',pw/2,ph-3,{align:'center'});
           refertoPdf.addPage(isLandscape2?'landscape':'portrait');
-          refertoPdf.addImage(imgData,'JPEG',0,0,pdfW,pdfH);
+          const p2wR = isLandscape2 ? 297 : 210;
+          const p2hR = isLandscape2 ? 210 : 297;
+          let drawWR = p2wR; let drawHR = drawWR / ratio;
+          if (drawHR > p2hR) { drawHR = p2hR; drawWR = drawHR * ratio; }
+          refertoPdf.addImage(imgData,'JPEG',(p2wR-drawWR)/2,(p2hR-drawHR)/2,drawWR,drawHR);
           if(ecg.batch_id){setPdfBlob(refertoPdf.output('blob'));}else{refertoPdf.save(`Referto_${ecg.paziente.replace(/[^a-zA-Z]/g,'_')}_${new Date().toISOString().slice(0,10)}.pdf`);}
         } else {
           if (ecg.batch_id) {
