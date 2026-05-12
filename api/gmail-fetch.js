@@ -231,7 +231,7 @@ export default async function handler(req, res) {
             batch_id: batchId,
             batch_nome: batchNome,
             file_ecg_url: storageFileName,
-            email_destinatario: fromEmail,
+            email_destinatario: matchUser?.email || fromEmail, // sempre email principale account, non email inviante
           });
         }
       }
