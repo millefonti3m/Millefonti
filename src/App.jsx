@@ -1864,7 +1864,7 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, pushAbilitato
             <div style={{ color:C.muted, fontSize:12, fontWeight:600 }}>{showCompensi ? '💰 Compensi' : 'Guadagni — mese corrente'}</div>
             <div style={{display:'flex',gap:4,alignItems:'center'}}>
               <button onClick={()=>setShowCompensi(p=>!p)} style={{background:showCompensi?'#e8f9f4':'rgba(255,255,255,0.6)',border:`1px solid ${showCompensi?C.teal:C.border}`,borderRadius:8,padding:"4px 10px",cursor:"pointer",fontSize:12,color:showCompensi?C.teal:C.muted,fontWeight:600}}>💰 {showCompensi?'Chiudi':'Compensi'}</button>
-              {!pushAbilitato ? <button onClick={registraPush} style={{background:'#fff8e1',border:'1px solid #f59e0b',borderRadius:8,padding:"4px 10px",cursor:"pointer",fontSize:13}} title="Abilita notifiche push">🔔</button> : <span style={{fontSize:14}} title="Notifiche attive">🔔✓</span>}
+              <button onClick={registraPush} style={{background:pushAbilitato?'#e6f9f1':'#fff8e1',border:`1px solid ${pushAbilitato?'#1aaa6e':'#f59e0b'}`,borderRadius:8,padding:"4px 10px",cursor:"pointer",fontSize:13}} title={pushAbilitato?"Notifiche attive — clicca per rinnovare":"Abilita notifiche push"}>{pushAbilitato?"🔔✓":"🔔"}</button>
               <button onClick={()=>setShowProfilo(p=>!p)} style={{background:showProfilo?"rgba(46,124,246,0.1)":"rgba(255,255,255,0.6)",border:`1px solid ${showProfilo?C.accent:C.border}`,borderRadius:8,padding:"4px 10px",cursor:"pointer",fontSize:12,color:showProfilo?C.accent:C.muted,fontWeight:600}}>⚙️</button>
             </div>
           </div>
@@ -3856,7 +3856,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
             <div style={{ fontSize:13, opacity:0.8, marginTop:2 }}>{mieiEcgs.filter(e=>e.stato==='in_attesa').length} ECG da refertare</div>
           </div>
           <div style={{display:'flex',gap:6,marginTop:4,alignItems:'center'}}>
-            {!pushAbilitato ? <button onClick={registraPush} style={{background:'rgba(255,220,0,0.25)',border:'1px solid rgba(255,220,0,0.5)',color:'white',borderRadius:10,padding:'8px 12px',cursor:'pointer',fontSize:16}} title="Abilita notifiche">🔔</button> : <span style={{fontSize:16,padding:'6px 4px'}} title="Notifiche attive">🔔✓</span>}
+            <button onClick={registraPush} style={{background:pushAbilitato?'rgba(26,170,110,0.25)':'rgba(255,220,0,0.25)',border:`1px solid ${pushAbilitato?'rgba(26,170,110,0.5)':'rgba(255,220,0,0.5)'}`,color:'white',borderRadius:10,padding:'8px 12px',cursor:'pointer',fontSize:16}} title={pushAbilitato?"Notifiche attive — tocca per rinnovare":"Abilita notifiche"}>{pushAbilitato?"🔔✓":"🔔"}</button>
             <button onClick={onLogout} style={{ background:'rgba(255,255,255,0.15)', border:'none', color:'white', borderRadius:10, padding:'8px 14px', cursor:'pointer', fontSize:13, fontWeight:600 }}>Esci</button>
           </div>
         </div>
