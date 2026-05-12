@@ -24,9 +24,23 @@ export default async function handler(req, res) {
     count = 1;
     console.log('push-lotto: webhook Supabase INSERT, batch_id:', record.batch_id);
 
-    // Nota: non facciamo deduplicazione per batch_id perché tutti gli ECG
-    // vengono inseriti atomicamente e il conteggio sarebbe sempre > 1.
-    // Il push tag 'ecg-notification' garantisce che il device mostri una sola notifica.
+    // Deduplicazione: manda push solo per il primo ECG del batch
+    // Cerca l'ECG con id minimo (alfabetico) nello stesso batch
+    if (record.batch_id) {
+      const { data: firstEcg } = await supabase
+        .from('ecgs')
+        .select('id')
+        .eq('batch_id', record.batch_id)
+        .order('id', { ascending: true })
+        .limit(1)
+        .single();
+
+      if (firstEcg && firstEcg.id !== record.id) {
+        console.log('push-lotto: deduplicato, non è il primo ECG del batch');
+        return res.status(200).json({ sent: 0, msg: 'Deduplicato' });
+      }
+    }
+
   } else {
     // Chiamata diretta (es. da inviaLotto)
     batchNome = req.body?.batchNome || 'Nuovo lotto';
