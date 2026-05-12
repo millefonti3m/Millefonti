@@ -3569,8 +3569,11 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
   const [previewDataUrl, setPreviewDataUrl] = useState(null);
   const [zoom, setZoom] = useState(1);
   const [rotationMobile, setRotationMobile] = useState(0);
+  const rotationMobileRef = useRef(0);
   const [chiudendo, setChiudendo] = useState(false);
   const [posizioneMobile, setPosizioneMobile] = useState('overlay');
+
+  useEffect(() => { rotationMobileRef.current = rotationMobile; }, [rotationMobile]);
 
   // Preload logo per pagina separata
   useEffect(() => {
@@ -3692,11 +3695,12 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
 
       // Biforca in base alla posizione scelta
       // Applica rotazione utente (↺↻) al canvas
+      const rotVal = rotationMobileRef.current;
       let finalCvMobile = cv;
-      if (rotationMobile !== 0) {
-        const rad = (rotationMobile * Math.PI) / 180;
+      if (rotVal !== 0) {
+        const rad = (rotVal * Math.PI) / 180;
         const rotCv = document.createElement('canvas');
-        if (rotationMobile === 90 || rotationMobile === 270) {
+        if (rotVal === 90 || rotVal === 270) {
           rotCv.width = cv.height; rotCv.height = cv.width;
         } else {
           rotCv.width = cv.width; rotCv.height = cv.height;
