@@ -802,6 +802,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
   const [pdfBlob, setPdfBlob] = useState(null);
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
+  const [numPages, setNumPages] = useState(1);
   const [confirming, setConfirming] = useState(false);
   const canvasRef = useRef(null);
   const previewCanvasRef = useRef(null);
@@ -821,6 +822,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
         pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
         const ab = await f.arrayBuffer();
         const pdfDoc = await pdfjsLib.getDocument({ data: ab }).promise;
+        if (!cancelled) setNumPages(pdfDoc.numPages);
         const page = await pdfDoc.getPage(1);
         const vp = page.getViewport({ scale: 1.2 });
         const cv = document.createElement('canvas');
@@ -845,6 +847,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
     setEcgType(null);
     setPreviewDataUrl(null);
     setRotation(0);
+    setNumPages(1);
     setGenerato(false);
     setPdfBlob(null);
     setCrocette({ limiti:false, correlare:false, approfondire:false, visita:false, urgente:false });
@@ -1410,13 +1413,21 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
           refertoPdf.setTextColor(107,125,153);refertoPdf.text(new Date().toLocaleDateString('it-IT'),pw-10,ph-17,{align:'right'});
           refertoPdf.setFillColor(37,87,54);refertoPdf.rect(0,ph-8,pw,8,'F');refertoPdf.setTextColor(255,255,255);refertoPdf.setFontSize(8);
           refertoPdf.text('Ambulatorio Millefonti — ambulatoriomillefonti.it',pw/2,ph-3,{align:'center'});
-          refertoPdf.addPage(isLandscape2?'landscape':'portrait');
-          const p2wR = isLandscape2 ? 297 : 210;
-          const p2hR = isLandscape2 ? 210 : 297;
-          let drawWR = p2wR; let drawHR = drawWR / ratio;
-          if (drawHR > p2hR) { drawHR = p2hR; drawWR = drawHR * ratio; }
-          refertoPdf.addImage(imgData,'JPEG',(p2wR-drawWR)/2,(p2hR-drawHR)/2,drawWR,drawHR);
-          if(ecg.batch_id){setPdfBlob(refertoPdf.output('blob'));}else{refertoPdf.save(`Referto_${ecg.paziente.replace(/[^a-zA-Z]/g,'_')}_${new Date().toISOString().slice(0,10)}.pdf`);}
+          // Merge referto + tutte le pagine originali (pdf-lib, nessun canvas)
+          const { PDFDocument } = await import('pdf-lib');
+          const mergedDoc = await PDFDocument.create();
+          const refertoSrc = await PDFDocument.load(refertoPdf.output('arraybuffer'));
+          const [refertoPageCopied] = await mergedDoc.copyPages(refertoSrc, [0]);
+          mergedDoc.addPage(refertoPageCopied);
+          const originalSrc = await PDFDocument.load(arrayBuffer);
+          const copiedPages = await mergedDoc.copyPages(originalSrc, originalSrc.getPageIndices());
+          copiedPages.forEach(p => mergedDoc.addPage(p));
+          const mergedBytes = await mergedDoc.save();
+          const mergedBlob = new Blob([mergedBytes], { type: 'application/pdf' });
+          if(ecg.batch_id){setPdfBlob(mergedBlob);}else{
+            const urlM=URL.createObjectURL(mergedBlob);
+            const aM=document.createElement('a');aM.href=urlM;aM.download=`Referto_${ecg.paziente.replace(/[^a-zA-Z]/g,'_')}_${new Date().toISOString().slice(0,10)}.pdf`;aM.click();URL.revokeObjectURL(urlM);
+          }
         } else {
           if (ecg.batch_id) {
             setPdfBlob(finalPdf.output("blob"));
@@ -3570,6 +3581,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
   const [zoom, setZoom] = useState(1);
   const [rotationMobile, setRotationMobile] = useState(0);
   const rotationMobileRef = useRef(0);
+  const [numPagesMobile, setNumPagesMobile] = useState(1);
   const [chiudendo, setChiudendo] = useState(false);
   const [posizioneMobile, setPosizioneMobile] = useState('overlay');
 
@@ -3611,6 +3623,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
               pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
               const ab = await data.arrayBuffer();
               const pdfDoc = await pdfjsLib.getDocument({ data: ab }).promise;
+              if (!cancelled) setNumPagesMobile(pdfDoc.numPages);
               const page = await pdfDoc.getPage(1);
               const vp = page.getViewport({ scale: 1.5 });
               const cv = document.createElement('canvas');
@@ -3628,7 +3641,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
 
   const resetReferta = () => {
     setCrocette({ limiti:false, correlare:false, approfondire:false, visita:false, urgente:false });
-    setCommento(''); setEcgFile(null); setEcgUrl(null); setPreviewDataUrl(null); setZoom(1); setRotationMobile(0);
+    setCommento(''); setEcgFile(null); setEcgUrl(null); setPreviewDataUrl(null); setZoom(1); setRotationMobile(0); setNumPagesMobile(1);
   };
 
   const apriEcg = (ecg) => {
@@ -3770,12 +3783,17 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
         pdf2.setFillColor(37,87,54);pdf2.rect(0,ph2-8,pw2,8,'F');
         pdf2.setTextColor(255,255,255);pdf2.setFontSize(8);
         pdf2.text('Ambulatorio Millefonti — ambulatoriomillefonti.it',pw2/2,ph2-3,{align:'center'});
-        // Pagina 2: ECG
-        pdf2.addPage(isLandscape?'landscape':'portrait');
-        const p2w2=isLandscape?297:210, p2h2=isLandscape?210:297;
-        let dW2=p2w2, dH2=dW2/ratio; if(dH2>p2h2){dH2=p2h2;dW2=dH2*ratio;}
-        pdf2.addImage(finalCvMobile.toDataURL('image/jpeg',0.78),'JPEG',(p2w2-dW2)/2,(p2h2-dH2)/2,dW2,dH2);
-        pdfBlob2 = pdf2.output('blob');
+        // Merge referto + tutte le pagine originali con pdf-lib (nessun canvas)
+        const { PDFDocument: PDFDoc2 } = await import('pdf-lib');
+        const mergedDoc2 = await PDFDoc2.create();
+        const refertoSrc2 = await PDFDoc2.load(pdf2.output('arraybuffer'));
+        const [refertoPageM] = await mergedDoc2.copyPages(refertoSrc2, [0]);
+        mergedDoc2.addPage(refertoPageM);
+        const originalSrc2 = await PDFDoc2.load(ab);
+        const copiedPages2 = await mergedDoc2.copyPages(originalSrc2, originalSrc2.getPageIndices());
+        copiedPages2.forEach(p => mergedDoc2.addPage(p));
+        const mergedBytes2 = await mergedDoc2.save();
+        pdfBlob2 = new Blob([mergedBytes2], { type: 'application/pdf' });
       } else {
 
       // Overlay identico al desktop
@@ -4036,6 +4054,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
             <button onClick={()=>setZoom(z=>Math.min(3,z+0.25))} style={{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:8, padding:'4px 10px', cursor:'pointer', fontWeight:700 }}>+</button>
             <button onClick={()=>setRotationMobile(r=>(r-90+360)%360)} style={{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:8, padding:'4px 10px', cursor:'pointer', fontSize:14 }}>↺</button>
             <button onClick={()=>setRotationMobile(r=>(r+90)%360)} style={{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:8, padding:'4px 10px', cursor:'pointer', fontSize:14 }}>↻</button>
+            {ecgUrl && ecgType==='pdf' && <a href={ecgUrl} target="_blank" rel="noreferrer" style={{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:8, padding:'4px 10px', fontSize:12, color:C.accent, textDecoration:'none', fontWeight:600 }}>🔍 Tab</a>}
           </div>
         </div>
         <div style={{ overflow:'auto', maxHeight:'38vh', background:'#f5f5f5' }}>
