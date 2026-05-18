@@ -1604,7 +1604,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
           <div style={{color:C.textSoft,fontSize:12,marginBottom:14}}>Clicca per segnare come refertato.</div>
           <button onClick={confermaSend} disabled={confirming}
             style={{background:confirming?C.muted:C.green,color:"white",border:"none",borderRadius:10,padding:"12px 0",cursor:confirming?"wait":"pointer",fontWeight:700,fontSize:14,width:"100%",boxShadow:confirming?"none":`0 4px 16px ${C.green}44`}}>
-            {confirming ? "⏳ Invio in corso..." : `Conferma refertazione +${ecg.origine==="azienda"?10:15}€`}
+            {confirming ? "⏳ Invio in corso..." : `Conferma refertazione`}
           </button>
         </div>
       )}
@@ -2160,7 +2160,7 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, pushAbilitato
           <div style={{ textAlign:"center", padding:"80px 0" }}>
             <div style={{ width:90, height:90, background:C.greenLight, borderRadius:"50%", display:"flex", alignItems:"center", justifyContent:"center", fontSize:40, margin:"0 auto 20px" }}>✅</div>
             <div style={{ color:C.green, fontWeight:700, fontSize:22 }}>Referto inviato!</div>
-            <div style={{ color:C.green, fontFamily:MONO, fontSize:28, fontWeight:"bold", marginTop:20 }}>+{selected.origine==="azienda"?10:15}€ 💰</div>
+            
             <button onClick={()=>{setSelected(null);setDone(false)}} style={{ marginTop:24, background:C.accent, color:C.white, border:"none", borderRadius:10, padding:"11px 28px", cursor:"pointer", fontWeight:700, fontSize:14 }}>← Prossimo ECG</button>
           </div>
         ) : (
