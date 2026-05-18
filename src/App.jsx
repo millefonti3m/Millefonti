@@ -926,7 +926,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
 
     const pad = Math.round(rH * 0.06);
     const fsTitle = Math.round(rH * 0.14);
-    const fsCr = Math.round(rH * 0.066) + 1;
+    const fsCr = Math.round(rH * 0.066) + 3;
     const boxSz = Math.round(fsCr * 1.1);
     const fsCommento = Math.round(rH * 0.092);
     const fsFirma = Math.round(rH * 0.110);
@@ -967,13 +967,16 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
       const cy = crocetteY + row * rowH + rowH * 0.65;
 
       // Box
-      ctx.strokeStyle = "#1a2640";
-      ctx.lineWidth = 1.2;
-      ctx.strokeRect(cx, cy - boxSz + 2, boxSz, boxSz);
       if (checked) {
         ctx.fillStyle = "#1aaa6e";
-        ctx.font = `bold ${Math.round(boxSz * 1.05)}px Arial`;
-        ctx.fillText("✓", cx + 1, cy + 1);
+        ctx.fillRect(cx, cy - boxSz + 2, boxSz, boxSz);
+        ctx.fillStyle = "#ffffff";
+        ctx.font = `bold ${Math.round(boxSz * 1.35)}px Arial`;
+        ctx.fillText("✓", cx, cy + 2);
+      } else {
+        ctx.strokeStyle = "#1a2640";
+        ctx.lineWidth = 1.2;
+        ctx.strokeRect(cx, cy - boxSz + 2, boxSz, boxSz);
       }
       // Label
       ctx.fillStyle = "#1a2640";
@@ -3802,7 +3805,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
       ctx.fillStyle='#ffffff';ctx.fillRect(rX,rY,rW,rH);
       ctx.strokeStyle='#1a2640';ctx.lineWidth=2;ctx.strokeRect(rX,rY,rW,rH);
       const headerH=Math.round(rH*0.18),crocetteH=Math.round(rH*0.42);
-      const pad=Math.round(rH*0.06),fsTitle=Math.round(rH*0.14),fsCr=Math.round(rH*0.066)+1;
+      const pad=Math.round(rH*0.06),fsTitle=Math.round(rH*0.14),fsCr=Math.round(rH*0.066)+3;
       const boxSz=Math.round(fsCr*1.1),fsCommento=Math.round(rH*0.092),fsFirma=Math.round(rH*0.110),fsStampM=Math.round(fsFirma*0.62);
       const firmaColX=rX+Math.round(rW*0.72),firmaColW=rW-Math.round(rW*0.72)-Math.round(rW*0.015);
       // Header
@@ -3820,8 +3823,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
       const crocetteY=rY+headerH,crocColW=(Math.round(rW*0.70)-pad*2)/3,rowH=Math.round(crocetteH/2);
       voci.forEach(([checked,label],i)=>{
         const col=i<3?i:i-3,row=i<3?0:1,cx=rX+pad+col*crocColW,cy=crocetteY+row*rowH+rowH*0.65;
-        ctx.strokeStyle='#1a2640';ctx.lineWidth=1.2;ctx.strokeRect(cx,cy-boxSz+2,boxSz,boxSz);
-        if(checked){ctx.fillStyle='#1aaa6e';ctx.font=`bold ${Math.round(boxSz*1.05)}px Arial`;ctx.fillText('✓',cx+1,cy+1);}
+        if(checked){ctx.fillStyle='#1aaa6e';ctx.fillRect(cx,cy-boxSz+2,boxSz,boxSz);ctx.fillStyle='#ffffff';ctx.font=`bold ${Math.round(boxSz*1.35)}px Arial`;ctx.fillText('✓',cx,cy+2);}else{ctx.strokeStyle='#1a2640';ctx.lineWidth=1.2;ctx.strokeRect(cx,cy-boxSz+2,boxSz,boxSz);}
         ctx.fillStyle='#1a2640';ctx.font=`${fsCr}px Arial`;
         const maxLW=i===4?crocColW*2-boxSz-12:crocColW-boxSz-12,words=label.split(' ');let line='';const lns=[];
         words.forEach(w=>{const t=line+w+' ';if(ctx.measureText(t).width>maxLW&&line){lns.push(line.trim());line=w+' ';}else line=t;});
