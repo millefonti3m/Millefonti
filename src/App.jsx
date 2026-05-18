@@ -1876,7 +1876,7 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, pushAbilitato
   const batchCorrente = selected?.batch_id ? mieiEcgs.filter(e => e.batch_id === selected.batch_id) : null;
   const batchRefertati = batchCorrente ? batchCorrente.filter(e => e.stato === "refertato").length : 0;
   const me = { referti: 0, guadagno: 0, rating: 4.9, ...Object.values(CARDIOLOGI_DATA).find((_,i)=>Object.keys(CARDIOLOGI_DATA)[i]===meCardiologo)||{} };
-  const guadagnoTot = (me.guadagno || 0) + refertatiMiei.reduce((s,e)=>s+(e.origine==="azienda"?10:15),0);
+  const guadagnoTot = (me.guadagno || 0) + refertatiMiei.reduce((s,e)=>s+getTariffa(e.origine_dettaglio||e.origine, e.urgenza==='urgente'?'urgente':'normale'),0);
 
   const handleReferti = () => {
     if (!file || !selected) return;
