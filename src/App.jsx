@@ -951,7 +951,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
     const voci = [
       [crocette.limiti,       "nei limiti della norma"],
       [crocette.correlare,    "da correlare con la clinica"],
-      [crocette.approfondire, "da approfondire con medico Curante"],
+      [crocette.approfondire, "da approfondire con Medico Curante"],
       [crocette.visita,       "da approfondire con visita cardiologica"],
       [crocette.urgente,      "Se nuova sintomatologia: visita cardiologica urgente / accesso in PS"],
     ];
@@ -1125,7 +1125,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
         const voci = [
           [crocette.limiti,       "ECG nei limiti della norma"],
           [crocette.correlare,    "ECG da correlare con la clinica"],
-          [crocette.approfondire, "ECG da approfondire con medico Curante"],
+          [crocette.approfondire, "ECG da approfondire con Medico Curante"],
           [crocette.visita,       "ECG da approfondire con visita cardiologica"],
           [crocette.urgente,      "Se nuova sintomatologia: visita cardiologica urgente / accesso in PS"],
         ];
@@ -1223,7 +1223,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
           const voci = [
             [crocette.limiti, "ECG nei limiti della norma"],
             [crocette.correlare, "ECG da correlare con la clinica"],
-            [crocette.approfondire, "ECG da approfondire con medico Curante"],
+            [crocette.approfondire, "ECG da approfondire con Medico Curante"],
             [crocette.visita, "ECG da approfondire con visita cardiologica"],
             [crocette.urgente, "Se nuova sintomatologia: visita cardiologica urgente / accesso in PS"],
           ];
@@ -1397,7 +1397,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
           refertoPdf.setDrawColor(220,229,240); refertoPdf.setLineWidth(0.4); refertoPdf.line(10,52,pw-10,52);
           refertoPdf.setFontSize(16); refertoPdf.setFont('helvetica','bold'); refertoPdf.setTextColor(37,87,54);
           refertoPdf.text('REFERTO ECG',10,62);
-          const voci2=[[crocette.limiti,"ECG nei limiti della norma"],[crocette.correlare,"ECG da correlare con la clinica"],[crocette.approfondire,"ECG da approfondire con medico Curante"],[crocette.visita,"ECG da approfondire con visita cardiologica"],[crocette.urgente,"Se nuova sintomatologia: visita cardiologica urgente / accesso in PS"]];
+          const voci2=[[crocette.limiti,"ECG nei limiti della norma"],[crocette.correlare,"ECG da correlare con la clinica"],[crocette.approfondire,"ECG da approfondire con Medico Curante"],[crocette.visita,"ECG da approfondire con visita cardiologica"],[crocette.urgente,"Se nuova sintomatologia: visita cardiologica urgente / accesso in PS"]];
           let cy2=72;
           voci2.forEach(([checked,label])=>{
             if(checked){refertoPdf.setFillColor(26,170,110);refertoPdf.setTextColor(255,255,255);refertoPdf.setFontSize(9);refertoPdf.setFont('helvetica','bold');refertoPdf.rect(10,cy2-5,4,4,'F');refertoPdf.text('✓',10.5,cy2-2);}
@@ -1499,7 +1499,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
   const CROCETTE_OPTS = [
     {k:"limiti",      label:"ECG nei limiti della norma",                                          color:C.green},
     {k:"correlare",   label:"ECG da correlare con la clinica",                                     color:C.orange},
-    {k:"approfondire",label:"ECG da approfondire con medico Curante",                              color:C.red},
+    {k:"approfondire",label:"ECG da approfondire con Medico Curante",                              color:C.red},
     {k:"visita",      label:"ECG da approfondire con visita cardiologica",                         color:C.purple},
     {k:"urgente",     label:"Se nuova sintomatologia: visita cardiologica urgente / accesso in PS", color:"#b91c1c"},
   ];
@@ -3754,7 +3754,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
         pdf2.setDrawColor(220,229,240); pdf2.setLineWidth(0.4); pdf2.line(10,52,pw2-10,52);
         pdf2.setFontSize(16); pdf2.setFont('helvetica','bold'); pdf2.setTextColor(37,87,54);
         pdf2.text('REFERTO ECG',10,62);
-        const voci2=[[crocette.limiti,'ECG nei limiti della norma'],[crocette.correlare,'ECG da correlare con la clinica'],[crocette.approfondire,'ECG da approfondire con medico Curante'],[crocette.visita,'ECG da approfondire con visita cardiologica'],[crocette.urgente,'Se nuova sintomatologia: visita cardiologica urgente / accesso in PS']];
+        const voci2=[[crocette.limiti,'ECG nei limiti della norma'],[crocette.correlare,'ECG da correlare con la clinica'],[crocette.approfondire,'ECG da approfondire con Medico Curante'],[crocette.visita,'ECG da approfondire con visita cardiologica'],[crocette.urgente,'Se nuova sintomatologia: visita cardiologica urgente / accesso in PS']];
         let cy2=72;
         voci2.forEach(([checked,label])=>{
           if(checked){pdf2.setFillColor(26,170,110);pdf2.setTextColor(255,255,255);pdf2.setFontSize(9);pdf2.setFont('helvetica','bold');pdf2.rect(10,cy2-5,4,4,'F');pdf2.text('✓',10.5,cy2-2);}
@@ -3816,7 +3816,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
       const voci=[
         [crocette.limiti,'nei limiti della norma'],
         [crocette.correlare,'da correlare con la clinica'],
-        [crocette.approfondire,'da approfondire con medico Curante'],
+        [crocette.approfondire,'da approfondire con Medico Curante'],
         [crocette.visita,'da approfondire con visita cardiologica'],
         [crocette.urgente,'Se nuova sintomatologia: visita cardiologica urgente / accesso in PS'],
       ];
@@ -4017,7 +4017,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
   const CROCETTE_MOBILE = [
     {k:'limiti', label:'ECG nei limiti della norma', color:'#1aaa6e'},
     {k:'correlare', label:'ECG da correlare con la clinica', color:'#f59e0b'},
-    {k:'approfondire', label:'ECG da approfondire con medico Curante', color:'#e03e5a'},
+    {k:'approfondire', label:'ECG da approfondire con Medico Curante', color:'#e03e5a'},
     {k:'visita', label:'ECG da approfondire con visita cardiologica', color:'#8b5cf6'},
     {k:'urgente', label:'Se nuova sintomatologia: visita cardiologica urgente', color:'#ef4444'},
   ];
