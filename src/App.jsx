@@ -926,13 +926,13 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
 
     const pad = Math.round(rH * 0.06);
     const fsTitle = Math.round(rH * 0.14);
-    const fsCr = Math.round(rH * 0.066);
+    const fsCr = Math.round(rH * 0.066) + 1;
     const boxSz = Math.round(fsCr * 1.1);
     const fsCommento = Math.round(rH * 0.092);
     const fsFirma = Math.round(rH * 0.110);
     const fsStamp = Math.round(fsFirma * 0.62);
-    const firmaColX = rX + Math.round(rW * 0.70);
-    const firmaColW = rW - Math.round(rW * 0.70) - Math.round(rW * 0.015);
+    const firmaColX = rX + Math.round(rW * 0.72);
+    const firmaColW = rW - Math.round(rW * 0.72) - Math.round(rW * 0.015);
 
     // ── HEADER ──
     ctx.fillStyle = "#1a2640";
@@ -949,20 +949,20 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
 
     // ── CROCETTE ──
     const voci = [
-      [crocette.limiti,       "ECG nei limiti della norma"],
-      [crocette.correlare,    "ECG da correlare con la clinica"],
-      [crocette.approfondire, "ECG da approfondire con medico Curante"],
-      [crocette.visita,       "ECG da approfondire con visita cardiologica"],
+      [crocette.limiti,       "nei limiti della norma"],
+      [crocette.correlare,    "da correlare con la clinica"],
+      [crocette.approfondire, "da approfondire con medico Curante"],
+      [crocette.visita,       "da approfondire con visita cardiologica"],
       [crocette.urgente,      "Se nuova sintomatologia: visita cardiologica urgente / accesso in PS"],
     ];
 
     const crocetteY = rY + headerH;
-    const crocColW = (Math.round(rW * 0.68) - pad * 2) / 2;
-    const rowH = Math.round(crocetteH / 3);
+    const crocColW = (Math.round(rW * 0.70) - pad * 2) / 3;
+    const rowH = Math.round(crocetteH / 2);
 
     voci.forEach(([checked, label], i) => {
-      const col = i % 2;
-      const row = Math.floor(i / 2);
+      const col = i < 3 ? i : i - 3;
+      const row = i < 3 ? 0 : 1;
       const cx = rX + pad + col * crocColW;
       const cy = crocetteY + row * rowH + rowH * 0.65;
 
@@ -975,10 +975,10 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
         ctx.font = `bold ${Math.round(boxSz * 1.05)}px Arial`;
         ctx.fillText("✓", cx + 1, cy + 1);
       }
-      // Label - può andare a capo se troppo lunga
+      // Label
       ctx.fillStyle = "#1a2640";
       ctx.font = `${fsCr}px Arial`;
-      const maxLabelW = crocColW - boxSz - 12;
+      const maxLabelW = i === 4 ? crocColW * 2 - boxSz - 12 : crocColW - boxSz - 12;
       const words = label.split(" ");
       let line = "";
       let labelY = cy;
@@ -3802,28 +3802,28 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
       ctx.fillStyle='#ffffff';ctx.fillRect(rX,rY,rW,rH);
       ctx.strokeStyle='#1a2640';ctx.lineWidth=2;ctx.strokeRect(rX,rY,rW,rH);
       const headerH=Math.round(rH*0.18),crocetteH=Math.round(rH*0.42);
-      const pad=Math.round(rH*0.06),fsTitle=Math.round(rH*0.14),fsCr=Math.round(rH*0.066);
+      const pad=Math.round(rH*0.06),fsTitle=Math.round(rH*0.14),fsCr=Math.round(rH*0.066)+1;
       const boxSz=Math.round(fsCr*1.1),fsCommento=Math.round(rH*0.092),fsFirma=Math.round(rH*0.110),fsStampM=Math.round(fsFirma*0.62);
-      const firmaColX=rX+Math.round(rW*0.70),firmaColW=rW-Math.round(rW*0.70)-Math.round(rW*0.015);
+      const firmaColX=rX+Math.round(rW*0.72),firmaColW=rW-Math.round(rW*0.72)-Math.round(rW*0.015);
       // Header
       ctx.fillStyle='#1a2640';ctx.font=`bold ${fsTitle}px Arial`;ctx.fillText('REFERTO ECG',rX+pad,rY+headerH*0.78);
       ctx.strokeStyle='#1a2640';ctx.lineWidth=1.2;
       ctx.beginPath();ctx.moveTo(rX+pad,rY+headerH);ctx.lineTo(rX+rW-pad,rY+headerH);ctx.stroke();
       // Crocette sinistra 70%
       const voci=[
-        [crocette.limiti,'ECG nei limiti della norma'],
-        [crocette.correlare,'ECG da correlare con la clinica'],
-        [crocette.approfondire,'ECG da approfondire con medico Curante'],
-        [crocette.visita,'ECG da approfondire con visita cardiologica'],
+        [crocette.limiti,'nei limiti della norma'],
+        [crocette.correlare,'da correlare con la clinica'],
+        [crocette.approfondire,'da approfondire con medico Curante'],
+        [crocette.visita,'da approfondire con visita cardiologica'],
         [crocette.urgente,'Se nuova sintomatologia: visita cardiologica urgente / accesso in PS'],
       ];
-      const crocetteY=rY+headerH,crocColW=(Math.round(rW*0.68)-pad*2)/2,rowH=Math.round(crocetteH/3);
+      const crocetteY=rY+headerH,crocColW=(Math.round(rW*0.70)-pad*2)/3,rowH=Math.round(crocetteH/2);
       voci.forEach(([checked,label],i)=>{
-        const col=i%2,row=Math.floor(i/2),cx=rX+pad+col*crocColW,cy=crocetteY+row*rowH+rowH*0.65;
+        const col=i<3?i:i-3,row=i<3?0:1,cx=rX+pad+col*crocColW,cy=crocetteY+row*rowH+rowH*0.65;
         ctx.strokeStyle='#1a2640';ctx.lineWidth=1.2;ctx.strokeRect(cx,cy-boxSz+2,boxSz,boxSz);
         if(checked){ctx.fillStyle='#1aaa6e';ctx.font=`bold ${Math.round(boxSz*1.05)}px Arial`;ctx.fillText('✓',cx+1,cy+1);}
         ctx.fillStyle='#1a2640';ctx.font=`${fsCr}px Arial`;
-        const maxLW=crocColW-boxSz-12,words=label.split(' ');let line='';const lns=[];
+        const maxLW=i===4?crocColW*2-boxSz-12:crocColW-boxSz-12,words=label.split(' ');let line='';const lns=[];
         words.forEach(w=>{const t=line+w+' ';if(ctx.measureText(t).width>maxLW&&line){lns.push(line.trim());line=w+' ';}else line=t;});
         if(line.trim())lns.push(line.trim());
         let lY=cy;if(lns.length>1)lY-=(lns.length-1)*fsCr*0.6;
