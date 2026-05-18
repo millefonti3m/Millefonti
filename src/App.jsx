@@ -2262,6 +2262,8 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
   const [cardiologoSelTariff, setCardiologoSelTariff] = useState('');
   const [meseCompAdmin, setMeseCompAdmin] = useState(() => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; });
   const [savingTariffAdmin, setSavingTariffAdmin] = useState(false);
+  const [tariffarioAmb, setTariffarioAmb] = useState({});
+  const [savingTariffAmb, setSavingTariffAmb] = useState(false);
 
   // Carica registro ECG quando tab attivo
   useEffect(() => {
@@ -2326,6 +2328,19 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
     return parseFloat(t['default']??10);
   };
 
+  const getTariffaAmb = (azienda, urgenza='normale') => {
+    if (urgenza === 'urgente') { const ku=`${azienda}|urgente`; if (tariffarioAmb[ku]!==undefined) return parseFloat(tariffarioAmb[ku]); }
+    if (tariffarioAmb[azienda]!==undefined) return parseFloat(tariffarioAmb[azienda]);
+    return parseFloat(tariffarioAmb['default']??10);
+  };
+
+  const salvaTariffarioAmb = async () => {
+    setSavingTariffAmb(true);
+    await supabase.from('config_ambulatorio').upsert({ id: 1, tariffario: tariffarioAmb });
+    setSavingTariffAmb(false);
+    alert('Tariffario ambulatorio salvato!');
+  };
+
   const regole_assegnazione_placeholder = null; // placeholder
   const [regole, setRegole] = useState({ modalita:'manuale', cardiologo_unico:'', lunedi:'', martedi:'', mercoledi:'', giovedi:'', venerdi:'', sabato:'', domenica:'' });
   const [regoleAziende, setRegoleAziende] = useState([]);
@@ -2338,6 +2353,12 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
       .then(({ data }) => { if (data) setRegole(data); });
     supabase.from('regole_per_azienda').select('*').order('azienda_nome')
       .then(({ data }) => { if (data) setRegoleAziende(data); });
+  }, []);
+
+  // Carica tariffario ambulatorio
+  useEffect(() => {
+    supabase.from('config_ambulatorio').select('tariffario').eq('id', 1).single()
+      .then(({ data }) => { if (data?.tariffario) setTariffarioAmb(typeof data.tariffario === 'string' ? JSON.parse(data.tariffario) : (data.tariffario||{})); });
   }, []);
 
   const salvaRegole = async () => {
@@ -2703,7 +2724,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
           {/* KPI ricavi */}
           {(()=>{ const oggi=new Date(); const meseCorr=ecgs.filter(e=>{ const d=new Date(e.created_at||e.ts); return d.getMonth()===oggi.getMonth()&&d.getFullYear()===oggi.getFullYear()&&e.stato==='refertato'; }); const MESI=['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic']; const ultimi6=Array.from({length:6},(_,i)=>{ const d=new Date(oggi); d.setMonth(d.getMonth()-5+i); return {anno:d.getFullYear(),mese:d.getMonth(),label:MESI[d.getMonth()]}; }); const countPerMese=ultimi6.map(({anno,mese})=>({ label:MESI[mese], tot:ecgs.filter(e=>{ const d=new Date(e.created_at||e.ts); return d.getFullYear()===anno&&d.getMonth()===mese; }).length, ref:ecgs.filter(e=>{ const d=new Date(e.created_at||e.ts); return d.getFullYear()===anno&&d.getMonth()===mese&&e.stato==='refertato'; }).length })); const maxVal=Math.max(...countPerMese.map(m=>m.tot),1); const byOrigine={azienda:0,farmacia:0,pubblico:0}; ecgs.forEach(e=>{ if(byOrigine[e.origine]!==undefined) byOrigine[e.origine]++; }); const totOrig=Object.values(byOrigine).reduce((a,b)=>a+b,0)||1; return (<>
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:12}}>
-              {[{label:'Ricavi mese',value:`${meseCorr.length*10}€`,color:C.green,icon:'💶',sub:'@10€/ECG'},{label:'Ricavi anno',value:`${ecgs.filter(e=>{ const d=new Date(e.created_at||e.ts); return d.getFullYear()===oggi.getFullYear()&&e.stato==='refertato';}).length*10}€`,color:C.teal,icon:'📈',sub:String(oggi.getFullYear())},{label:'ECG mese',value:meseCorr.length,color:C.accent,icon:'🫀',sub:'refertati'},{label:'Clienti attivi',value:new Set(ecgs.map(e=>e.origine_dettaglio||e.farmacia||'Altro').filter(Boolean)).size,color:C.purple,icon:'🏢',sub:'aziende/farmacie'}].map(({label,value,color,icon,sub})=>(
+              {[{label:'Ricavi mese',value:`${meseCorr.reduce((s,e)=>s+getTariffaAmb(e.origine_dettaglio||e.origine,e.urgenza==='urgente'?'urgente':'normale'),0).toFixed(0)}€`,color:C.green,icon:'💶',sub:'tariffario ambulatorio'},{label:'Ricavi anno',value:`${ecgs.filter(e=>{ const d=new Date(e.created_at||e.ts); return d.getFullYear()===oggi.getFullYear()&&e.stato==='refertato';}).reduce((s,e)=>s+getTariffaAmb(e.origine_dettaglio||e.origine,e.urgenza==='urgente'?'urgente':'normale'),0).toFixed(0)}€`,color:C.teal,icon:'📈',sub:String(oggi.getFullYear())},{label:'ECG mese',value:meseCorr.length,color:C.accent,icon:'🫀',sub:'refertati'},{label:'Clienti attivi',value:new Set(ecgs.map(e=>e.origine_dettaglio||e.farmacia||'Altro').filter(Boolean)).size,color:C.purple,icon:'🏢',sub:'aziende/farmacie'}].map(({label,value,color,icon,sub})=>(
                 <div key={label} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,padding:'16px 18px',boxShadow:C.shadow}}>
                   <div style={{fontSize:20,marginBottom:6}}>{icon}</div><div style={{fontSize:24,fontWeight:700,color}}>{value}</div><div style={{fontSize:12,fontWeight:600,color:C.text,marginTop:2}}>{label}</div><div style={{fontSize:11,color:C.muted}}>{sub}</div>
                 </div>))}
@@ -3223,6 +3244,61 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
                 </div>
               </div>
             )}
+            {/* Tariffario Ambulatorio */}
+            <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,padding:20,boxShadow:C.shadow}}>
+              <div style={{fontWeight:700,fontSize:14,color:C.text,marginBottom:4}}>🏥 Tariffario Ambulatorio</div>
+              <div style={{color:C.muted,fontSize:12,marginBottom:16}}>Prezzo fatturato dall'ambulatorio per ogni ECG. Usato per calcolare i ricavi nella dashboard.</div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 120px 120px',gap:12,alignItems:'center',padding:'10px 0',borderBottom:`1px solid ${C.borderLight}`}}>
+                <div style={{fontWeight:700,color:C.text,fontSize:13}}>🔧 Default (tutte le aziende)</div>
+                <div style={{display:'flex',alignItems:'center',gap:6}}>
+                  <input type="number" min="0" step="0.5" placeholder="10"
+                    value={tariffarioAmb['default']??''}
+                    onChange={e=>setTariffarioAmb(p=>({...p,default:parseFloat(e.target.value)||0}))}
+                    style={{width:70,border:`1.5px solid ${C.border}`,borderRadius:8,padding:'6px 8px',fontSize:13,textAlign:'center'}}/>
+                  <span style={{fontSize:12,color:C.muted}}>€ std</span>
+                </div>
+                <div style={{display:'flex',alignItems:'center',gap:6}}>
+                  <input type="number" min="0" step="0.5" placeholder="10"
+                    value={tariffarioAmb['default|urgente']??''}
+                    onChange={e=>setTariffarioAmb(p=>({...p,'default|urgente':parseFloat(e.target.value)||0}))}
+                    style={{width:70,border:`1.5px solid ${C.border}`,borderRadius:8,padding:'6px 8px',fontSize:13,textAlign:'center'}}/>
+                  <span style={{fontSize:12,color:'#f59e0b'}}>€ urg</span>
+                </div>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 120px 120px',gap:12,padding:'8px 0 4px',marginBottom:8}}>
+                <div style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>Azienda</div>
+                <div style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>€/ECG Standard</div>
+                <div style={{fontSize:11,fontWeight:700,color:'#f59e0b',textTransform:'uppercase',letterSpacing:1}}>€/ECG Urgente</div>
+              </div>
+              {aziendeTutte.map(az=>(
+                <div key={az} style={{display:'grid',gridTemplateColumns:'1fr 120px 120px',gap:12,alignItems:'center',padding:'8px 0',borderBottom:`1px solid ${C.borderLight}`}}>
+                  <div style={{fontSize:13,color:C.text,fontWeight:500}}>{az}</div>
+                  <div style={{display:'flex',alignItems:'center',gap:6}}>
+                    <input type="number" min="0" step="0.5"
+                      placeholder={String(tariffarioAmb['default']??10)}
+                      value={tariffarioAmb[az]??''}
+                      onChange={e=>setTariffarioAmb(p=>({...p,[az]:parseFloat(e.target.value)||0}))}
+                      style={{width:70,border:`1.5px solid ${C.border}`,borderRadius:8,padding:'6px 8px',fontSize:13,textAlign:'center'}}/>
+                    <span style={{fontSize:12,color:C.muted}}>€</span>
+                  </div>
+                  <div style={{display:'flex',alignItems:'center',gap:6}}>
+                    <input type="number" min="0" step="0.5"
+                      placeholder={String(tariffarioAmb[`${az}|urgente`]??tariffarioAmb['default']??10)}
+                      value={tariffarioAmb[`${az}|urgente`]??''}
+                      onChange={e=>setTariffarioAmb(p=>({...p,[`${az}|urgente`]:parseFloat(e.target.value)||0}))}
+                      style={{width:70,border:`1.5px solid ${C.border}`,borderRadius:8,padding:'6px 8px',fontSize:13,textAlign:'center'}}/>
+                    <span style={{fontSize:12,color:'#f59e0b'}}>€</span>
+                  </div>
+                </div>
+              ))}
+              <div style={{marginTop:16,display:'flex',justifyContent:'flex-end'}}>
+                <button onClick={salvaTariffarioAmb} disabled={savingTariffAmb}
+                  style={{background:savingTariffAmb?C.border:C.green,color:'white',border:'none',borderRadius:12,padding:'11px 24px',cursor:savingTariffAmb?'not-allowed':'pointer',fontWeight:700,fontSize:14}}>
+                  {savingTariffAmb?'⏳ Salvando...':'💾 Salva tariffario ambulatorio'}
+                </button>
+              </div>
+            </div>
+
             {/* Compensi mese */}
             {selCard && (
               <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,padding:20,boxShadow:C.shadow}}>
