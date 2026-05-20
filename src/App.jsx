@@ -1347,14 +1347,9 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(0, 0, cvs.width, cvs.height);
         await page.render({ canvasContext: ctx, viewport }).promise;
-        // Applica il riquadro SOLO se non è pagina separata
-        if (posizione !== "pagina-separata") {
-          disegnaOverlay(ctx, cvs.width, cvs.height);
-        }
-        // Salva come PDF
-        // Applica rotazione utente (↺↻) al canvas per pagina-separata
+        // Applica rotazione utente (↺↻) PRIMA di disegnare l'overlay
         let finalCvs = cvs;
-        if (rotation !== 0 && posizione === "pagina-separata") {
+        if (rotation !== 0) {
           const rad = (rotation * Math.PI) / 180;
           const rotCvs = document.createElement("canvas");
           if (rotation === 90 || rotation === 270) {
@@ -1367,6 +1362,10 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
           rCtx.rotate(rad);
           rCtx.drawImage(cvs, -cvs.width/2, -cvs.height/2);
           finalCvs = rotCvs;
+        }
+        // Disegna overlay sul canvas (già ruotato se necessario)
+        if (posizione !== "pagina-separata") {
+          disegnaOverlay(finalCvs.getContext("2d"), finalCvs.width, finalCvs.height);
         }
         const ratio = finalCvs.width / finalCvs.height;
         const isLandscape2 = ratio > 1;
@@ -3868,7 +3867,8 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
         const refertoSrc2 = await PDFDoc2.load(pdf2.output('arraybuffer'));
         const [refertoPageM] = await mergedDoc2.copyPages(refertoSrc2, [0]);
         mergedDoc2.addPage(refertoPageM);
-        const originalSrc2 = await PDFDoc2.load(ab);
+        const abForPdfLib = await ecgFile.arrayBuffer(); // fresh copy (ab detached da pdfjs)
+        const originalSrc2 = await PDFDoc2.load(abForPdfLib);
         const copiedPages2 = await mergedDoc2.copyPages(originalSrc2, originalSrc2.getPageIndices());
         copiedPages2.forEach(p => mergedDoc2.addPage(p));
         const mergedBytes2 = await mergedDoc2.save();
@@ -3876,18 +3876,19 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
       } else {
 
       // Overlay identico al desktop
-      const W = cv.width, H = cv.height;
+      const W = finalCvMobile.width, H = finalCvMobile.height;
+      const finalCtxM = finalCvMobile.getContext('2d');
       const rX=Math.round(W*0.21),rY=Math.round(H*0.082),rW=Math.round(W*0.78),rH=Math.round(H*0.142);
-      ctx.fillStyle='#ffffff';ctx.fillRect(rX,rY,rW,rH);
-      ctx.strokeStyle='#1a2640';ctx.lineWidth=2;ctx.strokeRect(rX,rY,rW,rH);
+      finalCtxM.fillStyle='#ffffff';finalCtxM.fillRect(rX,rY,rW,rH);
+      finalCtxM.strokeStyle='#1a2640';finalCtxM.lineWidth=2;finalCtxM.strokeRect(rX,rY,rW,rH);
       const headerH=Math.round(rH*0.18),crocetteH=Math.round(rH*0.42);
       const pad=Math.round(rH*0.06),fsTitle=Math.round(rH*0.14),fsCr=Math.round(rH*0.066)+3;
       const boxSz=Math.round(fsCr*1.1),fsCommento=Math.round(rH*0.092),fsFirma=Math.round(rH*0.110),fsStampM=Math.round(fsFirma*0.62);
       const firmaColX=rX+Math.round(rW*0.72),firmaColW=rW-Math.round(rW*0.72)-Math.round(rW*0.015);
       // Header
-      ctx.fillStyle='#1a2640';ctx.font=`bold ${fsTitle}px Arial`;ctx.fillText('REFERTO ECG',rX+pad,rY+headerH*0.78);
-      ctx.strokeStyle='#1a2640';ctx.lineWidth=1.2;
-      ctx.beginPath();ctx.moveTo(rX+pad,rY+headerH);ctx.lineTo(rX+rW-pad,rY+headerH);ctx.stroke();
+      finalCtxM.fillStyle='#1a2640';finalCtxM.font=`bold ${fsTitle}px Arial`;finalCtxM.fillText('REFERTO ECG',rX+pad,rY+headerH*0.78);
+      finalCtxM.strokeStyle='#1a2640';finalCtxM.lineWidth=1.2;
+      finalCtxM.beginPath();finalCtxM.moveTo(rX+pad,rY+headerH);finalCtxM.lineTo(rX+rW-pad,rY+headerH);finalCtxM.stroke();
       // Crocette sinistra 70%
       const voci=[
         [crocette.limiti,'nei limiti della norma'],
@@ -3899,13 +3900,13 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
       const crocetteY=rY+headerH,crocColW=(Math.round(rW*0.70)-pad*2)/3,rowH=Math.round(crocetteH/2);
       voci.forEach(([checked,label],i)=>{
         const col=i<3?i:i-3,row=i<3?0:1,cx=rX+pad+col*crocColW,cy=crocetteY+row*rowH+rowH*0.65;
-        if(checked){ctx.fillStyle='#1aaa6e';ctx.fillRect(cx,cy-boxSz+2,boxSz,boxSz);ctx.fillStyle='#ffffff';ctx.font=`bold ${Math.round(boxSz*1.35)}px Arial`;ctx.fillText('✓',cx,cy+2);}else{ctx.strokeStyle='#1a2640';ctx.lineWidth=1.2;ctx.strokeRect(cx,cy-boxSz+2,boxSz,boxSz);}
-        ctx.fillStyle='#1a2640';ctx.font=`${fsCr}px Arial`;
+        if(checked){finalCtxM.fillStyle='#1aaa6e';finalCtxM.fillRect(cx,cy-boxSz+2,boxSz,boxSz);finalCtxM.fillStyle='#ffffff';finalCtxM.font=`bold ${Math.round(boxSz*1.35)}px Arial`;finalCtxM.fillText('✓',cx,cy+2);}else{finalCtxM.strokeStyle='#1a2640';finalCtxM.lineWidth=1.2;finalCtxM.strokeRect(cx,cy-boxSz+2,boxSz,boxSz);}
+        finalCtxM.fillStyle='#1a2640';finalCtxM.font=`${fsCr}px Arial`;
         const maxLW=i===4?crocColW*2-boxSz-12:crocColW-boxSz-12,words=label.split(' ');let line='';const lns=[];
-        words.forEach(w=>{const t=line+w+' ';if(ctx.measureText(t).width>maxLW&&line){lns.push(line.trim());line=w+' ';}else line=t;});
+        words.forEach(w=>{const t=line+w+' ';if(finalCtxM.measureText(t).width>maxLW&&line){lns.push(line.trim());line=w+' ';}else line=t;});
         if(line.trim())lns.push(line.trim());
         let lY=cy;if(lns.length>1)lY-=(lns.length-1)*fsCr*0.6;
-        lns.forEach((ln,idx)=>ctx.fillText(ln,cx+boxSz+8,lY+idx*fsCr*1.15));
+        lns.forEach((ln,idx)=>finalCtxM.fillText(ln,cx+boxSz+8,lY+idx*fsCr*1.15));
       });
       // Firma scannerizzata destra (nella sezione crocette)
       const nbM=meCardiologo.replace(/^Dott\.\s*Dr\.?/i,'').replace(/^Dr\.?\s*/i,'').replace(/^Dott\.?\s*/i,'').trim();
@@ -3914,37 +3915,37 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
         const img2=window.__millefonti_firma;
         const maxW=firmaColW*0.92,maxH=crocetteH-pad*2,r2=img2.width/img2.height;
         const dW=Math.min(maxW,maxH*r2),dH=dW/r2;
-        ctx.drawImage(img2,firmaColX+(firmaColW-dW)/2,crocetteY+(crocetteH-dH)/2,dW,dH);
+        finalCtxM.drawImage(img2,firmaColX+(firmaColW-dW)/2,crocetteY+(crocetteH-dH)/2,dW,dH);
       }
       // Separatore
       const sepY=crocetteY+crocetteH;
-      ctx.strokeStyle='#cccccc';ctx.lineWidth=0.8;
-      ctx.beginPath();ctx.moveTo(rX+pad,sepY);ctx.lineTo(rX+rW-pad,sepY);ctx.stroke();
+      finalCtxM.strokeStyle='#cccccc';finalCtxM.lineWidth=0.8;
+      finalCtxM.beginPath();finalCtxM.moveTo(rX+pad,sepY);finalCtxM.lineTo(rX+rW-pad,sepY);finalCtxM.stroke();
       // Commento
       if(commento&&commento.trim()){
-        ctx.fillStyle='#1a2640';ctx.font=`${fsCommento}px Arial`;
+        finalCtxM.fillStyle='#1a2640';finalCtxM.font=`${fsCommento}px Arial`;
         const wds=commento.split(' ');let ln2='';const lns2=[];
-        wds.forEach(w=>{const t=ln2+w+' ';if(ctx.measureText(t).width>Math.round(rW*0.63)&&ln2){lns2.push(ln2.trim());ln2=w+' ';}else ln2=t;});
+        wds.forEach(w=>{const t=ln2+w+' ';if(finalCtxM.measureText(t).width>Math.round(rW*0.63)&&ln2){lns2.push(ln2.trim());ln2=w+' ';}else ln2=t;});
         if(ln2.trim())lns2.push(ln2.trim());
-        lns2.slice(0,3).forEach((l,idx)=>ctx.fillText(l,rX+pad,sepY+fsCommento*1.1+idx*fsCommento*1.2));
+        lns2.slice(0,3).forEach((l,idx)=>finalCtxM.fillText(l,rX+pad,sepY+fsCommento*1.1+idx*fsCommento*1.2));
       }
       // Firma testo agganciata al fondo
       const bPad=Math.round(rH*0.05);
       const lineDate=rY+rH-bPad,lineVia=lineDate-Math.round(fsStampM*1.35),lineAmb=lineVia-Math.round(fsStampM*1.35);
       const lineNome=lineAmb-fsFirma-Math.round(fsStampM*0.5),lineSepF=lineNome+Math.round(fsFirma*0.4);
-      ctx.fillStyle='#1a2640';ctx.font=`bold ${fsFirma}px Arial`;ctx.fillText(nomeFirmaM,firmaColX,lineNome);
-      ctx.strokeStyle='#1a2640';ctx.lineWidth=0.5;
-      ctx.beginPath();ctx.moveTo(firmaColX,lineSepF);ctx.lineTo(firmaColX+firmaColW*0.95,lineSepF);ctx.stroke();
-      ctx.fillStyle='#1a2640';ctx.font=`${fsStampM}px Arial`;
-      ctx.fillText('Ambulatorio Millefonti',firmaColX,lineAmb);
-      ctx.fillText('Via Garessio 47 - Torino',firmaColX,lineVia);
-      ctx.fillStyle='#6b7d99';ctx.font=`${Math.round(fsFirma*0.72)}px Arial`;
-      ctx.fillText(new Date().toLocaleDateString('it-IT'),firmaColX,lineDate);
+      finalCtxM.fillStyle='#1a2640';finalCtxM.font=`bold ${fsFirma}px Arial`;finalCtxM.fillText(nomeFirmaM,firmaColX,lineNome);
+      finalCtxM.strokeStyle='#1a2640';finalCtxM.lineWidth=0.5;
+      finalCtxM.beginPath();finalCtxM.moveTo(firmaColX,lineSepF);finalCtxM.lineTo(firmaColX+firmaColW*0.95,lineSepF);finalCtxM.stroke();
+      finalCtxM.fillStyle='#1a2640';finalCtxM.font=`${fsStampM}px Arial`;
+      finalCtxM.fillText('Ambulatorio Millefonti',firmaColX,lineAmb);
+      finalCtxM.fillText('Via Garessio 47 - Torino',firmaColX,lineVia);
+      finalCtxM.fillStyle='#6b7d99';finalCtxM.font=`${Math.round(fsFirma*0.72)}px Arial`;
+      finalCtxM.fillText(new Date().toLocaleDateString('it-IT'),firmaColX,lineDate);
 
       const ratio = W/H, isLandscape = ratio>1;
       const pdfW = isLandscape?297:210, pdfH = isLandscape?pdfW/ratio:pdfW*ratio;
       const pdf = new jsPDF({ orientation:isLandscape?'landscape':'portrait', unit:'mm', format:[pdfW,Math.min(pdfH,420)] });
-      pdf.addImage(cv.toDataURL('image/jpeg',0.78),'JPEG',0,0,pdfW,Math.min(pdfH,420));
+      pdf.addImage(finalCvMobile.toDataURL('image/jpeg',0.78),'JPEG',0,0,pdfW,Math.min(pdfH,420));
       pdfBlob2 = pdf.output('blob');
       } // end else overlay
 
