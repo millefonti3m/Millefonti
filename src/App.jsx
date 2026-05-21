@@ -1491,7 +1491,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
     })();
     
     // Passa subito al prossimo ECG senza aspettare l'upload!
-    onRefertato();
+    onRefertato(refertoFileName);
     setConfirming(false);
   };
 
@@ -2199,13 +2199,13 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, pushAbilitato
                 ecg={selected}
                 meCardiologo={meCardiologo}
                 firmaUrl={firmaUrl}
-                onRefertato={()=>{
+                onRefertato={(refertoFileName)=>{
                   const selectedId = selected.id;
                   const selectedBatchId = selected?.batch_id;
                   // Aggiorna stato locale e calcola prossimo
                   let prossimo = null;
                   setEcgs(prev => {
-                    const updated = prev.map(e => e.id===selectedId ? {...e,stato:"refertato"} : e);
+                    const updated = prev.map(e => e.id===selectedId ? {...e,stato:"refertato", file_referto_url: refertoFileName || e.file_referto_url} : e);
                     if (selectedBatchId) {
                       prossimo = updated.find(e => e.batch_id===selectedBatchId && e.stato==="in_attesa" && e.id!==selectedId);
                     }
@@ -3732,6 +3732,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
     try {
       const JSZip = (await import('jszip')).default;
       const batchEcgs = mieiEcgs.filter(e => e.batch_id===batchId && e.stato==='refertato' && e.file_referto_url);
+      if (!batchEcgs.length) { alert('Nessun referto disponibile. Attendi qualche secondo e riprova.'); setChiudendo(false); return; }
       const zip = new JSZip();
       await Promise.all(batchEcgs.map(async e => {
         const { data } = await supabase.storage.from('ecg-files').download(e.file_referto_url);
@@ -3958,8 +3959,8 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
         if (selectedEcg.file_ecg_url) await supabase.storage.from('ecg-files').remove([selectedEcg.file_ecg_url]).catch(()=>{});
       })();
 
-      // Aggiorna stato locale
-      setEcgs(prev => prev.map(e => e.id===selectedEcg.id ? {...e, stato:'refertato'} : e));
+      // Aggiorna stato locale (incluso file_referto_url per evitare zip vuoti in chiudiBatch)
+      setEcgs(prev => prev.map(e => e.id===selectedEcg.id ? {...e, stato:'refertato', file_referto_url: refertoFileName} : e));
 
       // Vai al prossimo ECG del batch o torna alla lista
       if (selectedEcg.batch_id) {
