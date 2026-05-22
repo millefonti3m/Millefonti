@@ -1361,6 +1361,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
           rCtx.translate(rotCvs.width/2, rotCvs.height/2);
           rCtx.rotate(rad);
           rCtx.drawImage(cvs, -cvs.width/2, -cvs.height/2);
+          rCtx.setTransform(1, 0, 0, 1, 0, 0); // reset transform: overlay non eredita la rotazione
           finalCvs = rotCvs;
         }
         // Disegna overlay sul canvas (già ruotato se necessario)
@@ -3804,6 +3805,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
         rCtx2.translate(rotCv.width/2, rotCv.height/2);
         rCtx2.rotate(rad);
         rCtx2.drawImage(cv, -cv.width/2, -cv.height/2);
+        rCtx2.setTransform(1, 0, 0, 1, 0, 0); // reset transform: overlay non eredita la rotazione
         finalCvMobile = rotCv;
       }
       let pdfBlob2 = null;
