@@ -1416,14 +1416,17 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
           refertoPdf.setFillColor(37,87,54);refertoPdf.rect(0,ph-8,pw,8,'F');refertoPdf.setTextColor(255,255,255);refertoPdf.setFontSize(8);
           refertoPdf.text('Ambulatorio Millefonti — ambulatoriomillefonti.it',pw/2,ph-3,{align:'center'});
           // Merge referto + tutte le pagine originali (pdf-lib, nessun canvas)
-          const { PDFDocument } = await import('pdf-lib');
+          const { PDFDocument, degrees: pdfDegrees } = await import('pdf-lib');
           const mergedDoc = await PDFDocument.create();
           const refertoSrc = await PDFDocument.load(refertoPdf.output('arraybuffer'));
           const [refertoPageCopied] = await mergedDoc.copyPages(refertoSrc, [0]);
           mergedDoc.addPage(refertoPageCopied);
           const originalSrc = await PDFDocument.load(arrayBuffer);
           const copiedPages = await mergedDoc.copyPages(originalSrc, originalSrc.getPageIndices());
-          copiedPages.forEach(p => mergedDoc.addPage(p));
+          copiedPages.forEach(p => {
+            if (rotation !== 0) { const ea = p.getRotation().angle; p.setRotation(pdfDegrees((ea + rotation) % 360)); }
+            mergedDoc.addPage(p);
+          });
           const mergedBytes = await mergedDoc.save();
           const mergedBlob = new Blob([mergedBytes], { type: 'application/pdf' });
           if(ecg.batch_id){setPdfBlob(mergedBlob);}else{
@@ -3863,7 +3866,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
         pdf2.setTextColor(255,255,255);pdf2.setFontSize(8);
         pdf2.text('Ambulatorio Millefonti — ambulatoriomillefonti.it',pw2/2,ph2-3,{align:'center'});
         // Merge referto + tutte le pagine originali con pdf-lib (nessun canvas)
-        const { PDFDocument: PDFDoc2 } = await import('pdf-lib');
+        const { PDFDocument: PDFDoc2, degrees: pdfDeg2 } = await import('pdf-lib');
         const mergedDoc2 = await PDFDoc2.create();
         const refertoSrc2 = await PDFDoc2.load(pdf2.output('arraybuffer'));
         const [refertoPageM] = await mergedDoc2.copyPages(refertoSrc2, [0]);
@@ -3871,7 +3874,10 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
         const abForPdfLib = await ecgFile.arrayBuffer(); // fresh copy (ab detached da pdfjs)
         const originalSrc2 = await PDFDoc2.load(abForPdfLib);
         const copiedPages2 = await mergedDoc2.copyPages(originalSrc2, originalSrc2.getPageIndices());
-        copiedPages2.forEach(p => mergedDoc2.addPage(p));
+        copiedPages2.forEach(p => {
+          if (rotVal !== 0) { const ea2 = p.getRotation().angle; p.setRotation(pdfDeg2((ea2 + rotVal) % 360)); }
+          mergedDoc2.addPage(p);
+        });
         const mergedBytes2 = await mergedDoc2.save();
         pdfBlob2 = new Blob([mergedBytes2], { type: 'application/pdf' });
       } else {
