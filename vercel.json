@@ -1,9 +1,10 @@
 {
   "framework": "vite",
   "routes": [
+    { "src": "/api/(.*)", "dest": "/api/$1" },
     { "src": "/app", "dest": "/index.html" },
     { "src": "/", "dest": "/landing_millefonti.html" },
-    { "src": "/api/(.*)", "dest": "/api/$1" },
+    { "handle": "filesystem" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
