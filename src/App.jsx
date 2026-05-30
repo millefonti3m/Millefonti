@@ -385,7 +385,13 @@ const FarmaciaView = ({ ecgs, setEcgs }) => {
   const [file, setFile] = useState(null);
   const [form, setForm] = useState({ paziente:"", eta:"", sesso:"M", note:"", urgenza:"normale" });
   const [sent, setSent] = useState(false);
-  const miei = ecgs.filter(e=>e.origine==="farmacia"&&e.farmacia===ME_FARMACIA);
+  const [meEmail, setMeEmail] = useState("");
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) setMeEmail(session.user.email);
+    });
+  }, []);
+  const miei = ecgs.filter(e=>e.origine==="farmacia"&&(meEmail?e.email_destinatario===meEmail:e.farmacia===ME_FARMACIA));
 
   const invia = async () => {
     if (!file||!form.paziente) return;
@@ -405,6 +411,7 @@ const FarmaciaView = ({ ecgs, setEcgs }) => {
       stato: "in_attesa",
       origine_dettaglio: ME_FARMACIA,
       file_ecg_url: fileUrl,
+      email_destinatario: meEmail,
     };
     const { data, error } = await supabase.from('ecgs').insert(nuovoEcg).select().single();
     if (!error && data) {
