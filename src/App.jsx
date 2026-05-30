@@ -386,9 +386,13 @@ const FarmaciaView = ({ ecgs, setEcgs }) => {
   const [form, setForm] = useState({ paziente:"", eta:"", sesso:"M", note:"", urgenza:"normale" });
   const [sent, setSent] = useState(false);
   const [meEmail, setMeEmail] = useState("");
+  const [nomeFarmacia, setNomeFarmacia] = useState("");
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) setMeEmail(session.user.email);
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session?.user) return;
+      setMeEmail(session.user.email);
+      const { data: profile } = await supabase.from('user_profiles').select('nome, cognome').eq('id', session.user.id).single();
+      if (profile) { const n = `${profile.nome||''} ${profile.cognome||''}`.trim(); if (n) setNomeFarmacia(n); }
     });
   }, []);
   const miei = ecgs.filter(e=>e.origine==="farmacia"&&(meEmail?e.email_destinatario===meEmail:e.farmacia===ME_FARMACIA));
@@ -409,7 +413,7 @@ const FarmaciaView = ({ ecgs, setEcgs }) => {
       note: form.note||"—",
       urgenza: form.urgenza,
       stato: "in_attesa",
-      origine_dettaglio: ME_FARMACIA,
+      origine_dettaglio: nomeFarmacia || ME_FARMACIA,
       file_ecg_url: fileUrl,
       email_destinatario: meEmail,
     };
@@ -555,7 +559,7 @@ const AziendaView = ({ ecgs, setEcgs }) => {
         note: noteGenerali || "Idoneità lavorativa",
         urgenza: "normale",
         stato: "in_attesa",
-        origine_dettaglio: ME_AZIENDA,
+        origine_dettaglio: nomeAzienda || ME_AZIENDA,
         batch_id: batchId,
         batch_nome: batchNome,
         file_ecg_url: fileUrl,
