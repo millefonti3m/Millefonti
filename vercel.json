@@ -1,7 +1,9 @@
 {
   "framework": "vite",
-  "rewrites": [
-    { "source": "/app", "destination": "/index.html" },
-    { "source": "/", "destination": "/landing_millefonti.html" }
+  "routes": [
+    { "src": "/app", "dest": "/index.html" },
+    { "src": "/", "dest": "/landing_millefonti.html" },
+    { "src": "/api/(.*)", "dest": "/api/$1" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
