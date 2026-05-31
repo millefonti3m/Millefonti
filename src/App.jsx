@@ -3911,6 +3911,10 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
       await supabase.storage.from('ecg-files').upload(zipFileName, zipBlob, { contentType:'application/zip', upsert:true });
       const { data: urlData } = await supabase.storage.from('ecg-files').createSignedUrl(zipFileName, 60*60*24*7);
       if (urlData?.signedUrl) {
+        await supabase.from('debug_log').insert({
+          messaggio: 'chiudiBatchMobile start',
+          dettaglio: JSON.stringify({ emailDest, batchNome, count: batchEcgs.length })
+        });
         const downloadUrl = urlData.signedUrl;
 
         // 1. Recupera codice_referti dell'azienda
