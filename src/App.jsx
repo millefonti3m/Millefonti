@@ -3908,6 +3908,10 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
       }));
       const zipBlob = await zip.generateAsync({ type:'blob' });
       const zipFileName = `referti/zip/_${batchNome.replace(/[^a-zA-Z0-9]/g,'_')}_${batchId}.zip`;
+      await supabase.from('debug_log').insert({
+        messaggio: 'chiudiBatchMobile zipBlob',
+        dettaglio: JSON.stringify({ zipSize: zipBlob?.size, zipFileName })
+      });
       await supabase.storage.from('ecg-files').upload(zipFileName, zipBlob, { contentType:'application/zip', upsert:true });
       const { data: urlData } = await supabase.storage.from('ecg-files').createSignedUrl(zipFileName, 60*60*24*7);
       await supabase.from('debug_log').insert({
