@@ -2250,6 +2250,9 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
   const [tab, setTab] = useState("assegnazioni");
   const [refreshing, setRefreshing] = useState(false);
   const [cardiologiDB, setCardiologiDB] = useState(cardiologiProp);
+  const [clientiCodici, setClientiCodici] = useState([]);
+  const [codiciTemp, setCodiciTemp] = useState({});
+  const [salvandoCodice, setSalvandoCodice] = useState({});
 
   // Carica cardiologi dal DB (sia ruolo singolo che ruoli multipli)
   useEffect(() => {
@@ -2265,6 +2268,23 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
       setCardiologiDB(unici);
     });
   }, []);
+
+  // Carica utenti azienda/farmacia quando si apre il tab aziende
+  useEffect(() => {
+    if (tab !== 'aziende') return;
+    supabase.from('user_profiles')
+      .select('id, nome, cognome, ruolo, codice_referti')
+      .or('ruolo.eq.azienda,ruolo.eq.farmacia')
+      .then(({ data }) => {
+        if (data) {
+          setClientiCodici(data);
+          const init = {};
+          data.forEach(u => { init[u.id] = u.codice_referti || ''; });
+          setCodiciTemp(init);
+        }
+      });
+  }, [tab]);
+
   const [tariffariAdmin, setTariffariAdmin] = useState({});
   const [registroEcgs, setRegistroEcgs] = useState([]);
   const [registroLoading, setRegistroLoading] = useState(false);
@@ -2431,6 +2451,19 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
         await supabase.from('ecgs').update({ cardiologo_nome: dest }).eq('id', ecg.id);
       }
     }
+  };
+
+  const generaCodice = (id) => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const codice = Array.from({length: 8}, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    setCodiciTemp(prev => ({...prev, [id]: codice}));
+  };
+
+  const salvaCodice = async (id) => {
+    setSalvandoCodice(prev => ({...prev, [id]: true}));
+    await supabase.from('user_profiles').update({ codice_referti: codiciTemp[id] }).eq('id', id);
+    setClientiCodici(prev => prev.map(u => u.id === id ? {...u, codice_referti: codiciTemp[id]} : u));
+    setSalvandoCodice(prev => ({...prev, [id]: false}));
   };
 
   const eliminaEcg = async (ecgId) => {
@@ -2826,6 +2859,46 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
                 </div>
               );
             })}
+          </div>
+
+          {/* ── GESTIONE CODICI DOWNLOAD ── */}
+          <hr style={{ border:'none', borderTop:`1px solid ${C.border}`, margin:'32px 0 24px' }} />
+          <div style={{ fontWeight:700, fontSize:17, color:C.text, marginBottom:6 }}>🔑 Gestione codici download</div>
+          <div style={{ color:C.muted, fontSize:13, marginBottom:20 }}>Ogni cliente usa il proprio codice per scaricare i referti dal portale.</div>
+          <div style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:16, boxShadow:C.shadow, overflow:'hidden' }}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 100px 180px 160px', padding:'10px 20px', background:C.cardAlt, fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:1 }}>
+              <div>Cliente</div><div>Ruolo</div><div>Codice download</div><div>Azioni</div>
+            </div>
+            {clientiCodici.length === 0 && (
+              <div style={{ padding:'24px 20px', color:C.muted, fontSize:13 }}>Nessun cliente registrato</div>
+            )}
+            {clientiCodici.map(u => (
+              <div key={u.id} style={{ display:'grid', gridTemplateColumns:'1fr 100px 180px 160px', padding:'14px 20px', borderTop:`1px solid ${C.border}`, alignItems:'center', gap:8 }}>
+                <div style={{ fontWeight:600, fontSize:14, color:C.text }}>{`${u.nome||''} ${u.cognome||''}`.trim() || '—'}</div>
+                <div>
+                  <span style={{ background: u.ruolo==='azienda' ? C.accentLight : C.greenLight, color: u.ruolo==='azienda' ? C.accent : C.green, borderRadius:20, padding:'3px 10px', fontSize:11, fontWeight:700 }}>
+                    {u.ruolo==='azienda' ? '🏢 Azienda' : '💊 Farmacia'}
+                  </span>
+                </div>
+                <div>
+                  <input
+                    value={codiciTemp[u.id] || ''}
+                    onChange={e => setCodiciTemp(prev => ({...prev, [u.id]: e.target.value.toUpperCase()}))}
+                    style={{ ...inputStyle, fontFamily:MONO, fontSize:13, letterSpacing:2, textTransform:'uppercase', width:'100%', boxSizing:'border-box' }}
+                    placeholder="—"
+                    maxLength={8}
+                  />
+                </div>
+                <div style={{ display:'flex', gap:8 }}>
+                  <button onClick={() => generaCodice(u.id)} style={{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:8, padding:'7px 12px', fontSize:12, fontWeight:600, color:C.muted, cursor:'pointer' }}>
+                    🎲 Genera
+                  </button>
+                  <button onClick={() => salvaCodice(u.id)} disabled={salvandoCodice[u.id]} style={{ background:C.accent, color:C.white, border:'none', borderRadius:8, padding:'7px 12px', fontSize:12, fontWeight:700, cursor:'pointer', opacity: salvandoCodice[u.id] ? 0.6 : 1 }}>
+                    {salvandoCodice[u.id] ? '...' : '💾 Salva'}
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
