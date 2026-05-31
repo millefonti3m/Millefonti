@@ -3945,6 +3945,10 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ tipo: 'token_creation_failed', messaggio: `Token creation failed per ${emailDest}` }),
           }).catch(() => {});
+          await supabase.from('debug_log').insert({
+            messaggio: 'token creation failed mobile',
+            dettaglio: JSON.stringify(tokenError)
+          });
         }
         const linkDownload = tokenError || !tokenData
           ? downloadUrl
