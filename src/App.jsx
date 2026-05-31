@@ -2542,8 +2542,8 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
 
   const salvaCodice = async (id) => {
     setSalvandoCodice(prev => ({...prev, [id]: true}));
-    await supabase.from('user_profiles').update({ codice_referti: codiciTemp[id] }).eq('id', id);
-    setClientiCodici(prev => prev.map(u => u.id === id ? {...u, codice_referti: codiciTemp[id]} : u));
+    await supabase.from('user_profiles').update({ codice_referti: codiciTemp[id] || null }).eq('id', id);
+    setClientiCodici(prev => prev.map(u => u.id === id ? {...u, codice_referti: codiciTemp[id] || null} : u));
     setSalvandoCodice(prev => ({...prev, [id]: false}));
   };
 
