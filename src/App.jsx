@@ -1490,14 +1490,55 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
         if (!ecg.batch_id && ecg.email_destinatario) {
           const { data: urlData } = await supabase.storage.from('ecg-files').createSignedUrl(refertoFileName, 60 * 60 * 24 * 7);
           if (urlData?.signedUrl) {
+            const emailDest = ecg.email_destinatario;
+            const downloadUrl = urlData.signedUrl;
+
+            // 1. Recupera codice_referti dell'azienda
+            const { data: profilo } = await supabase
+              .from('user_profiles')
+              .select('codice_referti')
+              .eq('email', emailDest)
+              .single();
+            const codiceReferti = profilo?.codice_referti || null;
+
+            // 2. Crea token di download
+            const expires = new Date();
+            expires.setDate(expires.getDate() + 7);
+            const { data: tokenData, error: tokenError } = await supabase
+              .from('download_tokens')
+              .insert({
+                download_url: downloadUrl,
+                azienda_email: emailDest,
+                batch_nome: ecg.paziente_nome || ecg.paziente,
+                count: 1,
+                cardiologo: meCardiologo,
+                expires_at: expires.toISOString(),
+                codice_referti: codiceReferti,
+              })
+              .select('token')
+              .single();
+
+            // 3. Costruisci link
+            if (tokenError) {
+              fetch('/api/notify-breach', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tipo: 'token_creation_failed', messaggio: `Token creation failed per ${emailDest}` }),
+              }).catch(() => {});
+            }
+            const linkDownload = tokenError || !tokenData
+              ? downloadUrl
+              : `https://ambulatoriomillefonti.it/api/scarica?token=${tokenData.token}`;
+
+            // 4. Invia email con linkDownload
             fetch('/api/notify-referto', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                email: ecg.email_destinatario,
+                email: emailDest,
                 paziente: ecg.paziente_nome || ecg.paziente,
                 cardiologo: meCardiologo,
-                downloadUrl: urlData.signedUrl,
+                downloadUrl: linkDownload,
               })
             }).catch(() => {});
           }
@@ -1855,12 +1896,52 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, pushAbilitato
       await supabase.storage.from('ecg-files').upload(zipFileName, zipBlob, { contentType:'application/zip', upsert:true });
       const { data: urlData } = await supabase.storage.from('ecg-files').createSignedUrl(zipFileName, 60*60*24*7);
       if (urlData?.signedUrl) {
+        const downloadUrl = urlData.signedUrl;
+
+        // 1. Recupera codice_referti dell'azienda
+        const { data: profilo } = await supabase
+          .from('user_profiles')
+          .select('codice_referti')
+          .eq('email', email)
+          .single();
+        const codiceReferti = profilo?.codice_referti || null;
+
+        // 2. Crea token di download
+        const expires = new Date();
+        expires.setDate(expires.getDate() + 7);
+        const { data: tokenData, error: tokenError } = await supabase
+          .from('download_tokens')
+          .insert({
+            download_url: downloadUrl,
+            azienda_email: email,
+            batch_nome: batchNome,
+            count: ecgsBatch.length,
+            cardiologo: meCardiologo,
+            expires_at: expires.toISOString(),
+            codice_referti: codiceReferti,
+          })
+          .select('token')
+          .single();
+
+        // 3. Costruisci link
+        if (tokenError) {
+          fetch('/api/notify-breach', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tipo: 'token_creation_failed', messaggio: `Token creation failed per ${email}` }),
+          }).catch(() => {});
+        }
+        const linkDownload = tokenError || !tokenData
+          ? downloadUrl
+          : `https://ambulatoriomillefonti.it/api/scarica?token=${tokenData.token}`;
+
+        // 4. Invia email con linkDownload
         await fetch('/api/notify-referto', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             email, cardiologo: meCardiologo,
-            downloadUrl: urlData.signedUrl,
+            downloadUrl: linkDownload,
             isBatch: true, batchNome, count: ecgsBatch.length,
           })
         }).catch(() => {});
@@ -3830,9 +3911,49 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
       await supabase.storage.from('ecg-files').upload(zipFileName, zipBlob, { contentType:'application/zip', upsert:true });
       const { data: urlData } = await supabase.storage.from('ecg-files').createSignedUrl(zipFileName, 60*60*24*7);
       if (urlData?.signedUrl) {
+        const downloadUrl = urlData.signedUrl;
+
+        // 1. Recupera codice_referti dell'azienda
+        const { data: profilo } = await supabase
+          .from('user_profiles')
+          .select('codice_referti')
+          .eq('email', emailDest)
+          .single();
+        const codiceReferti = profilo?.codice_referti || null;
+
+        // 2. Crea token di download
+        const expires = new Date();
+        expires.setDate(expires.getDate() + 7);
+        const { data: tokenData, error: tokenError } = await supabase
+          .from('download_tokens')
+          .insert({
+            download_url: downloadUrl,
+            azienda_email: emailDest,
+            batch_nome: batchNome,
+            count: batchEcgs.length,
+            cardiologo: meCardiologo,
+            expires_at: expires.toISOString(),
+            codice_referti: codiceReferti,
+          })
+          .select('token')
+          .single();
+
+        // 3. Costruisci link
+        if (tokenError) {
+          fetch('/api/notify-breach', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tipo: 'token_creation_failed', messaggio: `Token creation failed per ${emailDest}` }),
+          }).catch(() => {});
+        }
+        const linkDownload = tokenError || !tokenData
+          ? downloadUrl
+          : `https://ambulatoriomillefonti.it/api/scarica?token=${tokenData.token}`;
+
+        // 4. Invia email con linkDownload
         await fetch('/api/notify-referto', {
           method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ email:emailDest, cardiologo:meCardiologo, downloadUrl:urlData.signedUrl, isBatch:true, batchNome, count:batchEcgs.length })
+          body: JSON.stringify({ email:emailDest, cardiologo:meCardiologo, downloadUrl:linkDownload, isBatch:true, batchNome, count:batchEcgs.length })
         });
         alert('✅ Email inviata a ' + emailDest);
       }
