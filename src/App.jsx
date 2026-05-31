@@ -2887,7 +2887,6 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
                     onChange={e => setCodiciTemp(prev => ({...prev, [u.id]: e.target.value.toUpperCase()}))}
                     style={{ ...inputStyle, fontFamily:MONO, fontSize:13, letterSpacing:2, textTransform:'uppercase', width:'100%', boxSizing:'border-box' }}
                     placeholder="—"
-                    maxLength={8}
                   />
                 </div>
                 <div style={{ display:'flex', gap:8 }}>
