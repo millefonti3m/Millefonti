@@ -2275,7 +2275,8 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
     supabase.from('user_profiles')
       .select('id, nome, cognome, ruolo, codice_referti')
       .or('ruolo.eq.azienda,ruolo.eq.farmacia')
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        console.log('[DEBUG clientiCodici] data:', data, 'error:', error);
         if (data) {
           setClientiCodici(data);
           const init = {};
