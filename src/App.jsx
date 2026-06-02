@@ -2335,6 +2335,11 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
   const [codiciTemp, setCodiciTemp] = useState({});
   const [salvandoCodice, setSalvandoCodice] = useState({});
   const [downloadHistory, setDownloadHistory] = useState([]);
+  const [modalCliente, setModalCliente] = useState(null);
+  const [formCliente, setFormCliente] = useState({});
+  const [emailAutorizzateForm, setEmailAutorizzateForm] = useState([]);
+  const [salvandoCliente, setSalvandoCliente] = useState(false);
+  const [erroreCliente, setErroreCliente] = useState(null);
 
   // Carica cardiologi dal DB (sia ruolo singolo che ruoli multipli)
   useEffect(() => {
@@ -2355,7 +2360,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
   useEffect(() => {
     if (tab !== 'aziende') return;
     supabase.from('user_profiles')
-      .select('id, nome, cognome, ruolo, codice_referti')
+      .select('id, nome, cognome, ruolo, codice_referti, email')
       .or('ruolo.eq.azienda,ruolo.eq.farmacia')
       .then(({ data, error }) => {
         if (data) {
@@ -2553,6 +2558,67 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
     setSalvandoCodice(prev => ({...prev, [id]: false}));
   };
 
+  const apriNuovoCliente = () => {
+    setFormCliente({ nome:'', cognome:'', email:'', password:'', ruolo:'azienda', codice_referti:'' });
+    setEmailAutorizzateForm(['']);
+    setErroreCliente(null);
+    setModalCliente('nuovo');
+  };
+
+  const apriModificaCliente = (u) => {
+    setFormCliente({ ...u, password:'', codice_referti: u.codice_referti || '' });
+    setErroreCliente(null);
+    setModalCliente(u);
+    supabase.from('email_autorizzate')
+      .select('email')
+      .eq('user_id', u.id)
+      .then(({ data }) => {
+        setEmailAutorizzateForm(data?.length ? data.map(e => e.email) : ['']);
+      });
+  };
+
+  const salvaCliente = async () => {
+    setSalvandoCliente(true);
+    setErroreCliente(null);
+    try {
+      if (modalCliente === 'nuovo') {
+        const res = await fetch('/api/crea-cliente', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: formCliente.email,
+            password: formCliente.password,
+            nome: formCliente.nome,
+            cognome: formCliente.cognome || '',
+            ruolo: formCliente.ruolo,
+            codice_referti: formCliente.codice_referti || null,
+            email_autorizzate: emailAutorizzateForm.filter(Boolean),
+          }),
+        });
+        const json = await res.json();
+        if (!res.ok) { setErroreCliente(json.error || 'Errore creazione'); setSalvandoCliente(false); return; }
+        // Ricarica lista clienti
+        const { data } = await supabase.from('user_profiles').select('id, nome, cognome, ruolo, codice_referti, email').or('ruolo.eq.azienda,ruolo.eq.farmacia');
+        if (data) { setClientiCodici(data); const init={}; data.forEach(u=>{ init[u.id]=u.codice_referti||''; }); setCodiciTemp(init); }
+      } else {
+        const body = { userId: modalCliente.id, email_autorizzate: emailAutorizzateForm.filter(Boolean) };
+        if (formCliente.password) body.password = formCliente.password;
+        if ('codice_referti' in formCliente) body.codice_referti = formCliente.codice_referti || null;
+        const res = await fetch('/api/modifica-cliente', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const json = await res.json();
+        if (!res.ok) { setErroreCliente(json.error || 'Errore modifica'); setSalvandoCliente(false); return; }
+        setClientiCodici(prev => prev.map(u => u.id === modalCliente.id ? {...u, codice_referti: formCliente.codice_referti || null} : u));
+        setCodiciTemp(prev => ({...prev, [modalCliente.id]: formCliente.codice_referti || ''}));
+      }
+      setModalCliente(null);
+    } catch(e) { setErroreCliente(e.message); }
+    setSalvandoCliente(false);
+  };
+
   const eliminaEcg = async (ecgId) => {
     if (!confirm("Eliminare questo ECG? L'azione non è reversibile.")) return;
     await supabase.from('ecgs').delete().eq('id', ecgId);
@@ -2647,6 +2713,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
   const aziendeDisponibili = [...new Set(ecgs.map(e=>e.origine_dettaglio||e.azienda||e.farmacia||'Altro').filter(Boolean))].sort();
 
   return (
+    <>
     <div style={{ padding:32, maxWidth:960, margin:"0 auto" }}>
       <div style={{ display:"flex", alignItems:"center", gap:16, marginBottom:28 }}>
         <div style={{ width:52, height:52, background:"linear-gradient(135deg,#e8f0fe,#e5f7f7)", borderRadius:16, display:"flex", alignItems:"center", justifyContent:"center", fontSize:26 }}>⚙️</div>
@@ -2832,7 +2899,10 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
         const sorted=Object.entries(clienti).sort((a,b)=>b[1].tot-a[1].tot);
         const MESI=['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
         return (<div>
-          <div style={{fontWeight:700,fontSize:17,color:C.text,marginBottom:20}}>📊 Statistiche per cliente</div>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
+            <div style={{fontWeight:700,fontSize:17,color:C.text}}>📊 Statistiche per cliente</div>
+            <button onClick={apriNuovoCliente} style={{ background:C.accent, color:C.white, border:'none', borderRadius:8, padding:'8px 16px', fontSize:13, fontWeight:700, cursor:'pointer' }}>+ Nuovo cliente</button>
+          </div>
           <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,boxShadow:C.shadow,overflow:'hidden'}}>
             <div style={{display:'grid',gridTemplateColumns:'1fr 80px 80px 80px 80px 70px',padding:'10px 20px',background:C.cardAlt,fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>
               <div>Cliente</div><div style={{textAlign:'center'}}>Totale</div><div style={{textAlign:'center'}}>Ref.</div><div style={{textAlign:'center'}}>{MESI[meseCorr]}</div><div style={{textAlign:'center'}}>{MESI[mesePrec]}</div><div style={{textAlign:'center'}}>% compl.</div>
@@ -2862,7 +2932,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
               <div style={{ padding:'24px 20px', color:C.muted, fontSize:13 }}>Nessun cliente registrato</div>
             )}
             {clientiCodici.map(u => (
-              <div key={u.id} style={{ display:'grid', gridTemplateColumns:'1fr 100px 180px 160px', padding:'14px 20px', borderTop:`1px solid ${C.border}`, alignItems:'center', gap:8 }}>
+              <div key={u.id} style={{ display:'grid', gridTemplateColumns:'1fr 100px 180px 220px', padding:'14px 20px', borderTop:`1px solid ${C.border}`, alignItems:'center', gap:8 }}>
                 <div style={{ fontWeight:600, fontSize:14, color:C.text }}>{`${u.nome||''} ${u.cognome||''}`.trim() || '—'}</div>
                 <div>
                   <span style={{ background: u.ruolo==='azienda' ? C.accentLight : C.greenLight, color: u.ruolo==='azienda' ? C.accent : C.green, borderRadius:20, padding:'3px 10px', fontSize:11, fontWeight:700 }}>
@@ -2883,6 +2953,9 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
                   </button>
                   <button onClick={() => salvaCodice(u.id)} disabled={salvandoCodice[u.id]} style={{ background:C.accent, color:C.white, border:'none', borderRadius:8, padding:'7px 12px', fontSize:12, fontWeight:700, cursor:'pointer', opacity: salvandoCodice[u.id] ? 0.6 : 1 }}>
                     {salvandoCodice[u.id] ? '...' : '💾 Salva'}
+                  </button>
+                  <button onClick={() => apriModificaCliente(u)} style={{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:8, padding:'7px 10px', fontSize:12, fontWeight:600, color:C.text, cursor:'pointer' }}>
+                    ✏️
                   </button>
                 </div>
               </div>
@@ -3588,6 +3661,61 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
         </div>
       )}
     </div>
+    {/* ── MODALE CREA/MODIFICA CLIENTE ── */}
+    {modalCliente !== null && (
+      <div onClick={e => { if (e.target === e.currentTarget) setModalCliente(null); }}
+        style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
+        <div style={{ background:C.white, borderRadius:18, padding:32, maxWidth:520, width:'100%', boxShadow:'0 8px 40px rgba(0,0,0,0.18)', maxHeight:'90vh', overflowY:'auto' }}>
+          <h2 style={{ color:C.text, fontSize:20, fontWeight:700, marginBottom:24 }}>
+            {modalCliente === 'nuovo' ? '+ Nuovo cliente' : `✏️ Modifica — ${(modalCliente.nome||'')} ${(modalCliente.cognome||'')}`.trim()}
+          </h2>
+          {modalCliente === 'nuovo' && (<>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:14 }}>
+              <div><label style={{ color:C.textSoft, fontSize:12, fontWeight:600, display:'block', marginBottom:6 }}>Nome *</label>
+                <input value={formCliente.nome||''} onChange={e => { const n=e.target.value; setFormCliente(p=>({...p, nome:n, password:(n.split(' ')[0]||'').toUpperCase()+'MILLEFONTI'})); }} style={inputStyle} placeholder="Es. Salute e Lavoro" /></div>
+              <div><label style={{ color:C.textSoft, fontSize:12, fontWeight:600, display:'block', marginBottom:6 }}>Cognome</label>
+                <input value={formCliente.cognome||''} onChange={e => setFormCliente(p=>({...p,cognome:e.target.value}))} style={inputStyle} placeholder="Opzionale" /></div>
+            </div>
+            <div style={{ marginBottom:14 }}><label style={{ color:C.textSoft, fontSize:12, fontWeight:600, display:'block', marginBottom:6 }}>Email account *</label>
+              <input value={formCliente.email||''} onChange={e => setFormCliente(p=>({...p,email:e.target.value}))} type="email" style={inputStyle} placeholder="cliente@esempio.it" /></div>
+            <div style={{ marginBottom:14 }}><label style={{ color:C.textSoft, fontSize:12, fontWeight:600, display:'block', marginBottom:6 }}>Tipo *</label>
+              <select value={formCliente.ruolo||'azienda'} onChange={e => setFormCliente(p=>({...p,ruolo:e.target.value}))} style={inputStyle}>
+                <option value="azienda">🏢 Azienda</option>
+                <option value="farmacia">💊 Farmacia</option>
+              </select></div>
+          </>)}
+          {modalCliente !== 'nuovo' && (
+            <div style={{ background:C.bg, borderRadius:10, padding:'10px 14px', marginBottom:14, fontSize:13, color:C.muted }}>
+              <strong style={{ color:C.text }}>{modalCliente.nome} {modalCliente.cognome}</strong> · {modalCliente.ruolo==='azienda'?'🏢 Azienda':'💊 Farmacia'} · <span style={{ fontFamily:MONO }}>{modalCliente.email||'—'}</span>
+            </div>
+          )}
+          <div style={{ marginBottom:14 }}><label style={{ color:C.textSoft, fontSize:12, fontWeight:600, display:'block', marginBottom:6 }}>
+            Password {modalCliente==='nuovo' ? '*' : '(lascia vuoto per non cambiare)'}
+          </label>
+            <input value={formCliente.password||''} onChange={e => setFormCliente(p=>({...p,password:e.target.value}))} type="text" style={{ ...inputStyle, fontFamily:MONO }} placeholder={modalCliente==='nuovo' ? 'Auto-generata dal nome' : '••••••••'} /></div>
+          <div style={{ marginBottom:14 }}><label style={{ color:C.textSoft, fontSize:12, fontWeight:600, display:'block', marginBottom:6 }}>Codice download referti</label>
+            <input value={formCliente.codice_referti||''} onChange={e => setFormCliente(p=>({...p,codice_referti:e.target.value.toUpperCase()}))} style={{ ...inputStyle, fontFamily:MONO, letterSpacing:2 }} placeholder="Opzionale" /></div>
+          <div style={{ marginBottom:20 }}>
+            <label style={{ color:C.textSoft, fontSize:12, fontWeight:600, display:'block', marginBottom:8 }}>Email autorizzate all'invio ECG</label>
+            {emailAutorizzateForm.map((em, i) => (
+              <div key={i} style={{ display:'flex', gap:8, marginBottom:8 }}>
+                <input value={em} onChange={e => setEmailAutorizzateForm(prev => prev.map((v,j)=>j===i?e.target.value:v))} type="email" style={{ ...inputStyle, flex:1 }} placeholder="email@esempio.it" />
+                {emailAutorizzateForm.length > 1 && <button onClick={() => setEmailAutorizzateForm(prev=>prev.filter((_,j)=>j!==i))} style={{ background:C.redLight, color:C.red, border:'none', borderRadius:8, padding:'0 12px', cursor:'pointer', fontWeight:700 }}>×</button>}
+              </div>
+            ))}
+            <button onClick={() => setEmailAutorizzateForm(prev=>[...prev,''])} style={{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:8, padding:'7px 14px', fontSize:12, fontWeight:600, color:C.muted, cursor:'pointer' }}>+ Aggiungi email</button>
+          </div>
+          {erroreCliente && <div style={{ background:C.redLight, border:`1px solid ${C.red}33`, borderRadius:10, padding:'10px 14px', color:C.red, fontSize:13, marginBottom:16 }}>{erroreCliente}</div>}
+          <div style={{ display:'flex', gap:12, justifyContent:'flex-end' }}>
+            <button onClick={() => setModalCliente(null)} style={{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:10, padding:'11px 20px', fontSize:14, fontWeight:600, color:C.muted, cursor:'pointer' }}>Annulla</button>
+            <button onClick={salvaCliente} disabled={salvandoCliente} style={{ background:salvandoCliente?C.border:C.accent, color:C.white, border:'none', borderRadius:10, padding:'11px 24px', fontSize:14, fontWeight:700, cursor:salvandoCliente?'not-allowed':'pointer' }}>
+              {salvandoCliente ? '⏳...' : modalCliente==='nuovo' ? 'Crea cliente' : 'Salva modifiche'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 };
 
