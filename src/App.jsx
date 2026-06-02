@@ -3669,6 +3669,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
           <h2 style={{ color:C.text, fontSize:20, fontWeight:700, marginBottom:24 }}>
             {modalCliente === 'nuovo' ? '+ Nuovo cliente' : `✏️ Modifica — ${(modalCliente.nome||'')} ${(modalCliente.cognome||'')}`.trim()}
           </h2>
+          <div style={{ fontSize:11, color:C.muted, marginBottom:16 }}>* Campo obbligatorio</div>
           {modalCliente === 'nuovo' && (<>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:14 }}>
               <div><label style={{ color:C.textSoft, fontSize:12, fontWeight:600, display:'block', marginBottom:6 }}>Nome *</label>
@@ -3677,7 +3678,9 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
                 <input value={formCliente.cognome||''} onChange={e => setFormCliente(p=>({...p,cognome:e.target.value}))} style={inputStyle} placeholder="Opzionale" /></div>
             </div>
             <div style={{ marginBottom:14 }}><label style={{ color:C.textSoft, fontSize:12, fontWeight:600, display:'block', marginBottom:6 }}>Email account *</label>
-              <input value={formCliente.email||''} onChange={e => setFormCliente(p=>({...p,email:e.target.value}))} type="email" style={inputStyle} placeholder="cliente@esempio.it" /></div>
+              <input value={formCliente.email||''} onChange={e => setFormCliente(p=>({...p,email:e.target.value}))} type="email" style={inputStyle} placeholder="cliente@esempio.it" />
+              <div style={{ fontSize:11, color:C.muted, marginTop:4 }}>Le notifiche e le mail con i referti arriveranno solo ed esclusivamente a questa email</div>
+            </div>
             <div style={{ marginBottom:14 }}><label style={{ color:C.textSoft, fontSize:12, fontWeight:600, display:'block', marginBottom:6 }}>Tipo *</label>
               <select value={formCliente.ruolo||'azienda'} onChange={e => setFormCliente(p=>({...p,ruolo:e.target.value}))} style={inputStyle}>
                 <option value="azienda">🏢 Azienda</option>
@@ -3692,9 +3695,13 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
           <div style={{ marginBottom:14 }}><label style={{ color:C.textSoft, fontSize:12, fontWeight:600, display:'block', marginBottom:6 }}>
             Password {modalCliente==='nuovo' ? '*' : '(lascia vuoto per non cambiare)'}
           </label>
-            <input value={formCliente.password||''} onChange={e => setFormCliente(p=>({...p,password:e.target.value}))} type="text" style={{ ...inputStyle, fontFamily:MONO }} placeholder={modalCliente==='nuovo' ? 'Auto-generata dal nome' : '••••••••'} /></div>
+            <input value={formCliente.password||''} onChange={e => setFormCliente(p=>({...p,password:e.target.value}))} type="text" style={{ ...inputStyle, fontFamily:MONO }} placeholder={modalCliente==='nuovo' ? 'Auto-generata dal nome' : '••••••••'} />
+            <div style={{ fontSize:11, color:C.muted, marginTop:4 }}>Generata automaticamente dal nome. Comunicala al cliente quando vuoi.</div>
+          </div>
           <div style={{ marginBottom:14 }}><label style={{ color:C.textSoft, fontSize:12, fontWeight:600, display:'block', marginBottom:6 }}>Codice download referti</label>
-            <input value={formCliente.codice_referti||''} onChange={e => setFormCliente(p=>({...p,codice_referti:e.target.value.toUpperCase()}))} style={{ ...inputStyle, fontFamily:MONO, letterSpacing:2 }} placeholder="Opzionale" /></div>
+            <input value={formCliente.codice_referti||''} onChange={e => setFormCliente(p=>({...p,codice_referti:e.target.value.toUpperCase()}))} style={{ ...inputStyle, fontFamily:MONO, letterSpacing:2 }} placeholder="Opzionale" />
+            <div style={{ fontSize:11, color:C.muted, marginTop:4 }}>Il cliente userà questo codice per scaricare i referti. Se non impostato il download sarà libero.</div>
+          </div>
           <div style={{ marginBottom:20 }}>
             <label style={{ color:C.textSoft, fontSize:12, fontWeight:600, display:'block', marginBottom:8 }}>Email autorizzate all'invio ECG</label>
             {emailAutorizzateForm.map((em, i) => (
