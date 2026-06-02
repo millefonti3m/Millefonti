@@ -2334,6 +2334,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
   const [clientiCodici, setClientiCodici] = useState([]);
   const [codiciTemp, setCodiciTemp] = useState({});
   const [salvandoCodice, setSalvandoCodice] = useState({});
+  const [downloadHistory, setDownloadHistory] = useState([]);
 
   // Carica cardiologi dal DB (sia ruolo singolo che ruoli multipli)
   useEffect(() => {
@@ -2350,7 +2351,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
     });
   }, []);
 
-  // Carica utenti azienda/farmacia quando si apre il tab aziende
+  // Carica utenti azienda/farmacia e storico download quando si apre il tab aziende
   useEffect(() => {
     if (tab !== 'aziende') return;
     supabase.from('user_profiles')
@@ -2364,6 +2365,11 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
           setCodiciTemp(init);
         }
       });
+    supabase.from('download_tokens')
+      .select('id, batch_nome, azienda_email, count, cardiologo, expires_at, used_at, created_at')
+      .order('created_at', { ascending: false })
+      .limit(50)
+      .then(({ data }) => { if (data) setDownloadHistory(data); });
   }, [tab]);
 
   const [tariffariAdmin, setTariffariAdmin] = useState({});
@@ -2881,6 +2887,44 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* ── STORICO DOWNLOAD REFERTI ── */}
+          <hr style={{ border:'none', borderTop:`1px solid ${C.border}`, margin:'32px 0 24px' }} />
+          <div style={{ fontWeight:700, fontSize:17, color:C.text, marginBottom:6 }}>📬 Storico download referti</div>
+          <div style={{ color:C.muted, fontSize:13, marginBottom:20 }}>Ultimi 50 link inviati alle aziende.</div>
+          <div style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:16, boxShadow:C.shadow, overflow:'hidden' }}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 60px 100px 100px 100px 180px', padding:'10px 20px', background:C.cardAlt, fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:1 }}>
+              <div>Lotto</div><div>Azienda</div><div>ECG</div><div>Cardiologo</div><div>Inviato il</div><div>Scadenza</div><div>Scaricato</div>
+            </div>
+            {downloadHistory.length === 0 && (
+              <div style={{ padding:'24px 20px', color:C.muted, fontSize:13 }}>Nessun link inviato ancora</div>
+            )}
+            {downloadHistory.map(tk => {
+              const ora = new Date();
+              const scaduto = new Date(tk.expires_at) < ora;
+              const scaricato = !!tk.used_at;
+              let statoEl;
+              if (scaricato) {
+                const d = new Date(tk.used_at);
+                statoEl = <span style={{ color:C.green, fontWeight:700, fontSize:12 }}>✅ {d.toLocaleDateString('it-IT')} alle {d.toLocaleTimeString('it-IT', { hour:'2-digit', minute:'2-digit' })}</span>;
+              } else if (!scaduto) {
+                statoEl = <span style={{ color:C.muted, fontSize:12 }}>⏳ Non ancora</span>;
+              } else {
+                statoEl = <span style={{ color:C.red, fontWeight:700, fontSize:12 }}>❌ Scaduto senza download</span>;
+              }
+              return (
+                <div key={tk.id} style={{ display:'grid', gridTemplateColumns:'1fr 1fr 60px 100px 100px 100px 180px', padding:'12px 20px', borderTop:`1px solid ${C.border}`, alignItems:'center', fontSize:13 }}>
+                  <div style={{ fontWeight:600, color:C.text }}>{tk.batch_nome || '—'}</div>
+                  <div style={{ color:C.muted, fontSize:12 }}>{tk.azienda_email || '—'}</div>
+                  <div style={{ color:C.text, fontWeight:600 }}>{tk.count ?? '—'}</div>
+                  <div style={{ color:C.muted, fontSize:12 }}>{tk.cardiologo || '—'}</div>
+                  <div style={{ color:C.muted, fontSize:12 }}>{tk.created_at ? new Date(tk.created_at).toLocaleDateString('it-IT') : '—'}</div>
+                  <div style={{ color: scaduto && !scaricato ? C.red : C.muted, fontSize:12 }}>{new Date(tk.expires_at).toLocaleDateString('it-IT')}</div>
+                  <div>{statoEl}</div>
+                </div>
+              );
+            })}
           </div>
         </div>);
       })()}
