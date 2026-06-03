@@ -4449,8 +4449,14 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
         </div>
         <div style={{ padding:16, display:'flex', flexDirection:'column', gap:10 }}>
           {batchEcgs.map(ecg => (
-            <div key={ecg.id} onClick={()=>ecg.stato==='in_attesa'&&apriEcg(ecg)}
-              style={{ background:C.white, borderRadius:14, padding:18, boxShadow:'0 2px 8px rgba(0,0,0,0.05)', border:`2px solid ${ecg.stato==='refertato'?C.green:C.border}`, cursor:ecg.stato==='in_attesa'?'pointer':'default', opacity:ecg.stato==='refertato'?0.7:1 }}>
+            <div key={ecg.id} onClick={()=>{
+              if (ecg.stato === 'in_attesa') { apriEcg(ecg); return; }
+              if (ecg.stato === 'refertato' && ecg.file_referto_url) {
+                const { data } = supabase.storage.from('ecg-files').getPublicUrl(ecg.file_referto_url);
+                window.open(data.publicUrl, '_blank');
+              }
+            }}
+              style={{ background:C.white, borderRadius:14, padding:18, boxShadow:'0 2px 8px rgba(0,0,0,0.05)', border:`2px solid ${ecg.stato==='refertato'?C.green:C.border}`, cursor:'pointer' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                 <div style={{ fontWeight:600, fontSize:15, color:C.text }}>{ecg.paziente_nome||ecg.paziente}</div>
                 <div style={{ background:ecg.stato==='refertato'?C.greenLight:C.orangeLight, color:ecg.stato==='refertato'?C.green:C.orange, borderRadius:20, padding:'4px 12px', fontSize:12, fontWeight:700 }}>
@@ -4458,6 +4464,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
                 </div>
               </div>
               {ecg.stato==='in_attesa' && <div style={{ color:C.muted, fontSize:12, marginTop:4 }}>Tocca per refertare →</div>}
+              {ecg.stato==='refertato' && <div style={{ fontSize:11, color:C.muted, marginTop:4 }}>Tocca per visualizzare il referto →</div>}
             </div>
           ))}
           {tuttiRefertati && (
