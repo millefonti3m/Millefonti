@@ -4452,14 +4452,11 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
             <div key={ecg.id} onClick={async ()=>{
               if (ecg.stato === 'in_attesa') { apriEcg(ecg); return; }
               if (ecg.stato === 'refertato' && ecg.file_referto_url) {
-                const newTab = window.open('', '_blank');
                 const { data: urlData } = await supabase.storage
                   .from('ecg-files')
                   .createSignedUrl(ecg.file_referto_url, 300);
-                if (urlData?.signedUrl && newTab) {
-                  newTab.location.href = urlData.signedUrl;
-                } else if (newTab) {
-                  newTab.close();
+                if (urlData?.signedUrl) {
+                  window.location.href = urlData.signedUrl;
                 }
               }
             }}
