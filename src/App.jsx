@@ -4449,11 +4449,13 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
         </div>
         <div style={{ padding:16, display:'flex', flexDirection:'column', gap:10 }}>
           {batchEcgs.map(ecg => (
-            <div key={ecg.id} onClick={()=>{
+            <div key={ecg.id} onClick={async ()=>{
               if (ecg.stato === 'in_attesa') { apriEcg(ecg); return; }
               if (ecg.stato === 'refertato' && ecg.file_referto_url) {
-                const { data } = supabase.storage.from('ecg-files').getPublicUrl(ecg.file_referto_url);
-                window.open(data.publicUrl, '_blank');
+                const { data: urlData } = await supabase.storage
+                  .from('ecg-files')
+                  .createSignedUrl(ecg.file_referto_url, 300);
+                if (urlData?.signedUrl) window.open(urlData.signedUrl, '_blank');
               }
             }}
               style={{ background:C.white, borderRadius:14, padding:18, boxShadow:'0 2px 8px rgba(0,0,0,0.05)', border:`2px solid ${ecg.stato==='refertato'?C.green:C.border}`, cursor:'pointer' }}>
