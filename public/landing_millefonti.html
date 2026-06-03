@@ -493,6 +493,22 @@ document.querySelectorAll('.stat-n[data-target]').forEach(el=>cobs.observe(el));
 /* LOGIN */
 const SUPABASE_URL='https://weearnnmglyjufhpycju.supabase.co';
 const SUPABASE_ANON_KEY='sb_publishable_66zk8GO3NSC9_OW9KKw_1w_Buz7-qw5';
+
+// Auto-redirect se già loggato
+(function() {
+  const key = 'sb-weearnnmglyjufhpycju-auth-token';
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw) {
+      const session = JSON.parse(raw);
+      const expiresAt = session?.expires_at;
+      if (expiresAt && Date.now() / 1000 < expiresAt) {
+        window.location.href = '/app';
+      }
+    }
+  } catch(e) {}
+})();
+
 async function handleLogin(e){
   e.preventDefault();
   const email=document.getElementById('loginEmail').value.trim();
