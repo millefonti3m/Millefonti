@@ -148,11 +148,18 @@ async function inviaAlert(tipo, dettagli = '', contesto = '') {
         <p style="color:#9ca3af;font-size:11px;margin:0 0 4px;line-height:1.6;">
           Questa è una notifica automatica del sistema — si prega di non rispondere a questa email.
         </p>
-        <p style="color:#1a2640;font-size:12px;font-weight:600;margin:0;">Ambulatorio Millefonti</p>
-        <p style="color:#6b7d99;font-size:12px;margin:2px 0 0;">Via Garessio 47 — Torino</p>
         <div style="text-align:center;padding:24px 0 8px;">
           <img src="${LOGO}" alt="Ambulatorio Millefonti" width="120"
                style="display:block;margin:0 auto;" />
+        </div>
+        <div style="text-align:center; padding: 8px 0 16px; font-family: Arial, sans-serif;">
+          <p style="color:#255736; font-size:13px; font-weight:700; margin:0 0 4px;">Ambulatorio Millefonti</p>
+          <p style="color:#637082; font-size:11px; margin:0; line-height:1.8;">
+            Via Garessio 47 — 10126 Torino<br/>
+            Tel. 011 659 83 68 | +39 375 925 2801<br/>
+            <a href="mailto:info@ambulatoriomillefonti.it" style="color:#255736; text-decoration:none;">info@ambulatoriomillefonti.it</a> —
+            <a href="https://www.ambulatoriomillefonti.it" style="color:#255736; text-decoration:none;">www.ambulatoriomillefonti.it</a>
+          </p>
         </div>
       </div>
     </div>

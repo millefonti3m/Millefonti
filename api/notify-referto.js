@@ -62,6 +62,15 @@ export default async function handler(req, res) {
                 <img src="https://weearnnmglyjufhpycju.supabase.co/storage/v1/object/public/assets/logo%20definitivo.png" alt="Ambulatorio Millefonti" width="140"
                      style="display: block; margin: 0 auto;" />
               </div>
+              <div style="text-align:center; padding: 8px 0 16px; font-family: Arial, sans-serif;">
+                <p style="color:#255736; font-size:13px; font-weight:700; margin:0 0 4px;">Ambulatorio Millefonti</p>
+                <p style="color:#637082; font-size:11px; margin:0; line-height:1.8;">
+                  Via Garessio 47 — 10126 Torino<br/>
+                  Tel. 011 659 83 68 | +39 375 925 2801<br/>
+                  <a href="mailto:info@ambulatoriomillefonti.it" style="color:#255736; text-decoration:none;">info@ambulatoriomillefonti.it</a> —
+                  <a href="https://www.ambulatoriomillefonti.it" style="color:#255736; text-decoration:none;">www.ambulatoriomillefonti.it</a>
+                </p>
+              </div>
             </div>
           </div>
         `,
