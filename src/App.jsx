@@ -2340,6 +2340,13 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
   const [emailAutorizzateForm, setEmailAutorizzateForm] = useState([]);
   const [salvandoCliente, setSalvandoCliente] = useState(false);
   const [erroreCliente, setErroreCliente] = useState(null);
+  const [filesUpload, setFilesUpload] = useState([]);
+  const [batchNomeUpload, setBatchNomeUpload] = useState('');
+  const [noteUpload, setNoteUpload] = useState('');
+  const [clienteSelezionato, setClienteSelezionato] = useState(null);
+  const [urgenzaUpload, setUrgenzaUpload] = useState('normale');
+  const [caricandoUpload, setCaricandoUpload] = useState(false);
+  const [uploadSent, setUploadSent] = useState(false);
 
   // Carica cardiologi dal DB (sia ruolo singolo che ruoli multipli)
   useEffect(() => {
@@ -2356,9 +2363,9 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
     });
   }, []);
 
-  // Carica utenti azienda/farmacia e storico download quando si apre il tab aziende
+  // Carica utenti azienda/farmacia e storico download quando si apre il tab aziende o caricaecg
   useEffect(() => {
-    if (tab !== 'aziende') return;
+    if (tab !== 'aziende' && tab !== 'caricaecg') return;
     supabase.from('user_profiles')
       .select('id, nome, cognome, ruolo, codice_referti, email')
       .or('ruolo.eq.azienda,ruolo.eq.farmacia')
@@ -2619,6 +2626,58 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
     setSalvandoCliente(false);
   };
 
+  const inviaLottoAdmin = async () => {
+    if (!clienteSelezionato || !batchNomeUpload || filesUpload.length === 0 || caricandoUpload) return;
+    setCaricandoUpload(true);
+    const batchId = `BATCH-${Date.now()}`;
+    const nuovi = await Promise.all(filesUpload.map(async (file) => {
+      const nomePaziente = file.name.replace(/\.[^.]+$/, '');
+      const storageFileName = `${batchId}/${file.name}`;
+      const { error: uploadError } = await supabase.storage.from('ecg-files').upload(storageFileName, file);
+      const fileUrl = uploadError ? null : storageFileName;
+      return {
+        origine: "azienda",
+        paziente_nome: nomePaziente,
+        paziente_eta: 0,
+        paziente_sesso: "M",
+        note: noteUpload || "Idoneità lavorativa",
+        urgenza: urgenzaUpload,
+        stato: "in_attesa",
+        origine_dettaglio: `${clienteSelezionato.nome||''} ${clienteSelezionato.cognome||''}`.trim(),
+        batch_id: batchId,
+        batch_nome: batchNomeUpload,
+        file_ecg_url: fileUrl,
+        email_destinatario: clienteSelezionato.email,
+      };
+    }));
+    const { data, error } = await supabase.from('ecgs').insert(nuovi).select();
+    if (!error) {
+      fetch('/api/notify', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          paziente: `Lotto ${batchNomeUpload} — ${filesUpload.length} ECG`,
+          origine: "azienda", urgenza: urgenzaUpload,
+          note: `Azienda: ${`${clienteSelezionato.nome||''} ${clienteSelezionato.cognome||''}`.trim()} | Email: ${clienteSelezionato.email}`,
+        })
+      }).catch(()=>{});
+      if (clienteSelezionato.email) {
+        fetch('/api/notify-ricezione', { method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({
+            email: clienteSelezionato.email,
+            nomeAzienda: `${clienteSelezionato.nome||''} ${clienteSelezionato.cognome||''}`.trim(),
+            batchNome: batchNomeUpload,
+            count: filesUpload.length,
+            data: new Date().toLocaleDateString('it-IT'),
+          })
+        }).catch(()=>{});
+      }
+      await ricarica();
+      setUploadSent(true);
+      setFilesUpload([]); setBatchNomeUpload(''); setNoteUpload('');
+      setClienteSelezionato(null); setUrgenzaUpload('normale');
+    }
+    setCaricandoUpload(false);
+  };
+
   const eliminaEcg = async (ecgId) => {
     if (!confirm("Eliminare questo ECG? L'azione non è reversibile.")) return;
     await supabase.from('ecgs').delete().eq('id', ecgId);
@@ -2732,6 +2791,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
       {/* Tabs */}
       <div style={{ display:"flex", gap:6, marginBottom:24, background:C.bg, borderRadius:12, padding:4, width:"fit-content", flexWrap:"wrap" }}>
         {tabBtn("assegnazioni","Assegnazioni",nonAssegnati.length)}
+        {tabBtn("caricaecg","📤 Carica ECG",0)}
         {tabBtn("dashboard","Dashboard",0)}
         {tabBtn("aziende","📊 Aziende",0)}
         {tabBtn("prenotazioni","Prenotazioni",prenotazioni.length)}
@@ -3001,6 +3061,73 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
           </div>
         </div>);
       })()}
+
+      {/* ── TAB: CARICA ECG ── */}
+      {tab==="caricaecg" && (
+        <div style={{ maxWidth:640 }}>
+          <div style={{ fontWeight:700, fontSize:17, color:C.text, marginBottom:20 }}>📤 Carica ECG per un cliente</div>
+          {uploadSent ? (
+            <div style={{ background:'#f0fdf4', border:`2px solid ${C.green}`, borderRadius:16, padding:32, textAlign:'center' }}>
+              <div style={{ fontSize:40, marginBottom:12 }}>✅</div>
+              <div style={{ color:C.green, fontWeight:700, fontSize:18, marginBottom:8 }}>Lotto caricato con successo!</div>
+              <div style={{ color:C.muted, fontSize:13, marginBottom:20 }}>I file sono stati inviati e il cliente ha ricevuto la conferma via email.</div>
+              <button onClick={()=>setUploadSent(false)} style={{ background:C.accent, color:C.white, border:'none', borderRadius:10, padding:'11px 28px', cursor:'pointer', fontWeight:700, fontSize:14 }}>📤 Carica altro lotto</button>
+            </div>
+          ) : (
+            <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+              <div>
+                <label style={{ color:C.textSoft, fontSize:12, fontWeight:600, display:'block', marginBottom:6 }}>Cliente *</label>
+                <select value={clienteSelezionato?.id||''} onChange={e => {
+                  const u = clientiCodici.find(c => c.id === e.target.value);
+                  setClienteSelezionato(u || null);
+                }} style={inputStyle}>
+                  <option value="">Seleziona cliente...</option>
+                  {clientiCodici.map(u => (
+                    <option key={u.id} value={u.id}>
+                      {`${u.nome||''} ${u.cognome||''}`.trim()} — {u.ruolo==='azienda'?'🏢':'💊'} {u.email||''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={{ color:C.textSoft, fontSize:12, fontWeight:600, display:'block', marginBottom:6 }}>Nome lotto *</label>
+                <input value={batchNomeUpload} onChange={e=>setBatchNomeUpload(e.target.value)} style={inputStyle} placeholder="Es. Visita maggio 2026" />
+              </div>
+              <div>
+                <label style={{ color:C.textSoft, fontSize:12, fontWeight:600, display:'block', marginBottom:6 }}>Urgenza</label>
+                <div style={{ display:'flex', gap:8 }}>
+                  {[['normale','Normale'],['urgente','🔴 Urgente']].map(([v,l]) => (
+                    <button key={v} onClick={()=>setUrgenzaUpload(v)} style={{ flex:1, padding:'10px 0', borderRadius:10, cursor:'pointer', border:`1.5px solid ${urgenzaUpload===v?(v==='urgente'?C.red:C.accent):C.border}`, background:urgenzaUpload===v?(v==='urgente'?C.redLight:C.accentLight):C.bg, color:urgenzaUpload===v?(v==='urgente'?C.red:C.accent):C.muted, fontWeight:600, fontSize:13 }}>{l}</button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label style={{ color:C.textSoft, fontSize:12, fontWeight:600, display:'block', marginBottom:6 }}>Note (opzionale)</label>
+                <textarea value={noteUpload} onChange={e=>setNoteUpload(e.target.value)} style={{ ...inputStyle, height:70, resize:'vertical' }} placeholder="Motivo visita, note cliniche..." />
+              </div>
+              <div>
+                <label style={{ color:C.textSoft, fontSize:12, fontWeight:600, display:'block', marginBottom:6 }}>File ECG * (PDF/PNG/JPG)</label>
+                <input type="file" accept=".pdf,.png,.jpg,.jpeg" multiple onChange={e => setFilesUpload(Array.from(e.target.files))}
+                  style={{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:10, padding:'10px 14px', fontSize:13, width:'100%', boxSizing:'border-box' }} />
+              </div>
+              {filesUpload.length > 0 && (
+                <div style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:12, overflow:'hidden' }}>
+                  {filesUpload.map((f, i) => (
+                    <div key={i} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 16px', borderBottom: i < filesUpload.length-1 ? `1px solid ${C.borderLight}` : 'none' }}>
+                      <span style={{ fontSize:13, color:C.text }}>{f.name}</span>
+                      <button onClick={() => setFilesUpload(prev => prev.filter((_,j)=>j!==i))} style={{ background:C.redLight, color:C.red, border:'none', borderRadius:6, padding:'2px 10px', cursor:'pointer', fontWeight:700 }}>×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button onClick={inviaLottoAdmin} disabled={caricandoUpload || !clienteSelezionato || !batchNomeUpload || filesUpload.length===0}
+                style={{ background: (caricandoUpload || !clienteSelezionato || !batchNomeUpload || filesUpload.length===0) ? C.border : C.accent, color: (caricandoUpload || !clienteSelezionato || !batchNomeUpload || filesUpload.length===0) ? C.muted : C.white, border:'none', borderRadius:10, padding:'13px 0', cursor: (caricandoUpload || !clienteSelezionato || !batchNomeUpload || filesUpload.length===0) ? 'not-allowed' : 'pointer', fontWeight:700, fontSize:15, width:'100%' }}>
+                {caricandoUpload ? '⏳ Caricamento in corso...' : '📤 Carica lotto'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── TAB: DASHBOARD ── */}
       {tab==="dashboard" && (
