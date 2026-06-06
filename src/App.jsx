@@ -1689,6 +1689,7 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, pushAbilitato
   const [showProfilo, setShowProfilo] = useState(false);
   const [pdfBlobsMap, setPdfBlobsMap] = useState({}); // {ecgId: blob} per batch
   const [chiudendoBatch, setChiudendoBatch] = useState(null);
+  const [faseChiusuraDesktop, setFaseChiusuraDesktop] = useState({});
   const [showCompensi, setShowCompensi] = useState(false);
   const [tariffario, setTariffario] = useState({});
   const [meseComp, setMeseComp] = useState(() => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; });
@@ -1881,17 +1882,20 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, pushAbilitato
 
   const chiudiBatch = async (batchId) => {
     setChiudendoBatch(batchId);
+    setFaseChiusuraDesktop(prev => ({...prev, [batchId]: 'preparazione'}));
     const ecgsBatch = mieiEcgs.filter(e => e.batch_id === batchId && e.stato === "refertato" && e.file_referto_url);
     const email = ecgsBatch[0]?.email_destinatario;
     const batchNome = ecgsBatch[0]?.batch_nome || batchId;
-    if (ecgsBatch.length === 0 || !email) { setChiudendoBatch(null); alert("Nessun referto disponibile o email mancante"); return; }
+    if (ecgsBatch.length === 0 || !email) { setChiudendoBatch(null); setFaseChiusuraDesktop(prev => ({...prev, [batchId]: null})); alert("Nessun referto disponibile o email mancante"); return; }
     try {
       const zip = new JSZip();
       await Promise.all(ecgsBatch.map(async (e) => {
         const { data } = await supabase.storage.from('ecg-files').download(e.file_referto_url);
         if (data) zip.file(e.file_referto_url.split('/').pop(), data);
       }));
+      setFaseChiusuraDesktop(prev => ({...prev, [batchId]: 'zip'}));
       const zipBlob = await zip.generateAsync({ type: 'blob' });
+      setFaseChiusuraDesktop(prev => ({...prev, [batchId]: 'invio'}));
       const zipFileName = `referti/zip/_${batchNome.replace(/[^a-zA-Z0-9]/g,'_')}_${batchId}.zip`;
       await supabase.storage.from('ecg-files').upload(zipFileName, zipBlob, { contentType:'application/zip', upsert:true });
       const { data: urlData } = await supabase.storage.from('ecg-files').createSignedUrl(zipFileName, 60*60*24*7);
@@ -1949,6 +1953,7 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, pushAbilitato
       alert(`Lotto "${batchNome}" chiuso! Email con ZIP inviata a ${email}`);
     } catch(e) { console.error('chiudiBatch error:', e); alert('Errore: ' + e.message); }
     setChiudendoBatch(null);
+    setFaseChiusuraDesktop(prev => ({...prev, [batchId]: null}));
   };
 
   const caricaFirma = async (file) => {
@@ -2054,10 +2059,19 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, pushAbilitato
                       </div>
                       {tuttiRefertati && (
                         <div style={{ marginTop:8, display:"flex", gap:6 }}>
-                          <button onClick={()=>chiudiBatch(batchId)} disabled={chiudendoBatch===batchId}
-                            style={{ flex:1, background:C.green, color:"white", border:"none", borderRadius:8, padding:"7px 0", cursor:"pointer", fontWeight:700, fontSize:12 }}>
-                            {chiudendoBatch===batchId ? "⏳ Invio..." : "✉️ Invia email"}
-                          </button>
+                          <div style={{ flex:1, display:'flex', flexDirection:'column', gap:4 }}>
+                            <button onClick={()=>chiudiBatch(batchId)} disabled={chiudendoBatch===batchId}
+                              style={{ background:C.green, color:"white", border:"none", borderRadius:8, padding:"7px 0", cursor: chiudendoBatch===batchId?'not-allowed':'pointer', fontWeight:700, fontSize:12, width:'100%' }}>
+                              {chiudendoBatch===batchId ? "⏳ Invio..." : "✉️ Invia email"}
+                            </button>
+                            {faseChiusuraDesktop[batchId] && (
+                              <div style={{ fontSize:11, color:C.muted, textAlign:'center' }}>
+                                {faseChiusuraDesktop[batchId]==='preparazione' && '📥 Download referti...'}
+                                {faseChiusuraDesktop[batchId]==='zip'          && '🗜 Compressione...'}
+                                {faseChiusuraDesktop[batchId]==='invio'        && '📤 Invio email...'}
+                              </div>
+                            )}
+                          </div>
                           <button onClick={()=>scaricaBatch(batchId)}
                             style={{ flex:1, background:C.accent, color:"white", border:"none", borderRadius:8, padding:"7px 0", cursor:"pointer", fontWeight:700, fontSize:12 }}>
                             ⬇️ Scarica ZIP
@@ -4137,7 +4151,8 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
   const [rotationMobile, setRotationMobile] = useState(0);
   const rotationMobileRef = useRef(0);
   const [numPagesMobile, setNumPagesMobile] = useState(1);
-  const [chiudendo, setChiudendo] = useState(false);
+  const [faseChiusura, setFaseChiusura] = useState(null);
+  const chiudendo = faseChiusura !== null;
   const [posizioneMobile, setPosizioneMobile] = useState('overlay');
 
   useEffect(() => { rotationMobileRef.current = rotationMobile; }, [rotationMobile]);
@@ -4205,17 +4220,19 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
 
   const chiudiBatchMobile = async (batchId, batchNome, emailDest) => {
     if (!emailDest) { alert('Email destinatario non trovata'); return; }
-    setChiudendo(true);
+    setFaseChiusura('preparazione');
     try {
       const JSZip = (await import('jszip')).default;
       const batchEcgs = mieiEcgs.filter(e => e.batch_id===batchId && e.stato==='refertato' && e.file_referto_url);
-      if (!batchEcgs.length) { alert('Nessun referto disponibile. Attendi qualche secondo e riprova.'); setChiudendo(false); return; }
+      if (!batchEcgs.length) { alert('Nessun referto disponibile. Attendi qualche secondo e riprova.'); setFaseChiusura(null); return; }
       const zip = new JSZip();
       await Promise.all(batchEcgs.map(async e => {
         const { data } = await supabase.storage.from('ecg-files').download(e.file_referto_url);
         if (data) zip.file(e.file_referto_url.split('/').pop(), data);
       }));
+      setFaseChiusura('zip');
       const zipBlob = await zip.generateAsync({ type:'blob' });
+      setFaseChiusura('invio');
       const zipFileName = `referti/zip/_${batchNome.replace(/[^a-zA-Z0-9]/g,'_')}_${batchId}.zip`;
       await supabase.storage.from('ecg-files').upload(zipFileName, zipBlob, { contentType:'application/zip', upsert:true });
       const { data: urlData } = await supabase.storage.from('ecg-files').createSignedUrl(zipFileName, 60*60*24*7);
@@ -4267,7 +4284,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
         alert('✅ Email inviata a ' + emailDest);
       }
     } catch(err) { alert('Errore: ' + err.message); }
-    setChiudendo(false);
+    setFaseChiusura(null);
   };
 
   const scaricaBatchMobile = async (batchId, batchNome) => {
@@ -4601,6 +4618,34 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
               {ecg.stato==='refertato' && <div style={{ fontSize:11, color:C.muted, marginTop:4 }}>Tocca per visualizzare il referto →</div>}
             </div>
           ))}
+          {faseChiusura !== null && (
+            <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:999, display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <style>{`
+                @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+                @keyframes dot1 { 0%,20%,80%,100% { opacity:0.2 } 40%,60% { opacity:1 } }
+                @keyframes dot2 { 0%,30%,90%,100% { opacity:0.2 } 50%,70% { opacity:1 } }
+                @keyframes dot3 { 0%,40%,90%,100% { opacity:0.2 } 60%,80% { opacity:1 } }
+              `}</style>
+              <div style={{ background:'white', borderRadius:20, padding:40, maxWidth:300, width:'90%', textAlign:'center', boxShadow:'0 20px 60px rgba(0,0,0,0.3)' }}>
+                <div style={{ fontSize:48, display:'inline-block', animation:'spin 2s linear infinite', marginBottom:16 }}>⏳</div>
+                <div style={{ color:C.green, fontWeight:700, fontSize:18, marginBottom:6 }}>
+                  {faseChiusura==='preparazione' && 'Preparazione file ECG...'}
+                  {faseChiusura==='zip'          && 'Generazione archivio...'}
+                  {faseChiusura==='invio'        && 'Invio al cliente...'}
+                </div>
+                <div style={{ color:C.muted, fontSize:13, marginBottom:20 }}>
+                  {faseChiusura==='preparazione' && 'Download dei referti in corso'}
+                  {faseChiusura==='zip'          && 'Compressione file in corso'}
+                  {faseChiusura==='invio'        && 'Quasi fatto, attendere...'}
+                </div>
+                <div style={{ display:'flex', justifyContent:'center', gap:8 }}>
+                  <div style={{ width:10, height:10, borderRadius:'50%', background:C.green, animation:'dot1 1.4s ease-in-out infinite' }} />
+                  <div style={{ width:10, height:10, borderRadius:'50%', background:C.green, animation:'dot2 1.4s ease-in-out infinite' }} />
+                  <div style={{ width:10, height:10, borderRadius:'50%', background:C.green, animation:'dot3 1.4s ease-in-out infinite' }} />
+                </div>
+              </div>
+            </div>
+          )}
           {tuttiRefertati && (
             <div style={{ background:'#f0fdf4', border:`2px solid ${C.green}`, borderRadius:14, padding:20 }}>
               <div style={{ color:C.green, fontWeight:700, fontSize:16, marginBottom:4, textAlign:'center' }}>🎉 Lotto completato!</div>
