@@ -4066,7 +4066,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
 
   const resetReferta = () => {
     setCrocette({ limiti:false, correlare:false, approfondire:false, visita:false, urgente:false });
-    setCommento(''); setEcgFile(null); setEcgUrl(null); setPreviewDataUrl(null); setZoom(1); setRotationMobile(0); setNumPagesMobile(1);
+    setCommento(''); setEcgFile(null); if (ecgUrl) URL.revokeObjectURL(ecgUrl); setEcgUrl(null); setPreviewDataUrl(null); setZoom(1); setRotationMobile(0); setNumPagesMobile(1);
   };
 
   const apriEcg = (ecg) => {
@@ -4357,7 +4357,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
       if (selectedEcg.batch_id) {
         const prossimo = mieiEcgs.find(e => e.batch_id===selectedEcg.batch_id && e.stato==='in_attesa' && e.id!==selectedEcg.id);
         if (prossimo) { setSelectedEcg(prossimo); resetReferta(); }
-        else { setScreen('lotto'); }
+        else { resetReferta(); setScreen('lotto'); }
       } else {
         setScreen('lista');
       }
