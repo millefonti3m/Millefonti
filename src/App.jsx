@@ -3081,7 +3081,10 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
                   const u = clientiCodici.find(c => c.id === e.target.value);
                   setClienteSelezionato(u || null);
                 }} style={inputStyle}>
-                  <option value="">Seleziona cliente...</option>
+                  {clientiCodici.length === 0
+                    ? <option value="" disabled>⏳ Caricamento clienti...</option>
+                    : <option value="">Seleziona cliente...</option>
+                  }
                   {clientiCodici.map(u => (
                     <option key={u.id} value={u.id}>
                       {`${u.nome||''} ${u.cognome||''}`.trim()} — {u.ruolo==='azienda'?'🏢':'💊'} {u.email||''}
