@@ -2343,6 +2343,7 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, pushAbilitato
 // ── ADMIN ─────────────────────────────────────────────────────────────────
 const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
   const [tab, setTab] = useState("assegnazioni");
+  const [ultimoAggiornamento, setUltimoAggiornamento] = useState(Date.now());
   const [refreshing, setRefreshing] = useState(false);
   const [cardiologiDB, setCardiologiDB] = useState(cardiologiProp);
   const [clientiCodici, setClientiCodici] = useState([]);
@@ -2532,6 +2533,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
       }));
       setEcgs(mapped);
     }
+    setUltimoAggiornamento(Date.now());
     setRefreshing(false);
   };
   const [filtroStato, setFiltroStato] = useState("tutti");
@@ -2814,9 +2816,14 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
         {tabBtn("tariffario","💰 Tariffario",0)}
         {tabBtn("registro","📋 Registro",0)}
         {tabBtn("regole","⚙️ Assegnazione",0)}
-        <button onClick={ricarica} style={{marginLeft:"auto",background:C.bg,border:`1px solid ${C.border}`,borderRadius:10,padding:"6px 14px",cursor:"pointer",color:C.muted,fontSize:13,fontWeight:600}}>
-          {refreshing?"⏳":"🔄"} Aggiorna
-        </button>
+        <div style={{ marginLeft:"auto", display:'flex', flexDirection:'column', alignItems:'center' }}>
+          <button onClick={ricarica} style={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:10,padding:"6px 14px",cursor:"pointer",color:C.muted,fontSize:13,fontWeight:600}}>
+            {refreshing?"⏳":"🔄"} Aggiorna
+          </button>
+          <div style={{ fontSize:11, color:C.muted, marginTop:4, textAlign:'center' }}>
+            Aggiornato alle {new Date(ultimoAggiornamento).toLocaleTimeString('it-IT', { hour:'2-digit', minute:'2-digit' })}
+          </div>
+        </div>
       </div>
 
       {/* ── TAB: ASSEGNAZIONI ── */}
