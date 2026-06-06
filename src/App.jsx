@@ -1,7 +1,5 @@
 import { supabase } from "./supabase.js";
 import { useState, useEffect, useRef, useCallback } from "react";
-import { jsPDF } from "jspdf";
-import JSZip from "jszip";
 
 const C = {
   bg:"#f4f7fb", surface:"#ffffff", card:"#ffffff", cardAlt:"#f0f5ff",
@@ -587,6 +585,7 @@ const AziendaView = ({ ecgs, setEcgs }) => {
     if (!rows.length) { alert('Nessun referto disponibile'); return; }
     setScaricandoBatch(batchId);
     try {
+      const JSZip = (await import('jszip')).default;
       const zip = new JSZip();
       await Promise.all(rows.map(async e => {
         const { data } = await supabase.storage.from('ecg-files').download(e.file_referto_url);
@@ -1736,7 +1735,7 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, pushAbilitato
     alert('Tariffario salvato!');
   };
 
-  const esportaPDFCompensi = () => {
+  const esportaPDFCompensi = async () => {
     const ecgsMese = refertatiMiei.filter(e => {
       const d = new Date(e.created_at||e.ts);
       if (filtroTipo === 'mese') { const [anno,mese]=meseComp.split('-').map(Number); return d.getFullYear()===anno && d.getMonth()===mese-1; }
@@ -1754,6 +1753,7 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, pushAbilitato
       if (!byAz[k]) byAz[k] = { normale:[], urgente:[] };
       byAz[k][e.urgenza==='urgente'?'urgente':'normale'].push(e);
     });
+    const { jsPDF } = await import("jspdf");
     const pdf = new jsPDF({ unit:'mm', format:'a4' });
     const W=210, mar=18;
     const mesiLabel=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
@@ -1888,6 +1888,7 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, pushAbilitato
     const batchNome = ecgsBatch[0]?.batch_nome || batchId;
     if (ecgsBatch.length === 0 || !email) { setChiudendoBatch(null); setFaseChiusuraDesktop(prev => ({...prev, [batchId]: null})); alert("Nessun referto disponibile o email mancante"); return; }
     try {
+      const JSZip = (await import('jszip')).default;
       const zip = new JSZip();
       await Promise.all(ecgsBatch.map(async (e) => {
         const { data } = await supabase.storage.from('ecg-files').download(e.file_referto_url);
@@ -3377,7 +3378,8 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
           return true;
         });
 
-        const esportaRegistroPDF = () => {
+        const esportaRegistroPDF = async () => {
+          const { jsPDF } = await import("jspdf");
           const pdf = new jsPDF({ unit:'mm', format:'a4', orientation:'landscape' });
           const W=297, mar=14;
           // Header
