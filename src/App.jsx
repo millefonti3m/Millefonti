@@ -3865,20 +3865,24 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
             <input value={formCliente.password||''} onChange={e => setFormCliente(p=>({...p,password:e.target.value}))} type="text" style={{ ...inputStyle, fontFamily:MONO }} placeholder={modalCliente==='nuovo' ? 'Auto-generata dal nome' : '••••••••'} />
             <div style={{ fontSize:11, color:C.muted, marginTop:4 }}>Generata automaticamente dal nome. Comunicala al cliente quando vuoi.</div>
           </div>
-          <div style={{ marginBottom:14 }}><label style={{ color:C.textSoft, fontSize:12, fontWeight:600, display:'block', marginBottom:6 }}>Codice download referti</label>
-            <input value={formCliente.codice_referti||''} onChange={e => setFormCliente(p=>({...p,codice_referti:e.target.value.toUpperCase()}))} style={{ ...inputStyle, fontFamily:MONO, letterSpacing:2 }} placeholder="Opzionale" />
-            <div style={{ fontSize:11, color:C.muted, marginTop:4 }}>Il cliente userà questo codice per scaricare i referti. Se non impostato il download sarà libero.</div>
-          </div>
-          <div style={{ marginBottom:20 }}>
-            <label style={{ color:C.textSoft, fontSize:12, fontWeight:600, display:'block', marginBottom:8 }}>Email autorizzate all'invio ECG</label>
-            {emailAutorizzateForm.map((em, i) => (
-              <div key={i} style={{ display:'flex', gap:8, marginBottom:8 }}>
-                <input value={em} onChange={e => setEmailAutorizzateForm(prev => prev.map((v,j)=>j===i?e.target.value:v))} type="email" style={{ ...inputStyle, flex:1 }} placeholder="email@esempio.it" />
-                {emailAutorizzateForm.length > 1 && <button onClick={() => setEmailAutorizzateForm(prev=>prev.filter((_,j)=>j!==i))} style={{ background:C.redLight, color:C.red, border:'none', borderRadius:8, padding:'0 12px', cursor:'pointer', fontWeight:700 }}>×</button>}
-              </div>
-            ))}
-            <button onClick={() => setEmailAutorizzateForm(prev=>[...prev,''])} style={{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:8, padding:'7px 14px', fontSize:12, fontWeight:600, color:C.muted, cursor:'pointer' }}>+ Aggiungi email</button>
-          </div>
+          {formCliente.ruolo !== 'cardiologo' && (
+            <div style={{ marginBottom:14 }}><label style={{ color:C.textSoft, fontSize:12, fontWeight:600, display:'block', marginBottom:6 }}>Codice download referti</label>
+              <input value={formCliente.codice_referti||''} onChange={e => setFormCliente(p=>({...p,codice_referti:e.target.value.toUpperCase()}))} style={{ ...inputStyle, fontFamily:MONO, letterSpacing:2 }} placeholder="Opzionale" />
+              <div style={{ fontSize:11, color:C.muted, marginTop:4 }}>Il cliente userà questo codice per scaricare i referti. Se non impostato il download sarà libero.</div>
+            </div>
+          )}
+          {formCliente.ruolo !== 'cardiologo' && (
+            <div style={{ marginBottom:20 }}>
+              <label style={{ color:C.textSoft, fontSize:12, fontWeight:600, display:'block', marginBottom:8 }}>Email autorizzate all'invio ECG</label>
+              {emailAutorizzateForm.map((em, i) => (
+                <div key={i} style={{ display:'flex', gap:8, marginBottom:8 }}>
+                  <input value={em} onChange={e => setEmailAutorizzateForm(prev => prev.map((v,j)=>j===i?e.target.value:v))} type="email" style={{ ...inputStyle, flex:1 }} placeholder="email@esempio.it" />
+                  {emailAutorizzateForm.length > 1 && <button onClick={() => setEmailAutorizzateForm(prev=>prev.filter((_,j)=>j!==i))} style={{ background:C.redLight, color:C.red, border:'none', borderRadius:8, padding:'0 12px', cursor:'pointer', fontWeight:700 }}>×</button>}
+                </div>
+              ))}
+              <button onClick={() => setEmailAutorizzateForm(prev=>[...prev,''])} style={{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:8, padding:'7px 14px', fontSize:12, fontWeight:600, color:C.muted, cursor:'pointer' }}>+ Aggiungi email</button>
+            </div>
+          )}
           {erroreCliente && <div style={{ background:C.redLight, border:`1px solid ${C.red}33`, borderRadius:10, padding:'10px 14px', color:C.red, fontSize:13, marginBottom:16 }}>{erroreCliente}</div>}
           <div style={{ display:'flex', gap:12, justifyContent:'flex-end' }}>
             <button onClick={() => setModalCliente(null)} style={{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:10, padding:'11px 20px', fontSize:14, fontWeight:600, color:C.muted, cursor:'pointer' }}>Annulla</button>
