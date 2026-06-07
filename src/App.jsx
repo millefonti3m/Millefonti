@@ -2379,12 +2379,12 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
     });
   }, []);
 
-  // Carica utenti azienda/farmacia e storico download quando si apre il tab aziende o caricaecg
+  // Carica utenti azienda/farmacia/cardiologo e storico download quando si apre il tab aziende, caricaecg o team
   useEffect(() => {
-    if (tab !== 'aziende' && tab !== 'caricaecg') return;
+    if (tab !== 'aziende' && tab !== 'caricaecg' && tab !== 'team') return;
     supabase.from('user_profiles')
       .select('id, nome, cognome, ruolo, codice_referti, email')
-      .or('ruolo.eq.azienda,ruolo.eq.farmacia')
+      .or('ruolo.eq.azienda,ruolo.eq.farmacia,ruolo.eq.cardiologo')
       .then(({ data, error }) => {
         if (data) {
           setClientiCodici(data);
@@ -2622,7 +2622,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
         const json = await res.json();
         if (!res.ok) { setErroreCliente(json.error || 'Errore creazione'); setSalvandoCliente(false); return; }
         // Ricarica lista clienti
-        const { data } = await supabase.from('user_profiles').select('id, nome, cognome, ruolo, codice_referti, email').or('ruolo.eq.azienda,ruolo.eq.farmacia');
+        const { data } = await supabase.from('user_profiles').select('id, nome, cognome, ruolo, codice_referti, email').or('ruolo.eq.azienda,ruolo.eq.farmacia,ruolo.eq.cardiologo');
         if (data) { setClientiCodici(data); const init={}; data.forEach(u=>{ init[u.id]=u.codice_referti||''; }); setCodiciTemp(init); }
       } else {
         const body = { userId: modalCliente.id, email_autorizzate: emailAutorizzateForm.filter(Boolean) };
@@ -3780,7 +3780,13 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
 
       {tab==="team" && (
         <div>
-          <h3 style={{ color:C.text, fontWeight:700, fontSize:17, marginBottom:6 }}>Team cardiologi</h3>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6 }}>
+            <h3 style={{ color:C.text, fontWeight:700, fontSize:17 }}>Team cardiologi</h3>
+            <button onClick={() => { setFormCliente({ nome:'', cognome:'', email:'', password:'', ruolo:'cardiologo', codice_referti:'' }); setEmailAutorizzateForm(['']); setErroreCliente(null); setModalCliente('nuovo'); }}
+              style={{ background:C.accent, color:C.white, border:'none', borderRadius:8, padding:'8px 16px', fontSize:13, fontWeight:700, cursor:'pointer' }}>
+              + Nuovo cardiologo
+            </button>
+          </div>
           <p style={{ color:C.muted, fontSize:13, marginBottom:20 }}>I cardiologi vedono <strong>solo gli ECG che assegni loro</strong> individualmente dal tab Assegnazioni. Non c'è accesso a canali o code generali.</p>
           <div style={{ background:C.yellowLight, border:`1px solid ${C.yellow}33`, borderRadius:12, padding:"14px 18px", marginBottom:20, fontSize:13, color:C.textSoft }}>
             💡 <strong>Come funziona:</strong> ogni ECG in arrivo finisce nella coda "Non assegnato" (tab Assegnazioni). Vai lì per scegliere chi lo prende in carico. Il cardiologo lo vedrà solo dopo l'assegnazione.
@@ -3788,6 +3794,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
           <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
             {nomi.map(nome=>{
               const mieiEcgs = ecgs.filter(e=>e.cardiologo===nome);
+              const utenteCard = clientiCodici.find(u => `${u.nome||''} ${u.cognome||''}`.trim() === nome);
               return (
                 <div key={nome} style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:16, padding:"20px 24px", boxShadow:C.shadow }}>
                   <div style={{ display:"flex", alignItems:"center", gap:14, flexWrap:"wrap" }}>
@@ -3805,6 +3812,12 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
                         <div style={{ color:C.green, fontWeight:700, fontFamily:MONO, fontSize:16 }}>{mieiEcgs.filter(e=>e.stato==="refertato").length}</div>
                         <div style={{ color:C.muted, fontSize:10, textTransform:"uppercase" }}>refertati</div>
                       </div>
+                      {utenteCard && (
+                        <button onClick={() => apriModificaCliente(utenteCard)}
+                          style={{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:8, padding:'8px 12px', fontSize:13, cursor:'pointer', color:C.text, alignSelf:'center' }}>
+                          ✏️
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -3838,6 +3851,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
               <select value={formCliente.ruolo||'azienda'} onChange={e => setFormCliente(p=>({...p,ruolo:e.target.value}))} style={inputStyle}>
                 <option value="azienda">🏢 Azienda</option>
                 <option value="farmacia">💊 Farmacia</option>
+                <option value="cardiologo">🫀 Cardiologo</option>
               </select></div>
           </>)}
           {modalCliente !== 'nuovo' && (
