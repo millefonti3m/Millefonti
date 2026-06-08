@@ -1862,8 +1862,9 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, pushAbilitato
     if (ecgsBatch.length === 0) { alert("Nessun referto disponibile"); return; }
     
     // Scarica tutti i PDF e crea uno ZIP
+    const JSZip = (await import('jszip')).default;
     const zip = new JSZip();
-    
+
     await Promise.all(ecgsBatch.map(async (e) => {
       const { data } = await supabase.storage.from('ecg-files').download(e.file_referto_url);
       if (data) {
