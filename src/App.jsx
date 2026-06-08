@@ -1432,7 +1432,8 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
           const refertoSrc = await PDFDocument.load(refertoPdf.output('arraybuffer'));
           const [refertoPageCopied] = await mergedDoc.copyPages(refertoSrc, [0]);
           mergedDoc.addPage(refertoPageCopied);
-          const originalSrc = await PDFDocument.load(arrayBuffer);
+          const abForPdfLib = await ecgFile.arrayBuffer(); // fresh copy (arrayBuffer detached da pdfjs)
+          const originalSrc = await PDFDocument.load(abForPdfLib);
           const copiedPages = await mergedDoc.copyPages(originalSrc, originalSrc.getPageIndices());
           copiedPages.forEach(p => {
             if (rotation !== 0) { const ea = p.getRotation().angle; p.setRotation(pdfDegrees((ea + rotation) % 360)); }
