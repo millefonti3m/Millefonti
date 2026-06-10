@@ -3350,6 +3350,9 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
                     <OrigineTag ecg={ecg} />
                   </div>
                   <div style={{ color:C.text, fontSize:14, fontWeight:600 }}>{ecg.paziente}</div>
+                  {ecg.batch_nome && (
+                    <div style={{ color:C.muted, fontSize:11, marginTop:2 }}>📦 {ecg.batch_nome}</div>
+                  )}
                   <div style={{ color:C.muted, fontSize:12, marginTop:2 }}>{fmt(ecg.ts)}</div>
                 </div>
                 <div style={{ display:"flex", alignItems:"center", gap:8 }}>
