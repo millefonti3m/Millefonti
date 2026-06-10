@@ -101,9 +101,9 @@ const Badge = ({ stato, urgenza }) => {
 };
 
 const OrigineTag = ({ ecg }) => {
-  if (ecg.origine==="azienda") return <span style={{ background:C.purpleLight, color:C.purple, border:`1px solid ${C.purple}33`, borderRadius:6, padding:"2px 8px", fontSize:10, fontWeight:600 }}>🏢 Azienda</span>;
+  if (ecg.origine==="azienda") return <span style={{ background:C.purpleLight, color:C.purple, border:`1px solid ${C.purple}33`, borderRadius:6, padding:"2px 8px", fontSize:10, fontWeight:600 }}>🏢 {ecg.origine_dettaglio || 'Azienda'}</span>;
   if (ecg.origine==="pubblico") return <span style={{ background:C.pinkLight, color:C.pink, border:`1px solid ${C.pink}33`, borderRadius:6, padding:"2px 8px", fontSize:10, fontWeight:600 }}>👤 Privato</span>;
-  return <span style={{ background:C.tealLight, color:C.teal, border:`1px solid ${C.teal}33`, borderRadius:6, padding:"2px 8px", fontSize:10, fontWeight:600 }}>💊 Farmacia</span>;
+  return <span style={{ background:C.tealLight, color:C.teal, border:`1px solid ${C.teal}33`, borderRadius:6, padding:"2px 8px", fontSize:10, fontWeight:600 }}>💊 {ecg.origine_dettaglio || 'Farmacia'}</span>;
 };
 
 const StatCard = ({ label, value, color, sub, icon }) => (
