@@ -3844,7 +3844,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
           {modalCliente === 'nuovo' && (<>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:14 }}>
               <div><label style={{ color:C.textSoft, fontSize:12, fontWeight:600, display:'block', marginBottom:6 }}>Nome *</label>
-                <input value={formCliente.nome||''} onChange={e => { const n=e.target.value; setFormCliente(p=>({...p, nome:n, password:(n.split(' ')[0]||'').toUpperCase()+'MILLEFONTI'})); }} style={inputStyle} placeholder="Es. Salute e Lavoro" /></div>
+                <input value={formCliente.nome||''} onChange={e => { const n=e.target.value; setFormCliente(p=>({...p, nome:n, password:(() => { const p = n.split(' ')[0] || ''; return p.charAt(0).toUpperCase() + p.slice(1).toLowerCase() + 'Millefonti1!'; })()})); }} style={inputStyle} placeholder="Es. Salute e Lavoro" /></div>
               <div><label style={{ color:C.textSoft, fontSize:12, fontWeight:600, display:'block', marginBottom:6 }}>Cognome</label>
                 <input value={formCliente.cognome||''} onChange={e => setFormCliente(p=>({...p,cognome:e.target.value}))} style={inputStyle} placeholder="Opzionale" /></div>
             </div>
