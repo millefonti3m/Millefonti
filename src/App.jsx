@@ -2649,10 +2649,14 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
     if (!clienteSelezionato || !batchNomeUpload || filesUpload.length === 0 || caricandoUpload) return;
     setCaricandoUpload(true);
     const batchId = `BATCH-${Date.now()}`;
-    const sanitizeFilename = (name) => name
-      .normalize('NFD')
-      .replace(/[̀-ͯ]/g, '')
-      .replace(/[^a-zA-Z0-9._\-]/g, '_');
+    const sanitizeFilename = (name) => {
+      return name
+        .normalize('NFKD')
+        .replace(/[̀-ͯ؀-ۿ​-‍﻿]/g, '')
+        .replace(/[^a-zA-Z0-9._\-]/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '');
+    };
     const nuovi = await Promise.all(filesUpload.map(async (file) => {
       const nomePaziente = file.name.replace(/\.[^.]+$/, '');
       const safeFilename = sanitizeFilename(file.name);
