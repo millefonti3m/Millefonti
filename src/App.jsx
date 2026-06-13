@@ -2658,6 +2658,18 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
       const safeFilename = sanitizeFilename(file.name);
       const storageFileName = `${batchId}/${safeFilename}`;
       const { error: uploadError } = await supabase.storage.from('ecg-files').upload(storageFileName, file);
+      if (uploadError) {
+        console.error('Upload fallito:', storageFileName, uploadError.message);
+        fetch('/api/notify-breach', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tipo: 'upload_ecg',
+            dettagli: uploadError.message,
+            contesto: `File: ${safeFilename} | Azienda: ${clienteSelezionato?.nome}`,
+          }),
+        }).catch(() => {});
+      }
       const fileUrl = uploadError ? null : storageFileName;
       return {
         origine: "azienda",
