@@ -204,10 +204,15 @@ export default async function handler(req, res) {
       const batchNome = subject.trim();
       const nomeAzienda = `${profile.nome || ''} ${profile.cognome || ''}`.trim();
       const ecgs = [];
+      const sanitizeFilename = (name) => name
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '')
+        .replace(/[^a-zA-Z0-9._\-]/g, '_');
 
       for (const part of fileParts) {
         const buffer = await getAttachment(accessToken, msg.id, part.body.attachmentId);
-        const storageFileName = `${batchId}/${part.filename}`;
+        const safeFilename = sanitizeFilename(part.filename);
+        const storageFileName = `${batchId}/${safeFilename}`;
         const { error: uploadError } = await supabase.storage
           .from('ecg-files')
           .upload(storageFileName, buffer, { contentType: part.mimeType || 'application/pdf' });
