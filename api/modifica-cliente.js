@@ -29,7 +29,11 @@ export default async function handler(req, res) {
     if ('codice_referti' in req.body) {
       const { error: profileError } = await supabase
         .from('user_profiles')
-        .update({ codice_referti: codice_referti || null })
+        .update({
+          codice_referti: codice_referti || null,
+          codice_referti_set_at: new Date().toISOString(),
+          codice_referti_cycle: 1,
+        })
         .eq('id', userId);
 
       if (profileError) {

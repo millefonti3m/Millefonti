@@ -68,6 +68,21 @@ Questo accade di solito perché il token di accesso a Gmail è scaduto o è stat
     ],
     legale: true,
   },
+  scadenza_codice: {
+    emoji: '🟡',
+    titolo: 'Codice download in scadenza',
+    gravita: 'PROMEMORIA',
+    colore: '#d97706',
+    spiegazione: `Il codice di accesso per il download dei referti di uno o più clienti è prossimo alla scadenza (6 mesi). È necessario aggiornare il codice e comunicarlo al cliente.`,
+    impatto: `Il codice attuale continuerà a funzionare fino a quando non viene aggiornato manualmente. Nessun blocco automatico.`,
+    soluzioni: [
+      'Vai in AdminView → tab 📊 Aziende → sezione Gestione codici download',
+      'Clicca ✏️ Modifica sul cliente indicato',
+      'Aggiorna il codice con il nuovo suggerito',
+      'Comunica il nuovo codice al cliente',
+    ],
+    legale: false,
+  },
 };
 
 async function inviaAlert(tipo, dettagli = '', contesto = '') {
