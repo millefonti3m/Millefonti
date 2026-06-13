@@ -2649,9 +2649,14 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
     if (!clienteSelezionato || !batchNomeUpload || filesUpload.length === 0 || caricandoUpload) return;
     setCaricandoUpload(true);
     const batchId = `BATCH-${Date.now()}`;
+    const sanitizeFilename = (name) => name
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-zA-Z0-9._\-]/g, '_');
     const nuovi = await Promise.all(filesUpload.map(async (file) => {
       const nomePaziente = file.name.replace(/\.[^.]+$/, '');
-      const storageFileName = `${batchId}/${file.name}`;
+      const safeFilename = sanitizeFilename(file.name);
+      const storageFileName = `${batchId}/${safeFilename}`;
       const { error: uploadError } = await supabase.storage.from('ecg-files').upload(storageFileName, file);
       const fileUrl = uploadError ? null : storageFileName;
       return {
