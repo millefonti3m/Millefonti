@@ -2385,7 +2385,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
   useEffect(() => {
     if (tab !== 'aziende' && tab !== 'caricaecg' && tab !== 'team') return;
     supabase.from('user_profiles')
-      .select('id, nome, cognome, ruolo, codice_referti, email')
+      .select('id, nome, cognome, ruolo, codice_referti, codice_referti_cycle, email')
       .or('ruolo.eq.azienda,ruolo.eq.farmacia,ruolo.eq.cardiologo')
       .then(({ data, error }) => {
         if (data) {
@@ -2624,7 +2624,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
         const json = await res.json();
         if (!res.ok) { setErroreCliente(json.error || 'Errore creazione'); setSalvandoCliente(false); return; }
         // Ricarica lista clienti
-        const { data } = await supabase.from('user_profiles').select('id, nome, cognome, ruolo, codice_referti, email').or('ruolo.eq.azienda,ruolo.eq.farmacia,ruolo.eq.cardiologo');
+        const { data } = await supabase.from('user_profiles').select('id, nome, cognome, ruolo, codice_referti, codice_referti_cycle, email').or('ruolo.eq.azienda,ruolo.eq.farmacia,ruolo.eq.cardiologo');
         if (data) { setClientiCodici(data); const init={}; data.forEach(u=>{ init[u.id]=u.codice_referti||''; }); setCodiciTemp(init); }
       } else {
         const body = { userId: modalCliente.id, email_autorizzate: emailAutorizzateForm.filter(Boolean) };
@@ -3865,7 +3865,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
           {modalCliente === 'nuovo' && (<>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:14 }}>
               <div><label style={{ color:C.textSoft, fontSize:12, fontWeight:600, display:'block', marginBottom:6 }}>Nome *</label>
-                <input value={formCliente.nome||''} onChange={e => { const n=e.target.value; setFormCliente(p=>({...p, nome:n, password:(() => { const p = n.split(' ')[0] || ''; return p.charAt(0).toUpperCase() + p.slice(1).toLowerCase() + 'Millefonti1!'; })()})); }} style={inputStyle} placeholder="Es. Salute e Lavoro" /></div>
+                <input value={formCliente.nome||''} onChange={e => { const n=e.target.value; setFormCliente(p=>({...p, nome:n, password:(() => { const p = n.split(' ')[0] || ''; return p.toUpperCase() + 'MILLEFONTI'; })()})); }} style={inputStyle} placeholder="Es. Salute e Lavoro" /></div>
               <div><label style={{ color:C.textSoft, fontSize:12, fontWeight:600, display:'block', marginBottom:6 }}>Cognome</label>
                 <input value={formCliente.cognome||''} onChange={e => setFormCliente(p=>({...p,cognome:e.target.value}))} style={inputStyle} placeholder="Opzionale" /></div>
             </div>
@@ -3894,6 +3894,26 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
           {formCliente.ruolo !== 'cardiologo' && (
             <div style={{ marginBottom:14 }}><label style={{ color:C.textSoft, fontSize:12, fontWeight:600, display:'block', marginBottom:6 }}>Codice download referti</label>
               <input value={formCliente.codice_referti||''} onChange={e => setFormCliente(p=>({...p,codice_referti:e.target.value.toUpperCase()}))} style={{ ...inputStyle, fontFamily:MONO, letterSpacing:2 }} placeholder="Opzionale" />
+              {(() => {
+                const nome = formCliente.nome || ''
+                const primaParola = nome.split(' ')[0] || ''
+                const base = primaParola.charAt(0).toUpperCase() + primaParola.slice(1).toLowerCase()
+                const cycle = formCliente.codice_referti_cycle ?? 0
+                const prossimoCycle = cycle === 0 ? 1 : cycle === 1 ? 2 : 1
+                const suggerito = base + 'Millefonti' + prossimoCycle + '!'
+                return nome ? (
+                  <div style={{ fontSize:11, color:C.muted, marginTop:4 }}>
+                    💡 Codice suggerito:
+                    <span
+                      style={{ fontFamily:MONO, color:C.accent, cursor:'pointer', marginLeft:4, textDecoration:'underline' }}
+                      onClick={() => setFormCliente(p => ({...p, codice_referti: suggerito, codice_referti_cycle: prossimoCycle}))}
+                    >
+                      {suggerito}
+                    </span>
+                    <span style={{ marginLeft:4 }}>(clicca per usare)</span>
+                  </div>
+                ) : null
+              })()}
               <div style={{ fontSize:11, color:C.muted, marginTop:4 }}>Il cliente userà questo codice per scaricare i referti. Se non impostato il download sarà libero.</div>
             </div>
           )}
