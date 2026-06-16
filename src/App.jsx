@@ -542,6 +542,27 @@ const AziendaView = ({ ecgs, setEcgs }) => {
     setCaricando(true);
     const batchId = `BATCH-${Date.now()}`;
     const emailAccount = meEmail;
+
+    // Se Salute e Lavoro e il nome lotto contiene "sicurezza lavoro" → assegna a Sicurezza Lavoro
+    let destinatarioFinale = emailAccount;
+    let origineFinale = nomeAzienda || ME_AZIENDA;
+
+    if (
+      (nomeAzienda || '').toLowerCase().includes('salute') &&
+      batchNome.toLowerCase().includes('sicurezza lavoro')
+    ) {
+      const { data: slUser } = await supabase
+        .from('user_profiles')
+        .select('email, nome')
+        .ilike('nome', '%sicurezza lavoro%')
+        .eq('ruolo', 'azienda')
+        .single();
+      if (slUser) {
+        destinatarioFinale = slUser.email;
+        origineFinale = slUser.nome || 'Sicurezza Lavoro s.r.l.';
+      }
+    }
+
     const nuovi = await Promise.all(Array.from(filesLotto).map(async (file, i) => {
       // Nome paziente = nome file senza estensione
       const nomePaziente = file.name.replace(/\.[^.]+$/, '');
@@ -557,11 +578,11 @@ const AziendaView = ({ ecgs, setEcgs }) => {
         note: noteGenerali || "Idoneità lavorativa",
         urgenza: "normale",
         stato: "in_attesa",
-        origine_dettaglio: nomeAzienda || ME_AZIENDA,
+        origine_dettaglio: origineFinale,
         batch_id: batchId,
         batch_nome: batchNome,
         file_ecg_url: fileUrl,
-        email_destinatario: emailAccount,
+        email_destinatario: destinatarioFinale,
       };
     }));
     const { data, error } = await supabase.from('ecgs').insert(nuovi).select();
