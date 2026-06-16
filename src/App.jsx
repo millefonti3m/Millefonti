@@ -1847,8 +1847,8 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, pushAbilitato
     pdf.text('PAZIENTE', mar+2, y-0.5);
     pdf.text('DATA', 90, y-0.5);
     pdf.text('AZIENDA', 115, y-0.5);
-    pdf.text('EMAIL', 155, y-0.5);
-    pdf.text('TIPO', 185, y-0.5);
+    pdf.text('EMAIL', 148, y-0.5);
+    pdf.text('TIPO', 182, y-0.5);
     pdf.text('€', W-mar-2, y-0.5, {align:'right'});
     y += 5;
     ecgsMese.sort((a,b)=>new Date(a.created_at||a.ts)-new Date(b.created_at||b.ts)).forEach((e, idx) => {
@@ -1861,13 +1861,13 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, pushAbilitato
       const nome = (e.paziente_nome||e.paziente||'—').substring(0,22);
       const data = new Date(e.created_at||e.ts).toLocaleDateString('it-IT');
       const azS = az.substring(0,20);
-      const mail = (e.email_destinatario||'—').substring(0,22);
+      const mail = (e.email_destinatario||'—').substring(0,18);
       pdf.text(nome, mar+2, y);
       pdf.text(data, 90, y);
       pdf.text(azS, 115, y);
-      pdf.text(mail, 155, y);
+      pdf.text(mail, 148, y);
       pdf.setTextColor(isUrg?200:46, isUrg?100:124, isUrg?20:246);
-      pdf.text(isUrg?'URG':'STD', 185, y);
+      pdf.text(isUrg?'URG':'STD', 182, y);
       pdf.setTextColor(14,165,100); pdf.setFont('helvetica','bold');
       pdf.text(`${importo.toFixed(2)}€`, W-mar-2, y, {align:'right'});
       y += 8;
