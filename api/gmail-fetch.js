@@ -137,6 +137,7 @@ export default async function handler(req, res) {
       const headers = email.payload.headers;
       const from = headers.find(h => h.name === 'From')?.value || '';
       const subject = headers.find(h => h.name === 'Subject')?.value || 'Lotto ECG';
+      const isSicurezzaLavoro = subject.toLowerCase().includes('sicurezza lavoro');
       const fromEmail = from.match(/<(.+)>/)?.[1] || from.trim();
 
       // Cerca utente azienda con questa email (diretta o autorizzata)
@@ -204,6 +205,23 @@ export default async function handler(req, res) {
       const batchNome = subject.trim();
       const nomeAzienda = `${profile.nome || ''} ${profile.cognome || ''}`.trim();
       const ecgs = [];
+
+      // Destinatario e origine finali (override per Sicurezza Lavoro)
+      let destinatarioFinale = matchUser?.email || fromEmail;
+      let origineFinale = nomeAzienda;
+      if (isSicurezzaLavoro) {
+        const { data: slUser } = await supabase
+          .from('user_profiles')
+          .select('email, nome, cognome')
+          .ilike('nome', '%sicurezza lavoro%')
+          .eq('ruolo', 'azienda')
+          .single();
+        if (slUser) {
+          destinatarioFinale = slUser.email;
+          origineFinale = slUser.nome || 'Sicurezza Lavoro s.r.l.';
+        }
+      }
+
       const sanitizeFilename = (name) => name
         .normalize('NFD')
         .replace(/[̀-ͯ]/g, '')
@@ -232,11 +250,11 @@ export default async function handler(req, res) {
             note: 'Caricato via email',
             urgenza: subject.toLowerCase().includes('urgente') ? 'urgente' : 'normale',
             stato: 'in_attesa',
-            origine_dettaglio: nomeAzienda,
+            origine_dettaglio: origineFinale,
             batch_id: batchId,
             batch_nome: batchNome,
             file_ecg_url: storageFileName,
-            email_destinatario: matchUser?.email || fromEmail, // sempre email principale account, non email inviante
+            email_destinatario: destinatarioFinale,
           });
         }
       }
