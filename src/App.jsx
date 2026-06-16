@@ -3454,8 +3454,8 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
           pdf.text('AZIENDA', 84, y-0.5);
           pdf.text('CARDIOLOGO', 148, y-0.5);
           pdf.text('LOTTO', 180, y-0.5);
-          pdf.text('TIPO', 232, y-0.5);
-          pdf.text('EMAIL DEST.', 244, y-0.5);
+          pdf.text('TIPO', 228, y-0.5);
+          pdf.text('EMAIL DEST.', 248, y-0.5);
           y += 6;
           // Righe ECG
           filtrati.forEach((e, idx) => {
@@ -3467,7 +3467,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
             const az   = (e.origine_dettaglio||'—').substring(0,28);
             const card = (e.cardiologo_nome||'—').substring(0,18);
             const lotto= (e.batch_nome||'—').substring(0,18);
-            const mail = (e.email_destinatario||'—').substring(0,20);
+            const mail = (e.email_destinatario||'—').substring(0,16);
             const isUrg= e.urgenza==='urgente';
             pdf.text(nome, mar+2, y);
             pdf.text(data, 68, y);
@@ -3476,9 +3476,9 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
             pdf.text(lotto, 180, y);
             pdf.setTextColor(isUrg?200:46, isUrg?100:124, isUrg?20:246);
             pdf.setFont('helvetica','bold');
-            pdf.text(isUrg?'URG':'STD', 232, y);
+            pdf.text(isUrg?'URG':'STD', 228, y);
             pdf.setTextColor(107,125,153); pdf.setFont('helvetica','normal');
-            pdf.text(mail, 244, y);
+            pdf.text(mail, 248, y);
             y += 8;
           });
           // Footer
