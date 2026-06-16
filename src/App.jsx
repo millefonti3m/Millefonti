@@ -2620,7 +2620,9 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
       .select('email')
       .eq('user_id', u.id)
       .then(({ data }) => {
-        setEmailAutorizzateForm(data?.length ? data.map(e => e.email) : ['']);
+        const emails = data?.length ? data.map(e => e.email) : []
+        setEmailAutorizzateForm(emails.length ? emails : [''])
+        setModalCliente(prev => ({ ...prev, _emailOriginali: emails }))
       });
   };
 
@@ -2648,9 +2650,15 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
         const { data } = await supabase.from('user_profiles').select('id, nome, cognome, ruolo, codice_referti, codice_referti_cycle, email').or('ruolo.eq.azienda,ruolo.eq.farmacia,ruolo.eq.cardiologo');
         if (data) { setClientiCodici(data); const init={}; data.forEach(u=>{ init[u.id]=u.codice_referti||''; }); setCodiciTemp(init); }
       } else {
-        const body = { userId: modalCliente.id, email_autorizzate: emailAutorizzateForm.filter(Boolean) };
+        const body = { userId: modalCliente.id };
+        const emailFiltrate = emailAutorizzateForm.filter(Boolean);
+        const emailOriginali = modalCliente._emailOriginali || [];
+        const emailCambiate = JSON.stringify(emailFiltrate.sort()) !== JSON.stringify(emailOriginali.sort());
+        if (emailCambiate) body.email_autorizzate = emailFiltrate;
         if (formCliente.password) body.password = formCliente.password;
-        if ('codice_referti' in formCliente) body.codice_referti = formCliente.codice_referti || null;
+        if (formCliente.codice_referti !== (modalCliente.codice_referti || '')) {
+          body.codice_referti = formCliente.codice_referti || null;
+        }
         const res = await fetch('/api/modifica-cliente', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
