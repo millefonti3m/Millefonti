@@ -104,7 +104,7 @@ export default async function handler(req, res) {
 
   // ── POST: verifica codice ───────────────────────────────────────────
   if (req.method === 'POST') {
-    const codiceInserito = (req.body?.codice || '').trim().toLowerCase();
+    const codiceInserito = (req.body?.codice || '').trim();
 
     // Codice non impostato nel token: redirect diretto + alert breach
     if (!tk.codice_referti) {
@@ -124,7 +124,7 @@ export default async function handler(req, res) {
     }
 
     // Confronto case-insensitive
-    if (codiceInserito !== tk.codice_referti.toLowerCase()) {
+    if (codiceInserito !== tk.codice_referti) {
       return res.status(200).send(paginaHTML({
         batchNome: tk.batch_nome,
         count: tk.count,
