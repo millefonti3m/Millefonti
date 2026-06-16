@@ -3893,7 +3893,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
           </div>
           {formCliente.ruolo !== 'cardiologo' && (
             <div style={{ marginBottom:14 }}><label style={{ color:C.textSoft, fontSize:12, fontWeight:600, display:'block', marginBottom:6 }}>Codice download referti</label>
-              <input value={formCliente.codice_referti||''} onChange={e => setFormCliente(p=>({...p,codice_referti:e.target.value.toUpperCase()}))} style={{ ...inputStyle, fontFamily:MONO, letterSpacing:2 }} placeholder="Opzionale" />
+              <input value={formCliente.codice_referti||''} onChange={e => setFormCliente(p=>({...p,codice_referti:e.target.value}))} style={{ ...inputStyle, fontFamily:MONO, letterSpacing:2 }} placeholder="Opzionale" />
               {(() => {
                 const nome = formCliente.nome || ''
                 const primaParola = nome.split(' ')[0] || ''
