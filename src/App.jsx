@@ -2279,9 +2279,7 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, pushAbilitato
                       </div>
                     </div>
                   )}
-                  <div style={{ marginTop:8, color:C.muted, fontSize:11 }}>
-                    Le tariffe sono impostate dall'amministratore. Default: 10€/ECG. Clicca su un'azienda per vedere il dettaglio ECG.
-                  </div>
+
                 </>
               );
             })()}
