@@ -4418,6 +4418,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
       const ctx = cv.getContext('2d');
       ctx.fillStyle = '#fff'; ctx.fillRect(0,0,cv.width,cv.height);
       await page.render({ canvasContext: ctx, viewport: vp }).promise;
+      pdfDoc.destroy();
 
       // Biforca in base alla posizione scelta
       // Applica rotazione utente (↺↻) al canvas
