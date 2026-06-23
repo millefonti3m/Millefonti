@@ -821,7 +821,7 @@ const AziendaView = ({ ecgs, setEcgs }) => {
 // Vede SOLO gli ECG che l'admin gli ha assegnato esplicitamente.
 
 // ── REFERTAZIONE INLINE ───────────────────────────────────────────────────
-const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
+const RefertazioneInline = ({ ecg, meCardiologo, numeroAlbo, onRefertato, firmaUrl }) => {
   const [ecgFile, setEcgFile] = useState(null);
   const [ecgUrl, setEcgUrl] = useState(null);
   const [ecgType, setEcgType] = useState(null);
@@ -1070,6 +1070,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
     const lineSepF = lineNome + Math.round(fsFirma * 0.4);
     ctx.fillStyle = "#1a2640"; ctx.font = `bold ${fsFirma}px Arial`;
     ctx.fillText(nomeFirma, firmaColX, lineNome);
+    if (numeroAlbo) { ctx.font = `italic 11px Arial`; ctx.fillStyle = '#1a2640'; ctx.fillText(numeroAlbo, firmaColX, lineNome + 14); }
     ctx.strokeStyle = "#1a2640"; ctx.lineWidth = 0.5;
     ctx.beginPath(); ctx.moveTo(firmaColX, lineSepF); ctx.lineTo(firmaColX + firmaColW * 0.95, lineSepF); ctx.stroke();
     ctx.fillStyle = "#1a2640"; ctx.font = `${fsStamp}px Arial`;
@@ -1311,6 +1312,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
           }
           pdf.setFontSize(13); pdf.setFont("helvetica", "bold"); pdf.setTextColor(37, 87, 54);
           pdf.text(nomeFirma, pw - 10, ph - 36, { align: "right" });
+          if (numeroAlbo) { pdf.setFontSize(9); pdf.setFont('helvetica','italic'); pdf.text(numeroAlbo, pw-10, ph-30, {align:'right'}); }
           pdf.setDrawColor(26, 38, 64); pdf.setLineWidth(0.3);
           pdf.line(pw - 65, ph - 33, pw - 10, ph - 33);
           pdf.setFontSize(8); pdf.setFont("helvetica", "normal"); pdf.setTextColor(37, 87, 54);
@@ -1440,6 +1442,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, onRefertato, firmaUrl }) => {
           const nb2=meCardiologo.replace(/^Dott\.\s*Dr\.?/i,'').replace(/^Dr\.?\s*/i,'').replace(/^Dott\.?\s*/i,'').trim();
           if(window.__millefonti_firma){const fCR=document.createElement('canvas');fCR.width=window.__millefonti_firma.width;fCR.height=window.__millefonti_firma.height;fCR.getContext('2d').drawImage(window.__millefonti_firma,0,0);const fW2=35,fH2=fW2/(window.__millefonti_firma.width/window.__millefonti_firma.height);refertoPdf.addImage(fCR.toDataURL('image/png'),'PNG',pw-10-fW2,ph-38-fH2,fW2,fH2);}
           refertoPdf.setFontSize(13);refertoPdf.setFont('helvetica','bold');refertoPdf.setTextColor(37,87,54);refertoPdf.text('Dott. '+nb2,pw-10,ph-36,{align:'right'});
+          if (numeroAlbo) { refertoPdf.setFontSize(9); refertoPdf.setFont('helvetica','italic'); refertoPdf.text(numeroAlbo, pw-10, ph-30, {align:'right'}); }
           refertoPdf.setDrawColor(37,87,54);refertoPdf.setLineWidth(0.3);refertoPdf.line(pw-65,ph-33,pw-10,ph-33);
           refertoPdf.setFontSize(8);refertoPdf.setFont('helvetica','normal');refertoPdf.setTextColor(37,87,54);
           refertoPdf.text('Ambulatorio Millefonti',pw-10,ph-28,{align:'right'});
@@ -2333,6 +2336,7 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, pushAbilitato
                 key={selected?.id}
                 ecg={selected}
                 meCardiologo={meCardiologo}
+                numeroAlbo={meNumeroAlbo}
                 firmaUrl={firmaUrl}
                 onRefertato={(refertoFileName)=>{
                   const selectedId = selected.id;
@@ -4254,7 +4258,7 @@ const useIsMobile = () => {
 };
 
 // ── CARDIOLOGO MOBILE ──────────────────────────────────────────────────────
-const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, pushAbilitato, registraPush }) => {
+const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo, caricaEcgs, onLogout, pushAbilitato, registraPush }) => {
   const [screen, setScreen] = useState('lista'); // lista | lotto | referta
   const [selectedBatch, setSelectedBatch] = useState(null);
   const [selectedEcg, setSelectedEcg] = useState(null);
@@ -4518,6 +4522,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
           pdf2.addImage(fCvs2.toDataURL('image/png'),'PNG',pw2-10-fW2,ph2-38-fH2,fW2,fH2);
         }
         pdf2.setFontSize(13);pdf2.setFont('helvetica','bold');pdf2.setTextColor(37,87,54);pdf2.text(nomeFirma2,pw2-10,ph2-36,{align:'right'});
+        if (numeroAlbo) { pdf2.setFontSize(9); pdf2.setFont('helvetica','italic'); pdf2.text(numeroAlbo, pw2-10, ph2-30, {align:'right'}); }
         pdf2.setDrawColor(37,87,54);pdf2.setLineWidth(0.3);pdf2.line(pw2-65,ph2-33,pw2-10,ph2-33);
         pdf2.setFontSize(8);pdf2.setFont('helvetica','normal');pdf2.setTextColor(37,87,54);
         pdf2.text('Ambulatorio Millefonti',pw2-10,ph2-28,{align:'right'});
@@ -4602,6 +4607,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
       const lineDate=rY+rH-bPad,lineVia=lineDate-Math.round(fsStampM*1.35),lineAmb=lineVia-Math.round(fsStampM*1.35);
       const lineNome=lineAmb-fsFirma-Math.round(fsStampM*0.5),lineSepF=lineNome+Math.round(fsFirma*0.4);
       finalCtxM.fillStyle='#1a2640';finalCtxM.font=`bold ${fsFirma}px Arial`;finalCtxM.fillText(nomeFirmaM,firmaColX,lineNome);
+      if (numeroAlbo) { finalCtxM.font=`italic 11px Arial`; finalCtxM.fillStyle='#1a2640'; finalCtxM.fillText(numeroAlbo,firmaColX,lineNome+14); }
       finalCtxM.strokeStyle='#1a2640';finalCtxM.lineWidth=0.5;
       finalCtxM.beginPath();finalCtxM.moveTo(firmaColX,lineSepF);finalCtxM.lineTo(firmaColX+firmaColW*0.95,lineSepF);finalCtxM.stroke();
       finalCtxM.fillStyle='#1a2640';finalCtxM.font=`${fsStampM}px Arial`;
@@ -5012,6 +5018,7 @@ export default function App() {
   const [role, setRole] = useState(null);
   const [ruoliDisponibili, setRuoliDisponibili] = useState([]);
   const [meCardiologo, setMeCardiologo] = useState(ME_CARDIOLOGO_DEFAULT);
+  const [meNumeroAlbo, setMeNumeroAlbo] = useState('');
   const [ecgs, setEcgs] = useState([]);
   const [cardiologiDB, setCardiologiDB] = useState([]);
   const isMobile = useIsMobile(); // deve stare prima di qualsiasi return
@@ -5271,8 +5278,8 @@ export default function App() {
               setRole(r);
               if (r === 'cardiologo') {
                 const { data: { session } } = await supabase.auth.getSession();
-                const { data: profile } = await supabase.from('user_profiles').select('nome, cognome').eq('id', session.user.id).single();
-                if (profile) setMeCardiologo((profile.nome ? profile.nome + ' ' + profile.cognome : profile.cognome).trim());
+                const { data: profile } = await supabase.from('user_profiles').select('nome, cognome, numero_albo').eq('id', session.user.id).single();
+                if (profile) { setMeCardiologo((profile.nome ? profile.nome + ' ' + profile.cognome : profile.cognome).trim()); setMeNumeroAlbo(profile.numero_albo || ''); }
               }
             }}
               style={{ background:"white", border:"2px solid #dde5f0", borderRadius:14, padding:"18px 24px", cursor:"pointer", fontWeight:700, fontSize:16, color:"#1a2640", display:"flex", alignItems:"center", gap:14, boxShadow:"0 2px 12px rgba(46,124,246,0.08)", transition:"all 0.15s" }}>
@@ -5291,7 +5298,7 @@ export default function App() {
   if (!role) return <LoginReale onLogin={handleLogin} />;
 
   // Vista mobile — bypassa completamente Shell
-  if (isMobile && role === 'cardiologo') return <CardiologoMobile ecgs={ecgs} setEcgs={setEcgs} meCardiologo={meCardiologo} caricaEcgs={caricaEcgs} onLogout={handleLogout} pushAbilitato={pushAbilitato} registraPush={registraPush} />;
+  if (isMobile && role === 'cardiologo') return <CardiologoMobile ecgs={ecgs} setEcgs={setEcgs} meCardiologo={meCardiologo} numeroAlbo={meNumeroAlbo} caricaEcgs={caricaEcgs} onLogout={handleLogout} pushAbilitato={pushAbilitato} registraPush={registraPush} />;
   if (isMobile && role === 'admin') return <AdminMobile ecgs={ecgs} setEcgs={setEcgs} caricaEcgs={caricaEcgs} onLogout={handleLogout} />;
 
   return (
