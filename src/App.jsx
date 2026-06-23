@@ -2113,6 +2113,9 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, pushAbilitato
                           <div style={{ color:C.text, fontSize:13, fontWeight:600 }}>{ecg.paziente_nome || ecg.paziente}</div>
                           <Badge stato={ecg.stato} urgenza={ecg.urgenza} />
                         </div>
+                        {ecg.stato==="refertato" && (
+                          <div style={{ fontSize:11, color:C.muted, marginTop:3 }}>Clicca per modificare</div>
+                        )}
                       </div>
                     ))}
                   </div>
