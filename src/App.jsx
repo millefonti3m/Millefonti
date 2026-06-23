@@ -4705,6 +4705,11 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
           <button onClick={()=>setScreen('lista')} style={{ background:'rgba(255,255,255,0.2)', border:'none', color:'white', borderRadius:10, padding:'8px 12px', cursor:'pointer', fontSize:18 }}>←</button>
           <div>
             <div style={{ fontSize:18, fontWeight:700 }}>{selectedBatch?.nome}</div>
+            {batchEcgs[0]?.origine_dettaglio && (
+              <div style={{ fontSize:12, opacity:0.7, marginBottom:2 }}>
+                🏢 {batchEcgs[0].origine_dettaglio}
+              </div>
+            )}
             <div style={{ fontSize:13, opacity:0.8 }}>{batchEcgs.filter(e=>e.stato==='refertato').length}/{batchEcgs.length} refertati</div>
           </div>
         </div>
