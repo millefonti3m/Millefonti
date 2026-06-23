@@ -3966,6 +3966,27 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
               <div style={{ fontSize:11, color:C.muted, marginTop:4 }}>Il cliente userà questo codice per scaricare i referti. Se non impostato il download sarà libero.</div>
             </div>
           )}
+          {formCliente.ruolo === 'azienda' && (
+            <div style={{ marginBottom:14 }}>
+              <label style={{ fontSize:12, color:C.muted, display:'block', marginBottom:8 }}>
+                Modalità refertazione predefinita
+              </label>
+              <div style={{ display:'flex', gap:8 }}>
+                <button
+                  onClick={() => setFormCliente(p => ({...p, modalita_refertazione: 'overlay'}))}
+                  style={{ flex:1, padding:'8px 0', borderRadius:8, border:`2px solid ${formCliente.modalita_refertazione !== 'pagina-separata' ? C.accent : C.border}`, background:formCliente.modalita_refertazione !== 'pagina-separata' ? C.accentLight : 'white', color:formCliente.modalita_refertazione !== 'pagina-separata' ? C.accent : C.muted, fontWeight:700, fontSize:13, cursor:'pointer' }}
+                >
+                  Sovrapposto
+                </button>
+                <button
+                  onClick={() => setFormCliente(p => ({...p, modalita_refertazione: 'pagina-separata'}))}
+                  style={{ flex:1, padding:'8px 0', borderRadius:8, border:`2px solid ${formCliente.modalita_refertazione === 'pagina-separata' ? C.accent : C.border}`, background:formCliente.modalita_refertazione === 'pagina-separata' ? C.accentLight : 'white', color:formCliente.modalita_refertazione === 'pagina-separata' ? C.accent : C.muted, fontWeight:700, fontSize:13, cursor:'pointer' }}
+                >
+                  Pagina separata
+                </button>
+              </div>
+            </div>
+          )}
           {formCliente.ruolo !== 'cardiologo' && (
             <div style={{ marginBottom:20 }}>
               <label style={{ color:C.textSoft, fontSize:12, fontWeight:600, display:'block', marginBottom:8 }}>Email autorizzate all'invio ECG</label>
