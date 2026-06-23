@@ -4318,6 +4318,16 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
     setSelectedEcg(ecg); resetReferta(); setScreen('referta');
   };
 
+  const apriEcgModifica = (ecg) => {
+    setSelectedEcg(ecg)
+    setPosizioneMobile('overlay')
+    setCommento('')
+    setEcgFile(null)
+    setEcgUrl(null)
+    setPreviewDataUrl(null)
+    setScreen('referta')
+  }
+
   const chiudiBatchMobile = async (batchId, batchNome, emailDest) => {
     if (!emailDest) { alert('Email destinatario non trovata'); return; }
     setFaseChiusura('preparazione');
@@ -4716,7 +4726,17 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, onLogout, p
                 </div>
               </div>
               {ecg.stato==='in_attesa' && <div style={{ color:C.muted, fontSize:12, marginTop:4 }}>Tocca per refertare →</div>}
-              {ecg.stato==='refertato' && <div style={{ fontSize:11, color:C.muted, marginTop:4 }}>Tocca per visualizzare il referto →</div>}
+              {ecg.stato==='refertato' && (
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:8 }}>
+                  <div style={{ fontSize:11, color:C.muted }}>Tocca per visualizzare →</div>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); apriEcgModifica(ecg) }}
+                    style={{ background:'#fff3cd', color:'#856404', border:'1px solid #ffc107', borderRadius:8, padding:'4px 12px', fontSize:12, fontWeight:700, cursor:'pointer' }}
+                  >
+                    ✏️ Modifica
+                  </button>
+                </div>
+              )}
             </div>
           ))}
           {faseChiusura !== null && (
