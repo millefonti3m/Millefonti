@@ -2618,7 +2618,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
   };
 
   const apriModificaCliente = (u) => {
-    setFormCliente({ ...u, password:'', codice_referti: u.codice_referti || '' });
+    setFormCliente({ ...u, password:'', codice_referti: u.codice_referti || '', modalita_refertazione: u.modalita_refertazione || 'overlay' });
     setErroreCliente(null);
     setModalCliente(u);
     supabase.from('email_autorizzate')
@@ -2647,13 +2647,14 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
             ruolo: formCliente.ruolo,
             codice_referti: formCliente.codice_referti || null,
             numero_albo: formCliente.numero_albo || null,
+            modalita_refertazione: formCliente.modalita_refertazione || 'overlay',
             email_autorizzate: emailAutorizzateForm.filter(Boolean),
           }),
         });
         const json = await res.json();
         if (!res.ok) { setErroreCliente(json.error || 'Errore creazione'); setSalvandoCliente(false); return; }
         // Ricarica lista clienti
-        const { data } = await supabase.from('user_profiles').select('id, nome, cognome, ruolo, codice_referti, codice_referti_cycle, email').or('ruolo.eq.azienda,ruolo.eq.farmacia,ruolo.eq.cardiologo');
+        const { data } = await supabase.from('user_profiles').select('id, nome, cognome, ruolo, codice_referti, codice_referti_cycle, email, modalita_refertazione').or('ruolo.eq.azienda,ruolo.eq.farmacia,ruolo.eq.cardiologo');
         if (data) { setClientiCodici(data); const init={}; data.forEach(u=>{ init[u.id]=u.codice_referti||''; }); setCodiciTemp(init); }
       } else {
         const body = { userId: modalCliente.id };
@@ -2666,6 +2667,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
           body.codice_referti = formCliente.codice_referti || null;
         }
         if (formCliente.numero_albo !== undefined) body.numero_albo = formCliente.numero_albo || null;
+        body.modalita_refertazione = formCliente.modalita_refertazione || 'overlay';
         const res = await fetch('/api/modifica-cliente', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -4357,18 +4359,31 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo, caricaEcgs,
     setCommento(''); setEcgFile(null); if (ecgUrl) URL.revokeObjectURL(ecgUrl); setEcgUrl(null); setPreviewDataUrl(null); setZoom(1); setRotationMobile(0); setNumPagesMobile(1);
   };
 
-  const apriEcg = (ecg) => {
-    setSelectedEcg(ecg); resetReferta(); setScreen('referta');
+  const apriEcg = async (ecg) => {
+    setSelectedEcg(ecg);
+    resetReferta();
+    const { data: profilo } = await supabase
+      .from('user_profiles')
+      .select('modalita_refertazione')
+      .eq('email', ecg.email_destinatario)
+      .maybeSingle();
+    setPosizioneMobile(profilo?.modalita_refertazione || 'overlay');
+    setScreen('referta');
   };
 
-  const apriEcgModifica = (ecg) => {
-    setSelectedEcg(ecg)
-    setPosizioneMobile('overlay')
-    setCommento('')
-    setEcgFile(null)
-    setEcgUrl(null)
-    setPreviewDataUrl(null)
-    setScreen('referta')
+  const apriEcgModifica = async (ecg) => {
+    setSelectedEcg(ecg);
+    resetReferta();
+    const { data: profilo } = await supabase
+      .from('user_profiles')
+      .select('modalita_refertazione')
+      .eq('email', ecg.email_destinatario)
+      .maybeSingle();
+    setPosizioneMobile(profilo?.modalita_refertazione || 'overlay');
+    setEcgFile(null);
+    setEcgUrl(null);
+    setPreviewDataUrl(null);
+    setScreen('referta');
   }
 
   const chiudiBatchMobile = async (batchId, batchNome, emailDest) => {
