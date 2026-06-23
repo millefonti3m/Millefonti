@@ -4284,6 +4284,7 @@ const useIsMobile = () => {
 const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo, caricaEcgs, onLogout, pushAbilitato, registraPush }) => {
   const [screen, setScreen] = useState('lista'); // lista | lotto | referta
   const [selectedBatch, setSelectedBatch] = useState(null);
+  const [emailInviata, setEmailInviata] = useState(false);
   const [selectedEcg, setSelectedEcg] = useState(null);
   const [crocette, setCrocette] = useState({ limiti:false, correlare:false, approfondire:false, visita:false, urgente:false });
   const [commento, setCommento] = useState('');
@@ -4452,6 +4453,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo, caricaEcgs,
         alert('✅ Email inviata a ' + emailDest);
       }
     } catch(err) { alert('Errore: ' + err.message); }
+    setEmailInviata(true);
     setFaseChiusura(null);
   };
 
@@ -4715,7 +4717,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo, caricaEcgs,
           const totale = batch.ecgs.length;
           const tuttiRefertati = refertati===totale;
           return (
-            <div key={batchId} onClick={()=>{ setSelectedBatch({id:batchId,...batch}); setScreen('lotto'); }}
+            <div key={batchId} onClick={()=>{ setSelectedBatch({id:batchId,...batch}); setEmailInviata(false); setScreen('lotto'); }}
               style={{ background:C.white, borderRadius:16, padding:20, boxShadow:'0 2px 12px rgba(0,0,0,0.06)', border:`1px solid ${C.border}`, cursor:'pointer', active:{background:C.accentLight} }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
                 <div style={{ fontWeight:700, fontSize:16, color:C.text }}>📦 {batch.nome}</div>
@@ -4794,12 +4796,12 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo, caricaEcgs,
               {ecg.stato==='refertato' && (
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:8 }}>
                   <div style={{ fontSize:11, color:C.muted }}>Tocca per visualizzare →</div>
-                  <button
+                  {!emailInviata && <button
                     onClick={(e) => { e.stopPropagation(); apriEcgModifica(ecg) }}
                     style={{ background:'#fff3cd', color:'#856404', border:'1px solid #ffc107', borderRadius:8, padding:'4px 12px', fontSize:12, fontWeight:700, cursor:'pointer' }}
                   >
                     ✏️ Modifica
-                  </button>
+                  </button>}
                 </div>
               )}
             </div>
