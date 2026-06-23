@@ -8,7 +8,7 @@ const supabase = createClient(
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { email, password, nome, cognome, ruolo, codice_referti, email_autorizzate } = req.body;
+  const { email, password, nome, cognome, ruolo, codice_referti, numero_albo, email_autorizzate } = req.body;
 
   if (!email || !password || !nome || !ruolo) {
     return res.status(400).json({ error: 'Campi obbligatori mancanti: email, password, nome, ruolo' });
@@ -37,6 +37,7 @@ export default async function handler(req, res) {
         cognome: cognome || '',
         ruolo,
         codice_referti: codice_referti || null,
+        numero_albo: numero_albo || null,
       });
 
     if (profileError) {

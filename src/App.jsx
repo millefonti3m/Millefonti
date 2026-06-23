@@ -2642,6 +2642,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
             cognome: formCliente.cognome || '',
             ruolo: formCliente.ruolo,
             codice_referti: formCliente.codice_referti || null,
+            numero_albo: formCliente.numero_albo || null,
             email_autorizzate: emailAutorizzateForm.filter(Boolean),
           }),
         });
@@ -2660,6 +2661,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
         if (formCliente.codice_referti !== (modalCliente.codice_referti || '')) {
           body.codice_referti = formCliente.codice_referti || null;
         }
+        if (formCliente.numero_albo !== undefined) body.numero_albo = formCliente.numero_albo || null;
         const res = await fetch('/api/modifica-cliente', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -3921,6 +3923,19 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
             <input value={formCliente.password||''} onChange={e => setFormCliente(p=>({...p,password:e.target.value}))} type="text" style={{ ...inputStyle, fontFamily:MONO }} placeholder={modalCliente==='nuovo' ? 'Auto-generata dal nome' : '••••••••'} />
             <div style={{ fontSize:11, color:C.muted, marginTop:4 }}>Generata automaticamente dal nome. Comunicala al cliente quando vuoi.</div>
           </div>
+          {formCliente.ruolo === 'cardiologo' && (
+            <div style={{ marginBottom:14 }}>
+              <label style={{ fontSize:12, color:C.muted, display:'block', marginBottom:4 }}>
+                Numero iscrizione Albo dei Medici
+              </label>
+              <input
+                value={formCliente.numero_albo || ''}
+                onChange={e => setFormCliente(p => ({...p, numero_albo: e.target.value}))}
+                placeholder="Es. 12345"
+                style={{ ...inputStyle }}
+              />
+            </div>
+          )}
           {formCliente.ruolo !== 'cardiologo' && (
             <div style={{ marginBottom:14 }}><label style={{ color:C.textSoft, fontSize:12, fontWeight:600, display:'block', marginBottom:6 }}>Codice download referti</label>
               <input value={formCliente.codice_referti||''} onChange={e => setFormCliente(p=>({...p,codice_referti:e.target.value}))} style={{ ...inputStyle, fontFamily:MONO, letterSpacing:2 }} placeholder="Opzionale" />
