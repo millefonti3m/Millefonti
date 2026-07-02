@@ -2452,7 +2452,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
     const carica = async () => {
       setRegistroLoading(true);
       const { data } = await supabase.from('ecgs')
-        .select('id, paziente_nome, created_at, origine_dettaglio, cardiologo_nome, urgenza, stato, email_destinatario, batch_nome')
+        .select('id, paziente_nome, created_at, origine_dettaglio, cardiologo_nome, urgenza, stato, email_destinatario, batch_nome, esito_ecg')
         .eq('stato', 'refertato')
         .order('created_at', { ascending: false });
       setRegistroEcgs(data || []);
@@ -2467,7 +2467,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
     const carica = async () => {
       setRegistroLoading(true);
       const { data } = await supabase.from('ecgs')
-        .select('id, paziente_nome, created_at, origine_dettaglio, cardiologo_nome, urgenza, stato, email_destinatario, batch_nome')
+        .select('id, paziente_nome, created_at, origine_dettaglio, cardiologo_nome, urgenza, stato, email_destinatario, batch_nome, esito_ecg')
         .eq('stato', 'refertato')
         .order('created_at', { ascending: false });
       setRegistroEcgs(data || []);
@@ -3553,15 +3553,16 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
               <div style={{textAlign:'center',padding:40,color:C.muted,background:C.white,borderRadius:16,boxShadow:C.shadow}}>Nessun ECG trovato con i filtri selezionati</div>
             ) : (
               <div style={{background:C.white,borderRadius:16,boxShadow:C.shadow,overflow:'hidden'}}>
-                <div style={{display:'grid',gridTemplateColumns:'1.2fr 80px 1.4fr 100px 100px 55px',padding:'9px 16px',background:C.cardAlt,fontSize:10,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:0.5,gap:8}}>
-                  <div>Paziente</div><div>Data</div><div>Azienda</div><div>Cardiologo</div><div>Email dest.</div><div style={{textAlign:'center'}}>Tipo</div>
+                <div style={{display:'grid',gridTemplateColumns:'1.2fr 80px 1.4fr 100px 1.5fr 100px 55px',padding:'9px 16px',background:C.cardAlt,fontSize:10,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:0.5,gap:8}}>
+                  <div>Paziente</div><div>Data</div><div>Azienda</div><div>Cardiologo</div><div>Esito</div><div>Email dest.</div><div style={{textAlign:'center'}}>Tipo</div>
                 </div>
                 {filtrati.map((e,idx)=>(
-                  <div key={e.id} style={{display:'grid',gridTemplateColumns:'1.2fr 80px 1.4fr 100px 100px 55px',padding:'10px 16px',borderBottom:`1px solid ${C.borderLight}`,alignItems:'center',gap:8,background:idx%2===0?C.white:'#f9fbff'}}>
+                  <div key={e.id} style={{display:'grid',gridTemplateColumns:'1.2fr 80px 1.4fr 100px 1.5fr 100px 55px',padding:'10px 16px',borderBottom:`1px solid ${C.borderLight}`,alignItems:'center',gap:8,background:idx%2===0?C.white:'#f9fbff'}}>
                     <div style={{fontSize:13,fontWeight:600,color:C.text}}>{e.paziente_nome||'—'}</div>
                     <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap'}}>{new Date(e.created_at).toLocaleDateString('it-IT')}</div>
                     <div style={{fontSize:12,color:C.text}}>{e.origine_dettaglio||'—'}</div>
                     <div style={{fontSize:12,color:C.accent,fontWeight:600}}>{e.cardiologo_nome||'—'}</div>
+                    <div style={{fontSize:11,color:C.text}}>{e.esito_ecg?.length ? e.esito_ecg.map(k=>({limiti:'✅ Nei limiti',correlare:'⚡ Clinica',approfondire:'👨‍⚕️ Curante',visita:'🏥 Visita cardio',urgente:'🔴 Urgente'})[k]||k).join(' · ') : '—'}</div>
                     <div style={{fontSize:11,color:C.muted,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{e.email_destinatario||'—'}</div>
                     <div style={{textAlign:'center'}}>
                       <span style={{fontSize:9,fontWeight:700,padding:'2px 6px',borderRadius:6,
