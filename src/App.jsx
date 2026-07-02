@@ -1501,7 +1501,11 @@ const RefertazioneInline = ({ ecg, meCardiologo, numeroAlbo, onRefertato, firmaU
         if (uploadError) { console.error('Upload error:', uploadError); return; }
         
         const { error: dbError } = await supabase.from('ecgs')
-          .update({ stato: 'refertato', file_referto_url: refertoFileName })
+          .update({
+            stato: 'refertato',
+            file_referto_url: refertoFileName,
+            esito_ecg: Object.entries(crocette).filter(([_, v]) => v).map(([k]) => k)
+          })
           .eq('id', ecg.id);
         if (dbError) console.error('DB update error:', dbError);
         
@@ -4666,7 +4670,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo, caricaEcgs,
       const refertoFileName = `referti/_${nomeFileOrigMobile}.pdf`;
       (async () => {
         await supabase.storage.from('ecg-files').upload(refertoFileName, pdfBlob2, { contentType:'application/pdf', upsert:true });
-        await supabase.from('ecgs').update({ stato:'refertato', file_referto_url:refertoFileName }).eq('id', selectedEcg.id);
+        await supabase.from('ecgs').update({ stato:'refertato', file_referto_url:refertoFileName, esito_ecg: Object.entries(crocette).filter(([_, v]) => v).map(([k]) => k) }).eq('id', selectedEcg.id);
         if (selectedEcg.file_ecg_url) await supabase.storage.from('ecg-files').remove([selectedEcg.file_ecg_url]).catch(()=>{});
       })();
 
