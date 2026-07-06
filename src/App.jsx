@@ -2415,7 +2415,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
   useEffect(() => {
     if (tab !== 'aziende' && tab !== 'caricaecg' && tab !== 'team') return;
     supabase.from('user_profiles')
-      .select('id, nome, cognome, ruolo, codice_referti, codice_referti_cycle, email')
+      .select('id, nome, cognome, ruolo, codice_referti, codice_referti_cycle, email, modalita_refertazione')
       .or('ruolo.eq.azienda,ruolo.eq.farmacia,ruolo.eq.cardiologo')
       .then(({ data, error }) => {
         if (data) {
