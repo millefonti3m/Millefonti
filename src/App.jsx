@@ -2681,6 +2681,11 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
         if (!res.ok) { setErroreCliente(json.error || 'Errore modifica'); setSalvandoCliente(false); return; }
         setClientiCodici(prev => prev.map(u => u.id === modalCliente.id ? {...u, codice_referti: formCliente.codice_referti || null} : u));
         setCodiciTemp(prev => ({...prev, [modalCliente.id]: formCliente.codice_referti || ''}));
+        const { data: aggiornati } = await supabase
+          .from('user_profiles')
+          .select('id, nome, cognome, ruolo, codice_referti, codice_referti_cycle, email, modalita_refertazione')
+          .or('ruolo.eq.azienda,ruolo.eq.cardiologo,ruolo.eq.farmacia')
+        if (aggiornati) setClientiCodici(aggiornati)
       }
       setModalCliente(null);
     } catch(e) { setErroreCliente(e.message); }
