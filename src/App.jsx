@@ -4316,6 +4316,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo, caricaEcgs,
   const [faseChiusura, setFaseChiusura] = useState(null);
   const chiudendo = faseChiusura !== null;
   const [posizioneMobile, setPosizioneMobile] = useState('overlay');
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => { rotationMobileRef.current = rotationMobile; }, [rotationMobile]);
 
@@ -4369,7 +4370,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo, caricaEcgs,
         }
       });
     return () => { cancelled = true; };
-  }, [selectedEcg?.id]);
+  }, [selectedEcg?.id, reloadKey]);
 
   const resetReferta = () => {
     setCrocette({ limiti:false, correlare:false, approfondire:false, visita:false, urgente:false });
@@ -4400,6 +4401,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo, caricaEcgs,
     setEcgFile(null);
     setEcgUrl(null);
     setPreviewDataUrl(null);
+    setReloadKey(k => k + 1);
     setScreen('referta');
   }
 
