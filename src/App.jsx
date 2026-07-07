@@ -1508,12 +1508,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, numeroAlbo, onRefertato, firmaU
           })
           .eq('id', ecg.id);
         if (dbError) console.error('DB update error:', dbError);
-        
-        // Elimina file ECG originale
-        if (ecg.file_ecg_url) {
-          await supabase.storage.from('ecg-files').remove([ecg.file_ecg_url]).catch(() => {});
-        }
-        
+
         // Email solo per ECG singoli
         if (!ecg.batch_id && ecg.email_destinatario) {
           const { data: urlData } = await supabase.storage.from('ecg-files').createSignedUrl(refertoFileName, 60 * 60 * 24 * 7);
@@ -1986,6 +1981,11 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, pushAbilitato
             isBatch: true, batchNome, count: ecgsBatch.length,
           })
         }).catch(() => {});
+
+        const fileEcgDaEliminare = ecgsBatch.map(e => e.file_ecg_url).filter(Boolean)
+        if (fileEcgDaEliminare.length > 0) {
+          await supabase.storage.from('ecg-files').remove(fileEcgDaEliminare).catch(() => {})
+        }
       }
       alert(`Lotto "${batchNome}" chiuso! Email con ZIP inviata a ${email}`);
     } catch(e) { console.error('chiudiBatch error:', e); alert('Errore: ' + e.message); }
@@ -4475,6 +4475,10 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo, caricaEcgs,
           body: JSON.stringify({ email:emailDest, cardiologo:meCardiologo, downloadUrl:linkDownload, isBatch:true, batchNome, count:batchEcgs.length })
         });
         alert('✅ Email inviata a ' + emailDest);
+        const fileEcgDaEliminare = batchEcgs.map(e => e.file_ecg_url).filter(Boolean)
+        if (fileEcgDaEliminare.length > 0) {
+          await supabase.storage.from('ecg-files').remove(fileEcgDaEliminare).catch(() => {})
+        }
       }
     } catch(err) { alert('Errore: ' + err.message); }
     setEmailInviata(true);
@@ -4691,7 +4695,6 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo, caricaEcgs,
       (async () => {
         await supabase.storage.from('ecg-files').upload(refertoFileName, pdfBlob2, { contentType:'application/pdf', upsert:true });
         await supabase.from('ecgs').update({ stato:'refertato', file_referto_url:refertoFileName, esito_ecg: Object.entries(crocette).filter(([_, v]) => v).map(([k]) => k) }).eq('id', selectedEcg.id);
-        if (selectedEcg.file_ecg_url) await supabase.storage.from('ecg-files').remove([selectedEcg.file_ecg_url]).catch(()=>{});
       })();
 
       // Aggiorna stato locale (incluso file_referto_url per evitare zip vuoti in chiudiBatch)
