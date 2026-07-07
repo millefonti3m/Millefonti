@@ -1913,7 +1913,13 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, pushAbilitato
   const chiudiBatch = async (batchId) => {
     setChiudendoBatch(batchId);
     setFaseChiusuraDesktop(prev => ({...prev, [batchId]: 'preparazione'}));
-    const ecgsBatch = mieiEcgs.filter(e => e.batch_id === batchId && e.stato === "refertato" && e.file_referto_url);
+    const { data: ecgsFreschi } = await supabase
+      .from('ecgs')
+      .select('*')
+      .eq('batch_id', batchId)
+      .eq('stato', 'refertato')
+      .not('file_referto_url', 'is', null)
+    const ecgsBatch = ecgsFreschi || []
     const email = ecgsBatch[0]?.email_destinatario;
     const batchNome = ecgsBatch[0]?.batch_nome || batchId;
     if (ecgsBatch.length === 0 || !email) { setChiudendoBatch(null); setFaseChiusuraDesktop(prev => ({...prev, [batchId]: null})); alert("Nessun referto disponibile o email mancante"); return; }
@@ -4402,7 +4408,13 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo, caricaEcgs,
     setFaseChiusura('preparazione');
     try {
       const JSZip = (await import('jszip')).default;
-      const batchEcgs = mieiEcgs.filter(e => e.batch_id===batchId && e.stato==='refertato' && e.file_referto_url);
+      const { data: ecgsFreschi } = await supabase
+        .from('ecgs')
+        .select('*')
+        .eq('batch_id', batchId)
+        .eq('stato', 'refertato')
+        .not('file_referto_url', 'is', null)
+      const batchEcgs = ecgsFreschi || []
       if (!batchEcgs.length) { alert('Nessun referto disponibile. Attendi qualche secondo e riprova.'); setFaseChiusura(null); return; }
       const zip = new JSZip();
       await Promise.all(batchEcgs.map(async e => {
