@@ -2,6 +2,7 @@
   "framework": "vite",
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/manifest.json", "destination": "/manifest.json" },
     { "source": "/app", "destination": "/index.html" },
     { "source": "/", "destination": "/landing_millefonti.html" },
     { "source": "/(.*)", "destination": "/index.html" }
