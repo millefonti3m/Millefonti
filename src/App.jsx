@@ -821,7 +821,7 @@ const AziendaView = ({ ecgs, setEcgs }) => {
 // Vede SOLO gli ECG che l'admin gli ha assegnato esplicitamente.
 
 // ── REFERTAZIONE INLINE ───────────────────────────────────────────────────
-const RefertazioneInline = ({ ecg, meCardiologo, numeroAlbo, onRefertato, firmaUrl }) => {
+const RefertazioneInline = ({ ecg, meCardiologo, numeroAlbo = '', onRefertato, firmaUrl }) => {
   const [ecgFile, setEcgFile] = useState(null);
   const [ecgUrl, setEcgUrl] = useState(null);
   const [ecgType, setEcgType] = useState(null);
@@ -4297,7 +4297,7 @@ const useIsMobile = () => {
 };
 
 // ── CARDIOLOGO MOBILE ──────────────────────────────────────────────────────
-const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo, caricaEcgs, onLogout, pushAbilitato, registraPush }) => {
+const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo = '', caricaEcgs, onLogout, pushAbilitato, registraPush }) => {
   const [screen, setScreen] = useState('lista'); // lista | lotto | referta
   const [selectedBatch, setSelectedBatch] = useState(null);
   const [emailInviata, setEmailInviata] = useState(false);
