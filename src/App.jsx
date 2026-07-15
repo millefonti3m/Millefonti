@@ -1703,7 +1703,7 @@ const FirmaPreview = ({ firmaUrl }) => {
   return <img src={url} alt="Firma" style={{ maxHeight:60, maxWidth:200, objectFit:"contain" }} />;
 };
 
-const CardiologoView = ({ ecgs, setEcgs, meCardiologo, caricaEcgs, pushAbilitato, registraPush }) => {
+const CardiologoView = ({ ecgs, setEcgs, meCardiologo, meNumeroAlbo, caricaEcgs, pushAbilitato, registraPush }) => {
   const [selected, setSelected] = useState(null);
   const [done, setDone] = useState(false);
   const [file, setFile] = useState(null);
@@ -5371,7 +5371,7 @@ export default function App() {
       {role==="pubblico"   && <PubblicoView setEcgs={setEcgs} />}
       {role==="farmacia"   && <FarmaciaView ecgs={ecgs} setEcgs={setEcgs} />}
       {role==="azienda"    && <AziendaView  ecgs={ecgs} setEcgs={setEcgs} />}
-      {role==="cardiologo" && <CardiologoView ecgs={ecgs} setEcgs={setEcgs} meCardiologo={meCardiologo} caricaEcgs={caricaEcgs} pushAbilitato={pushAbilitato} registraPush={registraPush} />}
+      {role==="cardiologo" && <CardiologoView ecgs={ecgs} setEcgs={setEcgs} meCardiologo={meCardiologo} meNumeroAlbo={meNumeroAlbo} caricaEcgs={caricaEcgs} pushAbilitato={pushAbilitato} registraPush={registraPush} />}
       {role==="admin"      && <AdminView    ecgs={ecgs} setEcgs={setEcgs} cardiologiDB={cardiologiDB} />}
     </Shell>
   );
