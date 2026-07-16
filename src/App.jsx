@@ -2007,7 +2007,12 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, meNumeroAlbo, caricaEcgs,
   };
 
   // Solo ECG assegnati a questo cardiologo
-  const mieiEcgs = ecgs.filter(e => e.cardiologo === meCardiologo);
+  const mieiEcgs = Array.from(
+    new Map(
+      ecgs.filter(e => e.cardiologo === meCardiologo)
+        .map(e => [e.id, e])
+    ).values()
+  );
   const inAttesa = mieiEcgs.filter(e => e.stato === "in_attesa");
   const refertatiMiei = mieiEcgs.filter(e => e.stato === "refertato");
   // Mostra sempre tutti gli ECG assegnati (in attesa + refertati)
@@ -4330,7 +4335,12 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo = '', carica
     }
   }, []);
 
-  const mieiEcgs = ecgs.filter(e => e.cardiologo === meCardiologo);
+  const mieiEcgs = Array.from(
+    new Map(
+      ecgs.filter(e => e.cardiologo === meCardiologo)
+        .map(e => [e.id, e])
+    ).values()
+  );
   const almenoCrocetta = Object.values(crocette).some(Boolean);
 
   // Carica file da Storage quando cambia ECG
@@ -5137,7 +5147,10 @@ export default function App() {
               newEcg.cardiologo_nome = dest;
             }
           }
-          setEcgs(prev => [mapEcg(newEcg), ...prev]);
+          setEcgs(prev => {
+            if (prev.some(e => e.id === newEcg.id)) return prev
+            return [mapEcg(newEcg), ...prev]
+          });
         } else if (payload.eventType === 'UPDATE') {
           setEcgs(prev => prev.map(e => e.id === payload.new.id ? mapEcg(payload.new) : e));
         } else if (payload.eventType === 'DELETE') {
