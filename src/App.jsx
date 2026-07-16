@@ -2651,6 +2651,18 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
     setErroreCliente(null);
     try {
       if (modalCliente === 'nuovo') {
+        if (formCliente.ruolo !== 'cardiologo' && !formCliente.email?.trim()) {
+          setErroreCliente('Email obbligatoria per aziende e farmacie')
+          setSalvandoCliente(false); return
+        }
+        if (!formCliente.nome?.trim()) {
+          setErroreCliente('Nome obbligatorio')
+          setSalvandoCliente(false); return
+        }
+        if (!formCliente.password?.trim()) {
+          setErroreCliente('Password obbligatoria')
+          setSalvandoCliente(false); return
+        }
         const res = await fetch('/api/crea-cliente', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
