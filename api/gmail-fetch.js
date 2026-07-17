@@ -320,9 +320,17 @@ export default async function handler(req, res) {
           if (removeErr) throw new Error('Rimozione file Storage fallita: ' + removeErr.message);
         }
 
-        const { error: updateErr } = await supabase.from('ecgs')
-          .update({ file_referto_url: null, file_ecg_url: null })
-          .in('id', vecchi.map(e => e.id));
+        const idsValidi = vecchi.map(e => e.id).filter(Boolean);
+        let updateErr = null;
+        if (idsValidi.length > 0) {
+          const result = await supabase.from('ecgs')
+            .update({ file_referto_url: null, file_ecg_url: null })
+            .in('id', idsValidi);
+          updateErr = result.error;
+          if (updateErr) {
+            console.error('Errore update pulizia:', updateErr.message, 'IDs:', idsValidi);
+          }
+        }
         if (updateErr) throw new Error('Aggiornamento DB dopo pulizia fallito: ' + updateErr.message);
 
         console.log(`Pulizia: eliminati ${filesDaEliminare.length} file vecchi di 7+ giorni`);
