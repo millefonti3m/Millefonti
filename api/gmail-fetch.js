@@ -305,7 +305,8 @@ export default async function handler(req, res) {
         .from('ecgs')
         .select('id, file_referto_url, file_ecg_url')
         .eq('stato', 'refertato')
-        .lt('created_at', settaGiorniFa.toISOString());
+        .lt('created_at', settaGiorniFa.toISOString())
+        .or('file_referto_url.not.is.null,file_ecg_url.not.is.null');
 
       if (queryErr) throw new Error('Query pulizia fallita: ' + queryErr.message);
       vecchi = vecchiData;
@@ -322,13 +323,15 @@ export default async function handler(req, res) {
 
         const idsValidi = vecchi.map(e => e.id).filter(Boolean);
         let updateErr = null;
-        if (idsValidi.length > 0) {
+        const CHUNK_SIZE = 50;
+        for (let i = 0; i < idsValidi.length; i += CHUNK_SIZE) {
+          const chunk = idsValidi.slice(i, i + CHUNK_SIZE);
           const result = await supabase.from('ecgs')
             .update({ file_referto_url: null, file_ecg_url: null })
-            .in('id', idsValidi);
-          updateErr = result.error;
-          if (updateErr) {
-            console.error('Errore update pulizia:', updateErr.message, 'IDs:', idsValidi);
+            .in('id', chunk);
+          if (result.error) {
+            updateErr = result.error;
+            console.error('Errore update pulizia chunk:', result.error.message, 'IDs:', chunk);
           }
         }
         if (updateErr) throw new Error('Aggiornamento DB dopo pulizia fallito: ' + updateErr.message);
