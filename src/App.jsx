@@ -3696,7 +3696,12 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
         const cardiologiList = cardiologiTariffList;
         const selCard = cardiologiList.find(c => c.id === cardiologoSelTariff);
         const tariffSel = tariffariAdmin[cardiologoSelTariff] || {};
-        const aziendeTutte = [...new Set(ecgs.map(e=>e.origine_dettaglio||e.farmacia||e.azienda||'Altro').filter(Boolean))].sort();
+        const aziendeDaEcg = ecgs.map(e => e.origine_dettaglio || e.farmacia || e.azienda || 'Altro').filter(Boolean)
+        const aziendeDaClienti = clientiCodici
+          .filter(u => u.ruolo === 'azienda' || u.ruolo === 'farmacia')
+          .map(u => (u.nome ? u.nome + ' ' + (u.cognome || '') : u.cognome || '').trim())
+          .filter(Boolean)
+        const aziendeTutte = [...new Set([...aziendeDaEcg, ...aziendeDaClienti])].sort();
         const [annoC,meseC] = meseCompAdmin.split('-').map(Number);
         const ecgsCardio = ecgs.filter(e => {
           if (!selCard) return false;
