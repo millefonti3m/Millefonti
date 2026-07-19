@@ -48,21 +48,22 @@ export default async function handler(req, res) {
     }
 
     // 3. Inserisci email autorizzate
-    if (Array.isArray(email_autorizzate) && email_autorizzate.length > 0) {
-      const righe = email_autorizzate
-        .map(e => e.trim())
-        .filter(Boolean)
-        .map(e => ({ email: e, user_id: userId }));
+    const emailAutorizzateFinali = Array.isArray(email_autorizzate)
+      ? email_autorizzate.map(e => e.trim()).filter(Boolean)
+      : [];
 
-      if (righe.length > 0) {
-        const { error: emailErr } = await supabase
-          .from('email_autorizzate')
-          .insert(righe);
+    // Garantisce che l'email principale sia sempre autorizzata
+    if (email && !emailAutorizzateFinali.includes(email.trim())) {
+      emailAutorizzateFinali.push(email.trim());
+    }
 
-        if (emailErr) {
-          // Non critico — il cliente esiste, le email si aggiungono dopo
-          console.error('email_autorizzate insert error:', emailErr.message);
-        }
+    if (emailAutorizzateFinali.length > 0) {
+      const righe = emailAutorizzateFinali.map(e => ({ email: e, user_id: userId }));
+      const { error: emailErr } = await supabase
+        .from('email_autorizzate')
+        .insert(righe);
+      if (emailErr) {
+        console.error('Errore inserimento email_autorizzate:', emailErr.message);
       }
     }
 
