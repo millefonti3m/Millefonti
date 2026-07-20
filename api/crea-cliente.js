@@ -36,6 +36,7 @@ export default async function handler(req, res) {
         nome,
         cognome: cognome || '',
         ruolo,
+        email: email || null,
         codice_referti: codice_referti || null,
         numero_albo: numero_albo || null,
         modalita_refertazione: modalita_refertazione || 'overlay',
