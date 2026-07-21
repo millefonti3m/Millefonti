@@ -1070,7 +1070,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, numeroAlbo = '', onRefertato, f
     const lineSepF = lineNome + Math.round(fsFirma * 0.4);
     ctx.fillStyle = "#1a2640"; ctx.font = `bold ${fsFirma}px Arial`;
     ctx.fillText(nomeFirma, firmaColX, lineNome);
-    if (numeroAlbo) { ctx.font = `italic 11px Arial`; ctx.fillStyle = '#1a2640'; ctx.fillText(numeroAlbo, firmaColX, lineNome + 14); }
+    if (numeroAlbo) { ctx.font = `italic 11px Arial`; ctx.fillStyle = '#1a2640'; ctx.fillText(numeroAlbo, firmaColX, lineNome + 22); }
     ctx.strokeStyle = "#1a2640"; ctx.lineWidth = 0.5;
     ctx.beginPath(); ctx.moveTo(firmaColX, lineSepF); ctx.lineTo(firmaColX + firmaColW * 0.95, lineSepF); ctx.stroke();
     ctx.fillStyle = "#1a2640"; ctx.font = `${fsStamp}px Arial`;
@@ -1311,10 +1311,10 @@ const RefertazioneInline = ({ ecg, meCardiologo, numeroAlbo = '', onRefertato, f
             pdf.addImage(fCvs.toDataURL("image/png"), "PNG", pw - 10 - fW, ph - 38 - fH, fW, fH);
           }
           pdf.setFontSize(13); pdf.setFont("helvetica", "bold"); pdf.setTextColor(37, 87, 54);
-          pdf.text(nomeFirma, pw - 10, ph - 36, { align: "right" });
-          if (numeroAlbo) { pdf.setFontSize(9); pdf.setFont('helvetica','italic'); pdf.text(numeroAlbo, pw-10, ph-30, {align:'right'}); }
+          pdf.text(nomeFirma, pw - 10, ph - 42, { align: "right" });
+          if (numeroAlbo) { pdf.setFontSize(9); pdf.setFont('helvetica','italic'); pdf.text(numeroAlbo, pw-10, ph-33, {align:'right'}); }
           pdf.setDrawColor(26, 38, 64); pdf.setLineWidth(0.3);
-          pdf.line(pw - 65, ph - 33, pw - 10, ph - 33);
+          pdf.line(pw - 65, ph - 37, pw - 10, ph - 37);
           pdf.setFontSize(8); pdf.setFont("helvetica", "normal"); pdf.setTextColor(37, 87, 54);
           pdf.text("Ambulatorio Millefonti", pw - 10, ph - 28, { align: "right" });
           pdf.text("Via Garessio 47 - Torino", pw - 10, ph - 23, { align: "right" });
@@ -1441,9 +1441,9 @@ const RefertazioneInline = ({ ecg, meCardiologo, numeroAlbo = '', onRefertato, f
           if(commento.trim()){cy2+=4;refertoPdf.setDrawColor(220,229,240);refertoPdf.setLineWidth(0.5);refertoPdf.line(10,cy2,pw-10,cy2);cy2+=8;refertoPdf.setFontSize(10);refertoPdf.setFont('helvetica','bold');refertoPdf.setTextColor(107,125,153);refertoPdf.text('DESCRIZIONE',10,cy2);cy2+=7;refertoPdf.setFont('helvetica','normal');refertoPdf.setTextColor(37,87,54);refertoPdf.setFontSize(11);refertoPdf.text(refertoPdf.splitTextToSize(commento,pw-20),10,cy2);}
           const nb2=meCardiologo.replace(/^Dott\.\s*Dr\.?/i,'').replace(/^Dr\.?\s*/i,'').replace(/^Dott\.?\s*/i,'').trim();
           if(window.__millefonti_firma){const fCR=document.createElement('canvas');fCR.width=window.__millefonti_firma.width;fCR.height=window.__millefonti_firma.height;fCR.getContext('2d').drawImage(window.__millefonti_firma,0,0);const fW2=35,fH2=fW2/(window.__millefonti_firma.width/window.__millefonti_firma.height);refertoPdf.addImage(fCR.toDataURL('image/png'),'PNG',pw-10-fW2,ph-38-fH2,fW2,fH2);}
-          refertoPdf.setFontSize(13);refertoPdf.setFont('helvetica','bold');refertoPdf.setTextColor(37,87,54);refertoPdf.text('Dott. '+nb2,pw-10,ph-36,{align:'right'});
-          if (numeroAlbo) { refertoPdf.setFontSize(9); refertoPdf.setFont('helvetica','italic'); refertoPdf.text(numeroAlbo, pw-10, ph-30, {align:'right'}); }
-          refertoPdf.setDrawColor(37,87,54);refertoPdf.setLineWidth(0.3);refertoPdf.line(pw-65,ph-33,pw-10,ph-33);
+          refertoPdf.setFontSize(13);refertoPdf.setFont('helvetica','bold');refertoPdf.setTextColor(37,87,54);refertoPdf.text('Dott. '+nb2,pw-10,ph-42,{align:'right'});
+          if (numeroAlbo) { refertoPdf.setFontSize(9); refertoPdf.setFont('helvetica','italic'); refertoPdf.text(numeroAlbo, pw-10, ph-33, {align:'right'}); }
+          refertoPdf.setDrawColor(37,87,54);refertoPdf.setLineWidth(0.3);refertoPdf.line(pw-65,ph-37,pw-10,ph-37);
           refertoPdf.setFontSize(8);refertoPdf.setFont('helvetica','normal');refertoPdf.setTextColor(37,87,54);
           refertoPdf.text('Ambulatorio Millefonti',pw-10,ph-28,{align:'right'});
           refertoPdf.text('Via Garessio 47 - Torino',pw-10,ph-23,{align:'right'});
@@ -4614,9 +4614,9 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo = '', carica
           const fW2=35,fH2=fW2/(window.__millefonti_firma.width/window.__millefonti_firma.height);
           pdf2.addImage(fCvs2.toDataURL('image/png'),'PNG',pw2-10-fW2,ph2-38-fH2,fW2,fH2);
         }
-        pdf2.setFontSize(13);pdf2.setFont('helvetica','bold');pdf2.setTextColor(37,87,54);pdf2.text(nomeFirma2,pw2-10,ph2-36,{align:'right'});
-        if (numeroAlbo) { pdf2.setFontSize(9); pdf2.setFont('helvetica','italic'); pdf2.text(numeroAlbo, pw2-10, ph2-30, {align:'right'}); }
-        pdf2.setDrawColor(37,87,54);pdf2.setLineWidth(0.3);pdf2.line(pw2-65,ph2-33,pw2-10,ph2-33);
+        pdf2.setFontSize(13);pdf2.setFont('helvetica','bold');pdf2.setTextColor(37,87,54);pdf2.text(nomeFirma2,pw2-10,ph2-42,{align:'right'});
+        if (numeroAlbo) { pdf2.setFontSize(9); pdf2.setFont('helvetica','italic'); pdf2.text(numeroAlbo, pw2-10, ph2-33, {align:'right'}); }
+        pdf2.setDrawColor(37,87,54);pdf2.setLineWidth(0.3);pdf2.line(pw2-65,ph2-37,pw2-10,ph2-37);
         pdf2.setFontSize(8);pdf2.setFont('helvetica','normal');pdf2.setTextColor(37,87,54);
         pdf2.text('Ambulatorio Millefonti',pw2-10,ph2-28,{align:'right'});
         pdf2.text('Via Garessio 47 - Torino',pw2-10,ph2-23,{align:'right'});
@@ -4700,7 +4700,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo = '', carica
       const lineDate=rY+rH-bPad,lineVia=lineDate-Math.round(fsStampM*1.35),lineAmb=lineVia-Math.round(fsStampM*1.35);
       const lineNome=lineAmb-fsFirma-Math.round(fsStampM*0.5),lineSepF=lineNome+Math.round(fsFirma*0.4);
       finalCtxM.fillStyle='#1a2640';finalCtxM.font=`bold ${fsFirma}px Arial`;finalCtxM.fillText(nomeFirmaM,firmaColX,lineNome);
-      if (numeroAlbo) { finalCtxM.font=`italic 11px Arial`; finalCtxM.fillStyle='#1a2640'; finalCtxM.fillText(numeroAlbo,firmaColX,lineNome+14); }
+      if (numeroAlbo) { finalCtxM.font=`italic 11px Arial`; finalCtxM.fillStyle='#1a2640'; finalCtxM.fillText(numeroAlbo,firmaColX,lineNome+22); }
       finalCtxM.strokeStyle='#1a2640';finalCtxM.lineWidth=0.5;
       finalCtxM.beginPath();finalCtxM.moveTo(firmaColX,lineSepF);finalCtxM.lineTo(firmaColX+firmaColW*0.95,lineSepF);finalCtxM.stroke();
       finalCtxM.fillStyle='#1a2640';finalCtxM.font=`${fsStampM}px Arial`;
