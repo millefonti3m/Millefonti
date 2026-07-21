@@ -1066,11 +1066,12 @@ const RefertazioneInline = ({ ecg, meCardiologo, numeroAlbo = '', onRefertato, f
     const lineDate = rY + rH - bPad;
     const lineVia  = lineDate - Math.round(fsStamp * 1.35);
     const lineAmb  = lineVia  - Math.round(fsStamp * 1.35);
-    const lineNome = lineAmb  - fsFirma - Math.round(fsStamp * 0.5);
+    const lineNumeroAlbo = numeroAlbo ? (lineAmb - Math.round(fsStamp * 1.1)) : lineAmb;
+    const lineNome = lineNumeroAlbo - fsFirma - Math.round(fsStamp * 0.5);
     const lineSepF = lineNome + Math.round(fsFirma * 0.4);
     ctx.fillStyle = "#1a2640"; ctx.font = `bold ${fsFirma}px Arial`;
     ctx.fillText(nomeFirma, firmaColX, lineNome);
-    if (numeroAlbo) { ctx.font = `italic 11px Arial`; ctx.fillStyle = '#1a2640'; ctx.fillText(numeroAlbo, firmaColX, lineNome + 22); }
+    if (numeroAlbo) { ctx.font = `italic 11px Arial`; ctx.fillStyle = '#1a2640'; ctx.fillText(numeroAlbo, firmaColX, lineNumeroAlbo); }
     ctx.strokeStyle = "#1a2640"; ctx.lineWidth = 0.5;
     ctx.beginPath(); ctx.moveTo(firmaColX, lineSepF); ctx.lineTo(firmaColX + firmaColW * 0.95, lineSepF); ctx.stroke();
     ctx.fillStyle = "#1a2640"; ctx.font = `${fsStamp}px Arial`;
@@ -4698,9 +4699,10 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo = '', carica
       // Firma testo agganciata al fondo
       const bPad=Math.round(rH*0.05);
       const lineDate=rY+rH-bPad,lineVia=lineDate-Math.round(fsStampM*1.35),lineAmb=lineVia-Math.round(fsStampM*1.35);
-      const lineNome=lineAmb-fsFirma-Math.round(fsStampM*0.5),lineSepF=lineNome+Math.round(fsFirma*0.4);
+      const lineNumeroAlbo=numeroAlbo?(lineAmb-Math.round(fsStampM*1.1)):lineAmb;
+      const lineNome=lineNumeroAlbo-fsFirma-Math.round(fsStampM*0.5),lineSepF=lineNome+Math.round(fsFirma*0.4);
       finalCtxM.fillStyle='#1a2640';finalCtxM.font=`bold ${fsFirma}px Arial`;finalCtxM.fillText(nomeFirmaM,firmaColX,lineNome);
-      if (numeroAlbo) { finalCtxM.font=`italic 11px Arial`; finalCtxM.fillStyle='#1a2640'; finalCtxM.fillText(numeroAlbo,firmaColX,lineNome+22); }
+      if (numeroAlbo) { finalCtxM.font=`italic 11px Arial`; finalCtxM.fillStyle='#1a2640'; finalCtxM.fillText(numeroAlbo,firmaColX,lineNumeroAlbo); }
       finalCtxM.strokeStyle='#1a2640';finalCtxM.lineWidth=0.5;
       finalCtxM.beginPath();finalCtxM.moveTo(firmaColX,lineSepF);finalCtxM.lineTo(firmaColX+firmaColW*0.95,lineSepF);finalCtxM.stroke();
       finalCtxM.fillStyle='#1a2640';finalCtxM.font=`${fsStampM}px Arial`;
