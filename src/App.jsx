@@ -4434,6 +4434,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo = '', carica
   }
 
   const chiudiBatchMobile = async (batchId, batchNome, emailDest) => {
+    if (chiudendo) return;
     if (!emailDest) { alert('Email destinatario non trovata'); return; }
     setFaseChiusura('preparazione');
     try {
