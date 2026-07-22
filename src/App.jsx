@@ -1909,12 +1909,18 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, meNumeroAlbo, caricaEcgs,
   const chiudiBatch = async (batchId) => {
     setChiudendoBatch(batchId);
     setFaseChiusuraDesktop(prev => ({...prev, [batchId]: 'preparazione'}));
-    const { data: ecgsFreschi } = await supabase
-      .from('ecgs')
-      .select('*')
-      .eq('batch_id', batchId)
-      .eq('stato', 'refertato')
-      .not('file_referto_url', 'is', null)
+    let ecgsFreschi = null;
+    for (let tentativo = 0; tentativo < 3; tentativo++) {
+      const result = await supabase
+        .from('ecgs')
+        .select('*')
+        .eq('batch_id', batchId)
+        .eq('stato', 'refertato')
+        .not('file_referto_url', 'is', null)
+      ecgsFreschi = result.data;
+      if (ecgsFreschi && ecgsFreschi.length > 0) break;
+      if (tentativo < 2) await new Promise(r => setTimeout(r, 1500));
+    }
     const ecgsBatch = ecgsFreschi || []
     const email = ecgsBatch[0]?.email_destinatario;
     const batchNome = ecgsBatch[0]?.batch_nome || batchId;
@@ -4460,12 +4466,18 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo = '', carica
     setFaseChiusura('preparazione');
     try {
       const JSZip = (await import('jszip')).default;
-      const { data: ecgsFreschi } = await supabase
-        .from('ecgs')
-        .select('*')
-        .eq('batch_id', batchId)
-        .eq('stato', 'refertato')
-        .not('file_referto_url', 'is', null)
+      let ecgsFreschi = null;
+      for (let tentativo = 0; tentativo < 3; tentativo++) {
+        const result = await supabase
+          .from('ecgs')
+          .select('*')
+          .eq('batch_id', batchId)
+          .eq('stato', 'refertato')
+          .not('file_referto_url', 'is', null)
+        ecgsFreschi = result.data;
+        if (ecgsFreschi && ecgsFreschi.length > 0) break;
+        if (tentativo < 2) await new Promise(r => setTimeout(r, 1500));
+      }
       const batchEcgs = ecgsFreschi || []
       if (!batchEcgs.length) { alert('Nessun referto disponibile. Attendi qualche secondo e riprova.'); setFaseChiusura(null); return; }
       const zip = new JSZip();
