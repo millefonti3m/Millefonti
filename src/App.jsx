@@ -4329,6 +4329,8 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo = '', carica
   const [commento, setCommento] = useState('');
   const [ecgFile, setEcgFile] = useState(null);
   const [ecgUrl, setEcgUrl] = useState(null);
+  const [erroreCaricamentoEcg, setErroreCaricamentoEcg] = useState(false);
+  const [tentativiCaricamento, setTentativiCaricamento] = useState(0);
   const [ecgType, setEcgType] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [previewDataUrl, setPreviewDataUrl] = useState(null);
@@ -4364,11 +4366,22 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo = '', carica
   // Carica file da Storage quando cambia ECG
   useEffect(() => {
     if (!selectedEcg?.file_ecg_url) return;
+    setErroreCaricamentoEcg(false);
     setEcgFile(null); setEcgUrl(null); setPreviewDataUrl(null);
     let cancelled = false;
     supabase.storage.from('ecg-files').download(selectedEcg.file_ecg_url)
       .then(({ data, error }) => {
-        if (cancelled || error || !data) return;
+        if (cancelled) return;
+        if (error || !data) {
+          if (tentativiCaricamento < 3) {
+            setTimeout(() => { if (!cancelled) setTentativiCaricamento(t => t + 1); }, 1500);
+          } else {
+            setErroreCaricamentoEcg(true);
+          }
+          return;
+        }
+        setErroreCaricamentoEcg(false);
+        setTentativiCaricamento(0);
         const ext = selectedEcg.file_ecg_url.split('.').pop().toLowerCase();
         const mimeType = ext === 'pdf' ? 'application/pdf' : `image/${ext}`;
         const file = new File([data], selectedEcg.file_ecg_url, { type: mimeType });
@@ -4396,9 +4409,17 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo = '', carica
             } catch(e) {}
           })();
         }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        if (tentativiCaricamento < 3) {
+          setTimeout(() => { if (!cancelled) setTentativiCaricamento(t => t + 1); }, 1500);
+        } else {
+          setErroreCaricamentoEcg(true);
+        }
       });
     return () => { cancelled = true; };
-  }, [selectedEcg?.id, reloadKey]);
+  }, [selectedEcg?.id, reloadKey, tentativiCaricamento]);
 
   const resetReferta = () => {
     setCrocette({ limiti:false, correlare:false, approfondire:false, visita:false, urgente:false });
@@ -4962,7 +4983,16 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo = '', carica
         <div style={{ overflow:'auto', maxHeight:'38vh', background:'#f5f5f5' }}>
           {previewDataUrl
             ? <img src={previewDataUrl} alt="ECG" style={{ width:rotationMobile===90||rotationMobile===270?`${zoom*60}%`:`${zoom*100}%`, display:'block', transform:`rotate(${rotationMobile}deg)`, transformOrigin:'center center', margin:rotationMobile===90||rotationMobile===270?'15% auto':'0' }} />
-            : <div style={{ padding:40, textAlign:'center', color:C.muted }}>⏳ Caricamento...</div>
+            : erroreCaricamentoEcg
+              ? <div style={{ textAlign:'center', padding:20, color:'#dc2626' }}>
+                  <div style={{ fontSize:14, marginBottom:10 }}>⚠️ Impossibile caricare il tracciato ECG. Verifica la connessione.</div>
+                  <button onClick={() => { setTentativiCaricamento(0); setReloadKey(k => k+1); }} style={{ background:'#dc2626', color:'white', border:'none', borderRadius:8, padding:'10px 20px', fontWeight:700, cursor:'pointer' }}>🔄 Riprova</button>
+                </div>
+              : <div style={{ padding:40, textAlign:'center', color:C.muted }}>
+                  {tentativiCaricamento > 0 && tentativiCaricamento < 3
+                    ? <div style={{ fontSize:12 }}>Nuovo tentativo... ({tentativiCaricamento}/3)</div>
+                    : '⏳ Caricamento...'}
+                </div>
           }
         </div>
       </div>
@@ -4990,7 +5020,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo = '', carica
 
       {/* Bottone fisso in basso */}
       <div style={{ position:'fixed', bottom:0, left:0, right:0, padding:'12px 16px', background:'white', borderTop:`1px solid ${C.border}`, boxShadow:'0 -4px 20px rgba(0,0,0,0.08)' }}>
-        {!ecgFile && <div style={{ textAlign:'center', color:C.muted, fontSize:13, marginBottom:8 }}>⏳ Caricamento ECG...</div>}
+        {!ecgFile && !erroreCaricamentoEcg && <div style={{ textAlign:'center', color:C.muted, fontSize:13, marginBottom:8 }}>⏳ Caricamento ECG...</div>}
         <button onClick={generaEConferma} disabled={!ecgFile||!almenoCrocetta||generating}
           style={{ width:'100%', background:(!ecgFile||!almenoCrocetta||generating)?C.border:'linear-gradient(135deg,#1aaa6e,#0ea5a0)', color:(!ecgFile||!almenoCrocetta||generating)?C.muted:'white', border:'none', borderRadius:14, padding:'18px 0', cursor:(!ecgFile||!almenoCrocetta||generating)?'not-allowed':'pointer', fontWeight:700, fontSize:16, letterSpacing:0.3 }}>
           {generating ? '⏳ Generazione in corso...' : !almenoCrocetta ? 'Seleziona almeno una crocetta' : '✓ Genera e Conferma referto'}
