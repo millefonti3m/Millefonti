@@ -1928,10 +1928,27 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, meNumeroAlbo, caricaEcgs,
     try {
       const JSZip = (await import('jszip')).default;
       const zip = new JSZip();
+      const filiFalliti = [];
       await Promise.all(ecgsBatch.map(async (e) => {
-        const { data } = await supabase.storage.from('ecg-files').download(e.file_referto_url);
-        if (data) zip.file(e.file_referto_url.split('/').pop(), data);
+        let data = null;
+        for (let tentativo = 0; tentativo < 3; tentativo++) {
+          const result = await supabase.storage.from('ecg-files').download(e.file_referto_url);
+          data = result.data;
+          if (data) break;
+          if (tentativo < 2) await new Promise(r => setTimeout(r, 1000));
+        }
+        if (data) {
+          zip.file(e.file_referto_url.split('/').pop(), data);
+        } else {
+          filiFalliti.push(e.paziente_nome || e.file_referto_url);
+        }
       }));
+      if (filiFalliti.length > 0) {
+        const nomi = filiFalliti.join(', ');
+        const procedi = window.confirm(`⚠️ ATTENZIONE: ${filiFalliti.length} referto/i non è stato possibile scaricare dallo storage:\n\n${nomi}\n\nSe procedi, questi referti NON saranno inclusi nello ZIP inviato al cliente.\n\nVuoi procedere comunque?`);
+        if (!procedi) { setChiudendoBatch(null); setFaseChiusuraDesktop(prev => ({...prev, [batchId]: null})); return; }
+      }
+      const countEffettivo = ecgsBatch.length - filiFalliti.length;
       setFaseChiusuraDesktop(prev => ({...prev, [batchId]: 'zip'}));
       const zipBlob = await zip.generateAsync({ type: 'blob' });
       setFaseChiusuraDesktop(prev => ({...prev, [batchId]: 'invio'}));
@@ -1958,7 +1975,7 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, meNumeroAlbo, caricaEcgs,
             download_url: downloadUrl,
             azienda_email: email,
             batch_nome: batchNome,
-            count: ecgsBatch.length,
+            count: countEffettivo,
             cardiologo: meCardiologo,
             expires_at: expires.toISOString(),
             codice_referti: codiceReferti,
@@ -1985,7 +2002,7 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, meNumeroAlbo, caricaEcgs,
           body: JSON.stringify({
             email, cardiologo: meCardiologo,
             downloadUrl: linkDownload,
-            isBatch: true, batchNome, count: ecgsBatch.length,
+            isBatch: true, batchNome, count: countEffettivo,
           })
         }).catch(() => {});
 
@@ -4481,10 +4498,27 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo = '', carica
       const batchEcgs = ecgsFreschi || []
       if (!batchEcgs.length) { alert('Nessun referto disponibile. Attendi qualche secondo e riprova.'); setFaseChiusura(null); return; }
       const zip = new JSZip();
+      const filiFalliti = [];
       await Promise.all(batchEcgs.map(async e => {
-        const { data } = await supabase.storage.from('ecg-files').download(e.file_referto_url);
-        if (data) zip.file(e.file_referto_url.split('/').pop(), data);
+        let data = null;
+        for (let tentativo = 0; tentativo < 3; tentativo++) {
+          const result = await supabase.storage.from('ecg-files').download(e.file_referto_url);
+          data = result.data;
+          if (data) break;
+          if (tentativo < 2) await new Promise(r => setTimeout(r, 1000));
+        }
+        if (data) {
+          zip.file(e.file_referto_url.split('/').pop(), data);
+        } else {
+          filiFalliti.push(e.paziente_nome || e.file_referto_url);
+        }
       }));
+      if (filiFalliti.length > 0) {
+        const nomi = filiFalliti.join(', ');
+        const procedi = window.confirm(`⚠️ ATTENZIONE: ${filiFalliti.length} referto/i non è stato possibile scaricare dallo storage:\n\n${nomi}\n\nSe procedi, questi referti NON saranno inclusi nello ZIP inviato al cliente.\n\nVuoi procedere comunque?`);
+        if (!procedi) { setFaseChiusura(null); return; }
+      }
+      const countEffettivo = batchEcgs.length - filiFalliti.length;
       setFaseChiusura('zip');
       const zipBlob = await zip.generateAsync({ type:'blob' });
       setFaseChiusura('invio');
@@ -4511,7 +4545,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo = '', carica
             download_url: downloadUrl,
             azienda_email: emailDest,
             batch_nome: batchNome,
-            count: batchEcgs.length,
+            count: countEffettivo,
             cardiologo: meCardiologo,
             expires_at: expires.toISOString(),
             codice_referti: codiceReferti,
@@ -4534,7 +4568,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo = '', carica
         // 4. Invia email con linkDownload
         await fetch('/api/notify-referto', {
           method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ email:emailDest, cardiologo:meCardiologo, downloadUrl:linkDownload, isBatch:true, batchNome, count:batchEcgs.length })
+          body: JSON.stringify({ email:emailDest, cardiologo:meCardiologo, downloadUrl:linkDownload, isBatch:true, batchNome, count:countEffettivo })
         });
         alert('✅ Email inviata a ' + emailDest);
         const fileEcgDaEliminare = batchEcgs.map(e => e.file_ecg_url).filter(Boolean)
