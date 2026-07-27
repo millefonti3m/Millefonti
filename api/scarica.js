@@ -95,6 +95,10 @@ export default async function handler(req, res) {
 
   // ── GET: mostra pagina ──────────────────────────────────────────────
   if (req.method === 'GET') {
+    if (!tk.codice_referti) {
+      await supabase.from('download_tokens').update({ used_at: new Date().toISOString() }).eq('id', tk.id);
+      return res.redirect(302, tk.download_url);
+    }
     return res.status(200).send(paginaHTML({
       batchNome: tk.batch_nome,
       count: tk.count,
