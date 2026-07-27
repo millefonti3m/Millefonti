@@ -1,10 +1,15 @@
 {
   "framework": "vite",
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/landing_millefonti.html",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
-    { "source": "/manifest.json", "destination": "/manifest.json" },
     { "source": "/app", "destination": "/index.html" },
-    { "source": "/", "destination": "/landing_millefonti.html" },
     { "source": "/(.+)", "destination": "/index.html" }
   ]
 }
