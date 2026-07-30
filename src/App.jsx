@@ -1091,7 +1091,6 @@ const RefertazioneInline = ({ ecg, meCardiologo, numeroAlbo = '', onRefertato, f
   }, [crocette, commento, posizione, meCardiologo]);
 
   const generaPDF = async () => {
-    console.log('numeroAlbo al momento del PDF:', numeroAlbo);
     if (!ecgFile || !almenoCrocetta) return;
     setGenerating(true);
     // Precarica firma se disponibile
