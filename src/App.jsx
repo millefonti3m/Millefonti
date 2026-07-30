@@ -4524,14 +4524,14 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo = '', carica
 
       // Secondo retry: aspetta che file_referto_url sia popolato per tutti
       if (totaleAtteso > 0 && (ecgsFreschi?.length || 0) < totaleAtteso) {
-        for (let tentativo = 0; tentativo < 5; tentativo++) {
+        for (let tentativo = 0; tentativo < 10; tentativo++) {
           const result = await supabase
             .from('ecgs').select('*')
             .eq('batch_id', batchId).eq('stato', 'refertato')
             .not('file_referto_url', 'is', null);
           ecgsFreschi = result.data;
           if ((ecgsFreschi?.length || 0) >= totaleAtteso) break;
-          if (tentativo < 4) await new Promise(r => setTimeout(r, 2000));
+          if (tentativo < 9) await new Promise(r => setTimeout(r, 3000));
         }
         const mancanti = tuttiRefertati?.filter(e => !ecgsFreschi?.find(f => f.id === e.id)).map(e => e.paziente_nome || e.id);
         if (mancanti?.length > 0) console.warn('chiudiBatchMobile: file_referto_url ancora null per:', mancanti);
