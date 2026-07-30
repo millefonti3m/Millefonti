@@ -1338,7 +1338,19 @@ const RefertazioneInline = ({ ecg, meCardiologo, numeroAlbo = '', onRefertato, f
           if (drawH > p2h) { drawH = p2h; drawW = drawH * ratio; }
           const dx = (p2w - drawW) / 2;
           const dy = (p2h - drawH) / 2;
-          const imgData = (() => { const c = document.createElement("canvas"); c.width = W; c.height = H; c.getContext("2d").drawImage(img, 0, 0); return c.toDataURL("image/jpeg", 0.78); })();
+          const MAX_WIDTH = 1500;
+          let canvasW = W;
+          let canvasH = H;
+          if (W > MAX_WIDTH) {
+            canvasW = MAX_WIDTH;
+            canvasH = Math.round(H * MAX_WIDTH / W);
+          }
+          const tempCanvas = document.createElement('canvas');
+          tempCanvas.width = canvasW;
+          tempCanvas.height = canvasH;
+          const tempCtx = tempCanvas.getContext('2d');
+          tempCtx.drawImage(img, 0, 0, canvasW, canvasH);
+          const imgData = tempCanvas.toDataURL('image/jpeg', 0.5);
           pdf.addImage(imgData, "JPEG", dx, dy, drawW, drawH);
 
           if (ecg.batch_id) {
