@@ -1922,6 +1922,27 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, meNumeroAlbo, caricaEcgs,
       if (ecgsFreschi && ecgsFreschi.length > 0) break;
       if (tentativo < 2) await new Promise(r => setTimeout(r, 1500));
     }
+    // Conta totale refertati nel batch (inclusi quelli con file_referto_url null)
+    const { data: tuttiRefertati } = await supabase
+      .from('ecgs').select('id, paziente_nome')
+      .eq('batch_id', batchId).eq('stato', 'refertato');
+    const totaleAtteso = tuttiRefertati?.length || 0;
+
+    // Secondo retry: aspetta che file_referto_url sia popolato per tutti
+    if (totaleAtteso > 0 && (ecgsFreschi?.length || 0) < totaleAtteso) {
+      for (let tentativo = 0; tentativo < 5; tentativo++) {
+        const result = await supabase
+          .from('ecgs').select('*')
+          .eq('batch_id', batchId).eq('stato', 'refertato')
+          .not('file_referto_url', 'is', null);
+        ecgsFreschi = result.data;
+        if ((ecgsFreschi?.length || 0) >= totaleAtteso) break;
+        if (tentativo < 4) await new Promise(r => setTimeout(r, 2000));
+      }
+      const mancanti = tuttiRefertati?.filter(e => !ecgsFreschi?.find(f => f.id === e.id)).map(e => e.paziente_nome || e.id);
+      if (mancanti?.length > 0) console.warn('chiudiBatch: file_referto_url ancora null per:', mancanti);
+    }
+
     const ecgsBatch = ecgsFreschi || []
     const email = ecgsBatch[0]?.email_destinatario;
     const batchNome = ecgsBatch[0]?.batch_nome || batchId;
@@ -4496,6 +4517,27 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo = '', carica
         if (ecgsFreschi && ecgsFreschi.length > 0) break;
         if (tentativo < 2) await new Promise(r => setTimeout(r, 1500));
       }
+      // Conta totale refertati nel batch
+      const { data: tuttiRefertati } = await supabase
+        .from('ecgs').select('id, paziente_nome')
+        .eq('batch_id', batchId).eq('stato', 'refertato');
+      const totaleAtteso = tuttiRefertati?.length || 0;
+
+      // Secondo retry: aspetta che file_referto_url sia popolato per tutti
+      if (totaleAtteso > 0 && (ecgsFreschi?.length || 0) < totaleAtteso) {
+        for (let tentativo = 0; tentativo < 5; tentativo++) {
+          const result = await supabase
+            .from('ecgs').select('*')
+            .eq('batch_id', batchId).eq('stato', 'refertato')
+            .not('file_referto_url', 'is', null);
+          ecgsFreschi = result.data;
+          if ((ecgsFreschi?.length || 0) >= totaleAtteso) break;
+          if (tentativo < 4) await new Promise(r => setTimeout(r, 2000));
+        }
+        const mancanti = tuttiRefertati?.filter(e => !ecgsFreschi?.find(f => f.id === e.id)).map(e => e.paziente_nome || e.id);
+        if (mancanti?.length > 0) console.warn('chiudiBatchMobile: file_referto_url ancora null per:', mancanti);
+      }
+
       const batchEcgs = ecgsFreschi || []
       if (!batchEcgs.length) { alert('Nessun referto disponibile. Attendi qualche secondo e riprova.'); setFaseChiusura(null); return; }
       const zip = new JSZip();
