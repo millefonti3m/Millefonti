@@ -4523,7 +4523,6 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo = '', carica
       const totaleAtteso = tuttiRefertati?.length || 0;
 
       // Secondo retry: aspetta che file_referto_url sia popolato per tutti
-      alert('Retry 2 start - totaleAtteso: ' + totaleAtteso + ' ecgsFreschi: ' + (ecgsFreschi?.length || 0));
       if (totaleAtteso > 0 && (ecgsFreschi?.length || 0) < totaleAtteso) {
         for (let tentativo = 0; tentativo < 10; tentativo++) {
           const result = await supabase
@@ -4538,7 +4537,6 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo = '', carica
         if (mancanti?.length > 0) console.warn('chiudiBatchMobile: file_referto_url ancora null per:', mancanti);
       }
 
-      alert('Retry 2 end - batchEcgs length: ' + (ecgsFreschi?.length || 0));
       const batchEcgs = ecgsFreschi || []
       if (!batchEcgs.length) { alert('Nessun referto disponibile. Attendi qualche secondo e riprova.'); setFaseChiusura(null); return; }
       const zip = new JSZip();
@@ -4567,9 +4565,8 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo = '', carica
       const zipBlob = await zip.generateAsync({ type:'blob' });
       setFaseChiusura('invio');
       const zipFileName = `referti/zip/_${batchNome.replace(/[^a-zA-Z0-9]/g,'_')}_${batchId}.zip`;
-      const { error: uploadError } = await supabase.storage.from('ecg-files').upload(zipFileName, zipBlob, { contentType:'application/zip', upsert:true });
-      const { data: urlData, error: signedError } = await supabase.storage.from('ecg-files').createSignedUrl(zipFileName, 60*60*24*7);
-      alert('uploadError: ' + JSON.stringify(uploadError) + ' signedError: ' + JSON.stringify(signedError) + ' signedUrl: ' + urlData?.signedUrl);
+      await supabase.storage.from('ecg-files').upload(zipFileName, zipBlob, { contentType:'application/zip', upsert:true });
+      const { data: urlData } = await supabase.storage.from('ecg-files').createSignedUrl(zipFileName, 60*60*24*7);
       if (urlData?.signedUrl) {
         const downloadUrl = urlData.signedUrl;
 
@@ -4611,10 +4608,10 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo = '', carica
           : `https://ambulatoriomillefonti.it/api/scarica?token=${tokenData.token}`;
 
         // 4. Invia email con linkDownload
-        // await fetch('/api/notify-referto', {
-        //   method:'POST', headers:{'Content-Type':'application/json'},
-        //   body: JSON.stringify({ email:emailDest, cardiologo:meCardiologo, downloadUrl:linkDownload, isBatch:true, batchNome, count:countEffettivo })
-        // });
+        await fetch('/api/notify-referto', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ email:emailDest, cardiologo:meCardiologo, downloadUrl:linkDownload, isBatch:true, batchNome, count:countEffettivo })
+        });
         alert('✅ Email inviata a ' + emailDest);
         const fileEcgDaEliminare = batchEcgs.map(e => e.file_ecg_url).filter(Boolean)
         if (fileEcgDaEliminare.length > 0) {
