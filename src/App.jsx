@@ -4567,9 +4567,9 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo = '', carica
       const zipBlob = await zip.generateAsync({ type:'blob' });
       setFaseChiusura('invio');
       const zipFileName = `referti/zip/_${batchNome.replace(/[^a-zA-Z0-9]/g,'_')}_${batchId}.zip`;
-      await supabase.storage.from('ecg-files').upload(zipFileName, zipBlob, { contentType:'application/zip', upsert:true });
-      const { data: urlData } = await supabase.storage.from('ecg-files').createSignedUrl(zipFileName, 60*60*24*7);
-      alert('urlData signedUrl: ' + urlData?.signedUrl);
+      const { error: uploadError } = await supabase.storage.from('ecg-files').upload(zipFileName, zipBlob, { contentType:'application/zip', upsert:true });
+      const { data: urlData, error: signedError } = await supabase.storage.from('ecg-files').createSignedUrl(zipFileName, 60*60*24*7);
+      alert('uploadError: ' + JSON.stringify(uploadError) + ' signedError: ' + JSON.stringify(signedError) + ' signedUrl: ' + urlData?.signedUrl);
       if (urlData?.signedUrl) {
         const downloadUrl = urlData.signedUrl;
 
