@@ -1504,7 +1504,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, numeroAlbo = '', onRefertato, f
     const nomeFileOriginale = ecg.file_ecg_url 
       ? ecg.file_ecg_url.split('/').pop().replace(/\.[^.]+$/, '') // rimuove estensione
       : (ecg.paziente_nome || ecg.paziente || "paziente").replace(/[^a-zA-Z0-9]/g, "_");
-    const refertoFileName = `referti/_${nomeFileOriginale}.pdf`;
+    const refertoFileName = `referti/_${nomeFileOriginale.replace(/\.+/g, '_')}.pdf`;
     
     // Upload + DB update (async in background)
     (async () => {
@@ -4842,7 +4842,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo = '', carica
 
       // Salva su Storage
       const nomeFileOrigMobile = (selectedEcg.file_ecg_url||'').split('/').pop().replace(/\.[^.]+$/,'');
-      const refertoFileName = `referti/_${nomeFileOrigMobile}.pdf`;
+      const refertoFileName = `referti/_${nomeFileOrigMobile.replace(/\.+/g, '_')}.pdf`;
       (async () => {
         await supabase.storage.from('ecg-files').upload(refertoFileName, pdfBlob2, { contentType:'application/pdf', upsert:true });
         await supabase.from('ecgs').update({ stato:'refertato', file_referto_url:refertoFileName, esito_ecg: Object.entries(crocette).filter(([_, v]) => v).map(([k]) => k) }).eq('id', selectedEcg.id);
