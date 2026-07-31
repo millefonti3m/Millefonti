@@ -233,7 +233,7 @@ export default async function handler(req, res) {
         const storageFileName = `${batchId}/${safeFilename}`;
         const { error: uploadError } = await supabase.storage
           .from('ecg-files')
-          .upload(storageFileName, buffer, { contentType: part.mimeType || 'application/pdf' });
+          .upload(storageFileName, buffer, { contentType: part.mimeType || 'application/pdf', upsert: true });
 
         if (uploadError) {
           await sendAlert(
