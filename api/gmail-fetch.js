@@ -137,8 +137,15 @@ export default async function handler(req, res) {
       const headers = email.payload.headers;
       const from = headers.find(h => h.name === 'From')?.value || '';
       const subject = headers.find(h => h.name === 'Subject')?.value || 'Lotto ECG';
-      const isSicurezzaLavoro = subject.toLowerCase().includes('sicurezza');
       const fromEmail = from.match(/<(.+)>/)?.[1] || from.trim();
+      const mittentiSaluteELavoro = [
+        'segreteria@salutelavoro3m.com',
+        'chiara@salutelavoro3m.com',
+        'pc.ecg00@gmail.com',
+        'ambulatoriomillefonti@gmail.com'
+      ];
+      const isSicurezzaLavoro = subject.toLowerCase().includes('sicurezza')
+        && mittentiSaluteELavoro.includes(fromEmail);
 
       // Cerca utente azienda con questa email (diretta o autorizzata)
       const { data: { users } } = await supabase.auth.admin.listUsers();
