@@ -137,7 +137,8 @@ export default async function handler(req, res) {
       const headers = email.payload.headers;
       const from = headers.find(h => h.name === 'From')?.value || '';
       const subject = headers.find(h => h.name === 'Subject')?.value || 'Lotto ECG';
-      const isSicurezzaLavoro = subject.toLowerCase().includes('sicurezza lavoro');
+      const isSicurezzaLavoro = subject.toLowerCase().includes('sicurezza lavoro')
+        || subject.toLowerCase().includes('sicurezza e lavoro');
       const fromEmail = from.match(/<(.+)>/)?.[1] || from.trim();
 
       // Cerca utente azienda con questa email (diretta o autorizzata)
