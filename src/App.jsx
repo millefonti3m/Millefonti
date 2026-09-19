@@ -5423,9 +5423,10 @@ export default function App() {
     try {
       const { data } = await supabase
         .from('user_profiles')
-        .select('ruolo, ruoli, nome, cognome')
+        .select('ruolo, ruoli, nome, cognome, numero_albo')
         .eq('id', userId)
         .single();
+      setMeNumeroAlbo(data?.numero_albo || '');
       if (data?.nome || data?.cognome) {
         setMeCardiologo(`${data.nome||''} ${data.cognome||''}`.trim());
       }
@@ -5506,7 +5507,7 @@ export default function App() {
               setRole(r);
               if (r === 'cardiologo') {
                 const { data: { session } } = await supabase.auth.getSession();
-                const { data: profile } = await supabase.from('user_profiles').select('nome, cognome, numero_albo').eq('id', session.user.id).single();
+                const { data: profile, error: profErr } = await supabase.from('user_profiles').select('nome, cognome, numero_albo').eq('id', session.user.id).single();
                 if (profile) { setMeCardiologo((profile.nome ? profile.nome + ' ' + profile.cognome : profile.cognome).trim()); setMeNumeroAlbo(profile.numero_albo || ''); }
               }
             }}
