@@ -42,16 +42,16 @@ const ME_FARMACIA = "Farmacia Centrale Roma";
 const ME_AZIENDA = "Med Lavoro Torino";
 const ME_CARDIOLOGO_DEFAULT = "";
 
-// Ritorna il testo dell'alert di blocco se lo ZIP non contiene tutti gli ECG refertati del lotto, altrimenti null.
+// Ritorna il testo dell'alert di blocco se lo ZIP non contiene tutti gli ECG refertati del lotto, altrimenti null. I nomi file duplicati non bloccano: contano come inclusi.
 const messaggioZipIncompleto = ({ attesi, inseriti, tuttiRefertati, ecgsFreschi, filiFalliti, duplicati }) => {
-  if (inseriti === attesi) return null;
+  const inclusi = inseriti + duplicati.length;
+  if (inclusi === attesi) return null;
   const conUrl = new Set((ecgsFreschi || []).map(e => e.id));
   const righe = [
     ...(tuttiRefertati || []).filter(e => !conUrl.has(e.id)).map(e => `• ${e.paziente_nome || e.id} — file_referto_url nullo`),
     ...filiFalliti.map(n => `• ${n} — download fallito`),
-    ...duplicati.map(n => `• ${n} — nome file duplicato (sovrascritto nello ZIP)`),
   ];
-  return `⛔ INVIO BLOCCATO\n\nReferti nello ZIP: ${inseriti} su ${attesi} refertati nel lotto.\n\n`
+  return `⛔ INVIO BLOCCATO\n\nReferti inclusi: ${inclusi} su ${attesi} refertati nel lotto.\n\n`
     + (righe.length ? `Mancanti:\n${righe.join('\n')}` : 'Causa non determinata (possibile errore di lettura dal database): verifica la connessione e riprova.')
     + `\n\nNessun link creato, nessuna email inviata. Riprova tra qualche secondo.`;
 };
