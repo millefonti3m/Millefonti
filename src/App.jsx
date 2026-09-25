@@ -42,6 +42,20 @@ const ME_FARMACIA = "Farmacia Centrale Roma";
 const ME_AZIENDA = "Med Lavoro Torino";
 const ME_CARDIOLOGO_DEFAULT = "";
 
+// Ritorna il testo dell'alert di blocco se lo ZIP non contiene tutti gli ECG refertati del lotto, altrimenti null.
+const messaggioZipIncompleto = ({ attesi, inseriti, tuttiRefertati, ecgsFreschi, filiFalliti, duplicati }) => {
+  if (inseriti === attesi) return null;
+  const conUrl = new Set((ecgsFreschi || []).map(e => e.id));
+  const righe = [
+    ...(tuttiRefertati || []).filter(e => !conUrl.has(e.id)).map(e => `• ${e.paziente_nome || e.id} — file_referto_url nullo`),
+    ...filiFalliti.map(n => `• ${n} — download fallito`),
+    ...duplicati.map(n => `• ${n} — nome file duplicato (sovrascritto nello ZIP)`),
+  ];
+  return `⛔ INVIO BLOCCATO\n\nReferti nello ZIP: ${inseriti} su ${attesi} refertati nel lotto.\n\n`
+    + (righe.length ? `Mancanti:\n${righe.join('\n')}` : 'Causa non determinata (possibile errore di lettura dal database): verifica la connessione e riprova.')
+    + `\n\nNessun link creato, nessuna email inviata. Riprova tra qualche secondo.`;
+};
+
 const generaSlots = () => {
   const slots = [];
   const oggi = new Date();
@@ -1938,6 +1952,10 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, meNumeroAlbo, caricaEcgs,
       .from('ecgs').select('id, paziente_nome')
       .eq('batch_id', batchId).eq('stato', 'refertato');
     const totaleAtteso = tuttiRefertati?.length || 0;
+    const { count: nonRefertati } = await supabase
+      .from('ecgs').select('id', { count: 'exact', head: true })
+      .eq('batch_id', batchId).neq('stato', 'refertato');
+    const notaNonRefertati = nonRefertati > 0 ? `\n\nℹ️ Nel lotto ci sono ancora ${nonRefertati} ECG non refertati (non inclusi nello ZIP).` : '';
 
     // Secondo retry: aspetta che file_referto_url sia popolato per tutti
     if (totaleAtteso > 0 && (ecgsFreschi?.length || 0) < totaleAtteso) {
@@ -1957,11 +1975,20 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, meNumeroAlbo, caricaEcgs,
     const ecgsBatch = ecgsFreschi || []
     const email = ecgsBatch[0]?.email_destinatario;
     const batchNome = ecgsBatch[0]?.batch_nome || batchId;
-    if (ecgsBatch.length === 0 || !email) { setChiudendoBatch(null); setFaseChiusuraDesktop(prev => ({...prev, [batchId]: null})); alert("Nessun referto disponibile o email mancante"); return; }
+    if (ecgsBatch.length === 0 || !email) {
+      setChiudendoBatch(null); setFaseChiusuraDesktop(prev => ({...prev, [batchId]: null}));
+      const msgBlocco = ecgsBatch.length === 0 && totaleAtteso > 0
+        ? messaggioZipIncompleto({ attesi: totaleAtteso, inseriti: 0, tuttiRefertati, ecgsFreschi, filiFalliti: [], duplicati: [] })
+        : null;
+      alert(msgBlocco ? msgBlocco + notaNonRefertati : "Nessun referto disponibile o email mancante");
+      return;
+    }
     try {
       const JSZip = (await import('jszip')).default;
       const zip = new JSZip();
       const filiFalliti = [];
+      const duplicati = [];
+      const nomiInseriti = new Set();
       await Promise.all(ecgsBatch.map(async (e) => {
         let data = null;
         for (let tentativo = 0; tentativo < 3; tentativo++) {
@@ -1971,17 +1998,25 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, meNumeroAlbo, caricaEcgs,
           if (tentativo < 2) await new Promise(r => setTimeout(r, 1000));
         }
         if (data) {
-          zip.file(e.file_referto_url.split('/').pop(), data);
+          const nomeFile = e.file_referto_url.split('/').pop();
+          if (nomiInseriti.has(nomeFile)) {
+            duplicati.push(e.paziente_nome || nomeFile);
+          } else {
+            nomiInseriti.add(nomeFile);
+            zip.file(nomeFile, data);
+          }
         } else {
           filiFalliti.push(e.paziente_nome || e.file_referto_url);
         }
       }));
-      if (filiFalliti.length > 0) {
-        const nomi = filiFalliti.join(', ');
-        const procedi = window.confirm(`⚠️ ATTENZIONE: ${filiFalliti.length} referto/i non è stato possibile scaricare dallo storage:\n\n${nomi}\n\nSe procedi, questi referti NON saranno inclusi nello ZIP inviato al cliente.\n\nVuoi procedere comunque?`);
-        if (!procedi) { setChiudendoBatch(null); setFaseChiusuraDesktop(prev => ({...prev, [batchId]: null})); return; }
+      const inseriti = zip.file(/.*/).length;
+      const msgBlocco = messaggioZipIncompleto({ attesi: totaleAtteso, inseriti, tuttiRefertati, ecgsFreschi, filiFalliti, duplicati });
+      if (msgBlocco) {
+        setChiudendoBatch(null); setFaseChiusuraDesktop(prev => ({...prev, [batchId]: null}));
+        alert(msgBlocco + notaNonRefertati);
+        return;
       }
-      const countEffettivo = ecgsBatch.length - filiFalliti.length;
+      const countEffettivo = inseriti;
       setFaseChiusuraDesktop(prev => ({...prev, [batchId]: 'zip'}));
       const zipBlob = await zip.generateAsync({ type: 'blob' });
       setFaseChiusuraDesktop(prev => ({...prev, [batchId]: 'invio'}));
@@ -2044,7 +2079,7 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, meNumeroAlbo, caricaEcgs,
           await supabase.storage.from('ecg-files').remove(fileEcgDaEliminare).catch(() => {})
         }
       }
-      alert(`Lotto "${batchNome}" chiuso! Email con ZIP inviata a ${email}`);
+      alert(`Lotto "${batchNome}" chiuso! Email con ZIP inviata a ${email}` + notaNonRefertati);
     } catch(e) { console.error('chiudiBatch error:', e); alert('Errore: ' + e.message); }
     setChiudendoBatch(null);
     setFaseChiusuraDesktop(prev => ({...prev, [batchId]: null}));
@@ -4533,6 +4568,10 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo = '', carica
         .from('ecgs').select('id, paziente_nome')
         .eq('batch_id', batchId).eq('stato', 'refertato');
       const totaleAtteso = tuttiRefertati?.length || 0;
+      const { count: nonRefertati } = await supabase
+        .from('ecgs').select('id', { count: 'exact', head: true })
+        .eq('batch_id', batchId).neq('stato', 'refertato');
+      const notaNonRefertati = nonRefertati > 0 ? `\n\nℹ️ Nel lotto ci sono ancora ${nonRefertati} ECG non refertati (non inclusi nello ZIP).` : '';
 
       // Secondo retry: aspetta che file_referto_url sia popolato per tutti
       if (totaleAtteso > 0 && (ecgsFreschi?.length || 0) < totaleAtteso) {
@@ -4550,9 +4589,18 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo = '', carica
       }
 
       const batchEcgs = ecgsFreschi || []
-      if (!batchEcgs.length) { alert('Nessun referto disponibile. Attendi qualche secondo e riprova.'); setFaseChiusura(null); return; }
+      if (!batchEcgs.length) {
+        setFaseChiusura(null);
+        const msgBlocco = totaleAtteso > 0
+          ? messaggioZipIncompleto({ attesi: totaleAtteso, inseriti: 0, tuttiRefertati, ecgsFreschi, filiFalliti: [], duplicati: [] })
+          : null;
+        alert(msgBlocco ? msgBlocco + notaNonRefertati : 'Nessun referto disponibile. Attendi qualche secondo e riprova.');
+        return;
+      }
       const zip = new JSZip();
       const filiFalliti = [];
+      const duplicati = [];
+      const nomiInseriti = new Set();
       await Promise.all(batchEcgs.map(async e => {
         let data = null;
         for (let tentativo = 0; tentativo < 3; tentativo++) {
@@ -4562,17 +4610,25 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo = '', carica
           if (tentativo < 2) await new Promise(r => setTimeout(r, 1000));
         }
         if (data) {
-          zip.file(e.file_referto_url.split('/').pop(), data);
+          const nomeFile = e.file_referto_url.split('/').pop();
+          if (nomiInseriti.has(nomeFile)) {
+            duplicati.push(e.paziente_nome || nomeFile);
+          } else {
+            nomiInseriti.add(nomeFile);
+            zip.file(nomeFile, data);
+          }
         } else {
           filiFalliti.push(e.paziente_nome || e.file_referto_url);
         }
       }));
-      if (filiFalliti.length > 0) {
-        const nomi = filiFalliti.join(', ');
-        const procedi = window.confirm(`⚠️ ATTENZIONE: ${filiFalliti.length} referto/i non è stato possibile scaricare dallo storage:\n\n${nomi}\n\nSe procedi, questi referti NON saranno inclusi nello ZIP inviato al cliente.\n\nVuoi procedere comunque?`);
-        if (!procedi) { setFaseChiusura(null); return; }
+      const inseriti = zip.file(/.*/).length;
+      const msgBlocco = messaggioZipIncompleto({ attesi: totaleAtteso, inseriti, tuttiRefertati, ecgsFreschi, filiFalliti, duplicati });
+      if (msgBlocco) {
+        setFaseChiusura(null);
+        alert(msgBlocco + notaNonRefertati);
+        return;
       }
-      const countEffettivo = batchEcgs.length - filiFalliti.length;
+      const countEffettivo = inseriti;
       setFaseChiusura('zip');
       const zipBlob = await zip.generateAsync({ type:'blob' });
       setFaseChiusura('invio');
@@ -4624,7 +4680,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo = '', carica
           method:'POST', headers:{'Content-Type':'application/json'},
           body: JSON.stringify({ email:emailDest, cardiologo:meCardiologo, downloadUrl:linkDownload, isBatch:true, batchNome, count:countEffettivo })
         });
-        alert('✅ Email inviata a ' + emailDest);
+        alert('✅ Email inviata a ' + emailDest + notaNonRefertati);
         const fileEcgDaEliminare = batchEcgs.map(e => e.file_ecg_url).filter(Boolean)
         if (fileEcgDaEliminare.length > 0) {
           await supabase.storage.from('ecg-files').remove(fileEcgDaEliminare).catch(() => {})
