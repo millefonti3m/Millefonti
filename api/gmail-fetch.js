@@ -255,7 +255,7 @@ export default async function handler(req, res) {
             paziente_eta: 0,
             paziente_sesso: 'M',
             note: 'Caricato via email',
-            urgenza: subject.toLowerCase().includes('urgente') ? 'urgente' : 'normale',
+            urgenza: subject.toLowerCase().includes('urgent') ? 'urgente' : 'normale', // urgente, urgenti, urgentissimo, urgent
             stato: 'in_attesa',
             origine_dettaglio: origineFinale,
             batch_id: batchId,
