@@ -56,6 +56,59 @@ const messaggioZipIncompleto = ({ attesi, inseriti, tuttiRefertati, ecgsFreschi,
     + `\n\nNessun link creato, nessuna email inviata. Riprova tra qualche secondo.`;
 };
 
+// Modalità "pagina separata", ramo PDF: unisce la pagina del referto alle pagine dell'ECG originale.
+// Strada 1: pdf-lib (copyPages). Se pdf-lib va in errore o copia un numero di pagine diverso da quelle lette da pdf.js (pdfDoc.numPages)
+// → strada 2 (fallback): ogni pagina dell'originale è renderizzata con pdf.js (scala 2, rotazione utente, JPEG 0.7) e aggiunta come pagina immagine dopo il referto.
+// Ritorna { bytes, strada, pagine }. Se anche il fallback fallisce ritorna il solo referto (pagine = 1): il chiamante deve bloccare.
+const creaPdfRefertoConEcg = async ({ PDFDocument, pdfDegrees, refertoBytes, ecgFile, pdfDoc, rotazione, contesto }) => {
+  const attese = pdfDoc.numPages;
+  const refertoSrc = await PDFDocument.load(refertoBytes);
+  const nuovoDoc = async () => {
+    const d = await PDFDocument.create();
+    const [pRef] = await d.copyPages(refertoSrc, [0]);
+    d.addPage(pRef);
+    return d;
+  };
+  let mergedDoc = await nuovoDoc();
+  let strada = 'pdf-lib';
+  try {
+    const abForPdfLib = await ecgFile.arrayBuffer(); // fresh copy (arrayBuffer detached da pdfjs)
+    const originalSrc = await PDFDocument.load(abForPdfLib);
+    const copiedPages = await mergedDoc.copyPages(originalSrc, originalSrc.getPageIndices());
+    if (copiedPages.length !== attese) throw new Error(`pdf-lib ha copiato ${copiedPages.length} pagine, pdf.js ne legge ${attese}`);
+    copiedPages.forEach(p => {
+      if (rotazione !== 0) { const ea = p.getRotation().angle; p.setRotation(pdfDegrees((ea + rotazione) % 360)); }
+      mergedDoc.addPage(p);
+    });
+  } catch (e) {
+    console.warn(`[PDF referto ${contesto}] pdf-lib non utilizzabile, uso il fallback pdf.js:`, e);
+    strada = 'fallback';
+    mergedDoc = await nuovoDoc(); // documento pulito: scarta eventuali oggetti copiati a metà
+    try {
+      for (let i = 1; i <= attese; i++) {
+        const pg = await pdfDoc.getPage(i);
+        const vp = pg.getViewport({ scale: 2.0, rotation: (pg.rotate + rotazione) % 360 });
+        const cv = document.createElement('canvas');
+        cv.width = vp.width; cv.height = vp.height;
+        const cx = cv.getContext('2d');
+        cx.fillStyle = '#ffffff'; cx.fillRect(0, 0, cv.width, cv.height);
+        await pg.render({ canvasContext: cx, viewport: vp }).promise;
+        const img = await mergedDoc.embedJpg(cv.toDataURL('image/jpeg', 0.7));
+        const pagina = mergedDoc.addPage([vp.width / 2, vp.height / 2]); // 72 dpi: scala 2 → metà dei pixel
+        pagina.drawImage(img, { x: 0, y: 0, width: vp.width / 2, height: vp.height / 2 });
+        cv.width = 0; cv.height = 0;
+        pg.cleanup();
+      }
+    } catch (e2) {
+      console.error(`[PDF referto ${contesto}] fallback pdf.js fallito:`, e2);
+      mergedDoc = await nuovoDoc(); // solo referto → pagine = 1 → il chiamante blocca
+    }
+  }
+  const pagine = mergedDoc.getPageCount();
+  console.log(`[PDF referto ${contesto}] strada: ${strada}, pagine: ${pagine} (1 referto + ${pagine - 1} ECG; pdf.js legge ${attese} pagine ECG)`);
+  return { bytes: await mergedDoc.save(), strada, pagine };
+};
+
 const generaSlots = () => {
   const slots = [];
   const oggi = new Date();
@@ -1479,19 +1532,14 @@ const RefertazioneInline = ({ ecg, meCardiologo, numeroAlbo = '', titolo = 'Dott
           refertoPdf.text('Ambulatorio Millefonti — ambulatoriomillefonti.it',pw/2,ph-3,{align:'center'});
           // Merge referto + tutte le pagine originali (pdf-lib, nessun canvas)
           const { PDFDocument, degrees: pdfDegrees } = await import('pdf-lib');
-          const mergedDoc = await PDFDocument.create();
-          const refertoSrc = await PDFDocument.load(refertoPdf.output('arraybuffer'));
-          const [refertoPageCopied] = await mergedDoc.copyPages(refertoSrc, [0]);
-          mergedDoc.addPage(refertoPageCopied);
-          const abForPdfLib = await ecgFile.arrayBuffer(); // fresh copy (arrayBuffer detached da pdfjs)
-          const originalSrc = await PDFDocument.load(abForPdfLib);
-          const copiedPages = await mergedDoc.copyPages(originalSrc, originalSrc.getPageIndices());
-          copiedPages.forEach(p => {
-            if (rotation !== 0) { const ea = p.getRotation().angle; p.setRotation(pdfDegrees((ea + rotation) % 360)); }
-            mergedDoc.addPage(p);
-          });
-          const mergedBytes = await mergedDoc.save();
-          const mergedBlob = new Blob([mergedBytes], { type: 'application/pdf' });
+          const esitoMerge = await creaPdfRefertoConEcg({ PDFDocument, pdfDegrees, refertoBytes: refertoPdf.output('arraybuffer'), ecgFile, pdfDoc, rotazione: rotation, contesto: 'desktop' });
+          if (esitoMerge.pagine <= 1) {
+            // Controllo finale bloccante: referto senza ECG → non salvare, non caricare
+            alert("ECG non allegato al referto: riprova o usa la modalità sovrapposta");
+            setPdfBlob(null); setGenerato(false); setGenerating(false);
+            return;
+          }
+          const mergedBlob = new Blob([esitoMerge.bytes], { type: 'application/pdf' });
           if(ecg.batch_id){setPdfBlob(mergedBlob);}else{
             const urlM=URL.createObjectURL(mergedBlob);
             const aM=document.createElement('a');aM.href=urlM;aM.download=`Referto_${ecg.paziente.replace(/[^a-zA-Z]/g,'_')}_${new Date().toISOString().slice(0,10)}.pdf`;aM.click();URL.revokeObjectURL(urlM);
@@ -4741,7 +4789,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo = '', titolo
       const ctx = cv.getContext('2d');
       ctx.fillStyle = '#fff'; ctx.fillRect(0,0,cv.width,cv.height);
       await page.render({ canvasContext: ctx, viewport: vp }).promise;
-      pdfDoc.destroy();
+      // pdfDoc.destroy() spostato dopo il merge: serve al fallback pdf.js della pagina separata
 
       // Biforca in base alla posizione scelta
       // Applica rotazione utente (↺↻) al canvas
@@ -4824,19 +4872,15 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo = '', titolo
         pdf2.text('Ambulatorio Millefonti — ambulatoriomillefonti.it',pw2/2,ph2-3,{align:'center'});
         // Merge referto + tutte le pagine originali con pdf-lib (nessun canvas)
         const { PDFDocument: PDFDoc2, degrees: pdfDeg2 } = await import('pdf-lib');
-        const mergedDoc2 = await PDFDoc2.create();
-        const refertoSrc2 = await PDFDoc2.load(pdf2.output('arraybuffer'));
-        const [refertoPageM] = await mergedDoc2.copyPages(refertoSrc2, [0]);
-        mergedDoc2.addPage(refertoPageM);
-        const abForPdfLib = await ecgFile.arrayBuffer(); // fresh copy (ab detached da pdfjs)
-        const originalSrc2 = await PDFDoc2.load(abForPdfLib);
-        const copiedPages2 = await mergedDoc2.copyPages(originalSrc2, originalSrc2.getPageIndices());
-        copiedPages2.forEach(p => {
-          if (rotVal !== 0) { const ea2 = p.getRotation().angle; p.setRotation(pdfDeg2((ea2 + rotVal) % 360)); }
-          mergedDoc2.addPage(p);
-        });
-        const mergedBytes2 = await mergedDoc2.save();
-        pdfBlob2 = new Blob([mergedBytes2], { type: 'application/pdf' });
+        const esitoMerge2 = await creaPdfRefertoConEcg({ PDFDocument: PDFDoc2, pdfDegrees: pdfDeg2, refertoBytes: pdf2.output('arraybuffer'), ecgFile, pdfDoc, rotazione: rotVal, contesto: 'mobile' });
+        if (esitoMerge2.pagine <= 1) {
+          // Controllo finale bloccante: referto senza ECG → non salvare, non caricare
+          pdfDoc.destroy();
+          alert('ECG non allegato al referto: riprova o usa la modalità sovrapposta');
+          setGenerating(false);
+          return;
+        }
+        pdfBlob2 = new Blob([esitoMerge2.bytes], { type: 'application/pdf' });
       } else {
 
       // Overlay identico al desktop
@@ -4914,6 +4958,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo = '', titolo
       pdf.addImage(finalCvMobile.toDataURL('image/jpeg',0.78),'JPEG',0,0,pdfW,Math.min(pdfH,420));
       pdfBlob2 = pdf.output('blob');
       } // end else overlay
+      pdfDoc.destroy();
 
       // Salva su Storage
       const nomeFileOrigMobile = (selectedEcg.file_ecg_url||'').split('/').pop().replace(/\.[^.]+$/,'');
