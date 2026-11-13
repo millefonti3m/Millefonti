@@ -835,7 +835,7 @@ const AziendaView = ({ ecgs, setEcgs }) => {
 // Vede SOLO gli ECG che l'admin gli ha assegnato esplicitamente.
 
 // ── REFERTAZIONE INLINE ───────────────────────────────────────────────────
-const RefertazioneInline = ({ ecg, meCardiologo, numeroAlbo = '', onRefertato, firmaUrl }) => {
+const RefertazioneInline = ({ ecg, meCardiologo, numeroAlbo = '', titolo = 'Dott.', onRefertato, firmaUrl }) => {
   const [ecgFile, setEcgFile] = useState(null);
   const [ecgUrl, setEcgUrl] = useState(null);
   const [ecgType, setEcgType] = useState(null);
@@ -1048,7 +1048,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, numeroAlbo = '', onRefertato, f
 
     // Firma scannerizzata nella colonna destra (zona crocette)
     const nomeFirmaBase = meCardiologo.replace(/^Dott\.\s*Dr\.?/i, "").replace(/^Dr\.?\s*/i, "").replace(/^Dott\.?\s*/i, "").trim();
-    const nomeFirma = "Dott. " + nomeFirmaBase;
+    const nomeFirma = titolo + " " + nomeFirmaBase;
     if (window.__millefonti_firma) {
       const img = window.__millefonti_firma;
       const maxW = firmaColW * 0.92, maxH = crocetteH - pad * 2;
@@ -1160,7 +1160,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, numeroAlbo = '', onRefertato, f
         pdf.setFont("helvetica","normal");
         pdf.text(`Paziente: ${ecg.paziente}`, 10, 28);
         pdf.text(`Data: ${new Date().toLocaleDateString("it-IT")}`, 10, 36);
-        pdf.text(`Cardiologo: Dott. ${meCardiologo}`, 10, 44);
+        pdf.text(`Cardiologo: ${titolo} ${meCardiologo}`, 10, 44);
         // Linea separatore
         pdf.setDrawColor(200,210,220);
         pdf.setLineWidth(0.3);
@@ -1209,7 +1209,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, numeroAlbo = '', onRefertato, f
         pdf.setFont("helvetica","bold");
         pdf.setFontSize(10);
         pdf.setTextColor(26,38,64);
-        pdf.text(`Dott. ${meCardiologo}`, 10, footerY+8);
+        pdf.text(`${titolo} ${meCardiologo}`, 10, footerY+8);
         pdf.setFont("helvetica","normal");
         pdf.setFontSize(8);
         pdf.setTextColor(100,120,140);
@@ -1316,7 +1316,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, numeroAlbo = '', onRefertato, f
 
           // Firma con timbro
           const nomeFirmaBase = meCardiologo.replace(/^Dott\.\s*Dr\.?/i,"").replace(/^Dr\.?\s*/i,"").replace(/^Dott\.?\s*/i,"").trim();
-          const nomeFirma = "Dott. " + nomeFirmaBase;
+          const nomeFirma = titolo + " " + nomeFirmaBase;
           if (window.__millefonti_firma) {
             const fImg = window.__millefonti_firma;
             const fCvs = document.createElement("canvas");
@@ -1468,7 +1468,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, numeroAlbo = '', onRefertato, f
           if(commento.trim()){cy2+=4;refertoPdf.setDrawColor(220,229,240);refertoPdf.setLineWidth(0.5);refertoPdf.line(10,cy2,pw-10,cy2);cy2+=8;refertoPdf.setFontSize(10);refertoPdf.setFont('helvetica','bold');refertoPdf.setTextColor(107,125,153);refertoPdf.text('DESCRIZIONE',10,cy2);cy2+=7;refertoPdf.setFont('helvetica','normal');refertoPdf.setTextColor(37,87,54);refertoPdf.setFontSize(11);refertoPdf.text(refertoPdf.splitTextToSize(commento,pw-20),10,cy2);}
           const nb2=meCardiologo.replace(/^Dott\.\s*Dr\.?/i,'').replace(/^Dr\.?\s*/i,'').replace(/^Dott\.?\s*/i,'').trim();
           if(window.__millefonti_firma){const fCR=document.createElement('canvas');fCR.width=window.__millefonti_firma.width;fCR.height=window.__millefonti_firma.height;fCR.getContext('2d').drawImage(window.__millefonti_firma,0,0);const fW2=35,fH2=fW2/(window.__millefonti_firma.width/window.__millefonti_firma.height);refertoPdf.addImage(fCR.toDataURL('image/png'),'PNG',pw-10-fW2,ph-38-fH2,fW2,fH2);}
-          refertoPdf.setFontSize(13);refertoPdf.setFont('helvetica','bold');refertoPdf.setTextColor(37,87,54);refertoPdf.text('Dott. '+nb2,pw-10,ph-42,{align:'right'});
+          refertoPdf.setFontSize(13);refertoPdf.setFont('helvetica','bold');refertoPdf.setTextColor(37,87,54);refertoPdf.text(titolo+' '+nb2,pw-10,ph-42,{align:'right'});
           if (numeroAlbo) { refertoPdf.setFontSize(9); refertoPdf.setFont('helvetica','italic'); refertoPdf.text(numeroAlbo, pw-10, ph-33, {align:'right'}); }
           refertoPdf.setDrawColor(37,87,54);refertoPdf.setLineWidth(0.3);refertoPdf.line(pw-65,ph-37,pw-10,ph-37);
           refertoPdf.setFontSize(8);refertoPdf.setFont('helvetica','normal');refertoPdf.setTextColor(37,87,54);
@@ -1588,6 +1588,7 @@ const RefertazioneInline = ({ ecg, meCardiologo, numeroAlbo = '', onRefertato, f
                 email: emailDest,
                 paziente: ecg.paziente_nome || ecg.paziente,
                 cardiologo: meCardiologo,
+                titolo,
                 downloadUrl: linkDownload,
               })
             }).catch(() => {});
@@ -1730,7 +1731,7 @@ const FirmaPreview = ({ firmaUrl }) => {
   return <img src={url} alt="Firma" style={{ maxHeight:60, maxWidth:200, objectFit:"contain" }} />;
 };
 
-const CardiologoView = ({ ecgs, setEcgs, meCardiologo, meNumeroAlbo, caricaEcgs, pushAbilitato, registraPush }) => {
+const CardiologoView = ({ ecgs, setEcgs, meCardiologo, meNumeroAlbo, meTitolo = 'Dott.', caricaEcgs, pushAbilitato, registraPush }) => {
   const [selected, setSelected] = useState(null);
   const [done, setDone] = useState(false);
   const [file, setFile] = useState(null);
@@ -1815,7 +1816,7 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, meNumeroAlbo, caricaEcgs,
     pdf.setFontSize(10); pdf.setFont('helvetica','normal');
     pdf.text(`Ambulatorio Millefonti  ·  Via Garessio 47, Torino`, mar, 25);
     pdf.setFontSize(11); pdf.setFont('helvetica','bold');
-    pdf.text(`Dott. ${meCardiologo}`, mar, 34);
+    pdf.text(`${meTitolo} ${meCardiologo}`, mar, 34);
     pdf.setFont('helvetica','normal');
     pdf.text(`${mesiLabel[mese-1]} ${anno}`, W-mar, 34, {align:'right'});
     // ── Info box ──
@@ -2068,7 +2069,7 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, meNumeroAlbo, caricaEcgs,
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            email, cardiologo: meCardiologo,
+            email, cardiologo: meCardiologo, titolo: meTitolo,
             downloadUrl: linkDownload,
             isBatch: true, batchNome, count: countEffettivo,
           })
@@ -2444,6 +2445,7 @@ const CardiologoView = ({ ecgs, setEcgs, meCardiologo, meNumeroAlbo, caricaEcgs,
                 ecg={selected}
                 meCardiologo={meCardiologo}
                 numeroAlbo={meNumeroAlbo}
+                titolo={meTitolo}
                 firmaUrl={firmaUrl}
                 onRefertato={(refertoFileName)=>{
                   const selectedId = selected.id;
@@ -2518,7 +2520,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
   useEffect(() => {
     if (tab !== 'aziende' && tab !== 'caricaecg' && tab !== 'team') return;
     supabase.from('user_profiles')
-      .select('id, nome, cognome, ruolo, codice_referti, codice_referti_cycle, email, modalita_refertazione')
+      .select('id, nome, cognome, ruolo, codice_referti, codice_referti_cycle, email, modalita_refertazione, titolo')
       .or('ruolo.eq.azienda,ruolo.eq.farmacia,ruolo.eq.cardiologo')
       .then(({ data, error }) => {
         if (data) {
@@ -2766,6 +2768,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
             ruolo: formCliente.ruolo,
             codice_referti: formCliente.codice_referti || null,
             numero_albo: formCliente.numero_albo || null,
+            titolo: formCliente.titolo || 'Dott.',
             modalita_refertazione: formCliente.modalita_refertazione || 'overlay',
             email_autorizzate: emailAutorizzateForm.filter(Boolean),
           }),
@@ -2773,7 +2776,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
         const json = await res.json();
         if (!res.ok) { setErroreCliente(json.error || 'Errore creazione'); setSalvandoCliente(false); return; }
         // Ricarica lista clienti
-        const { data } = await supabase.from('user_profiles').select('id, nome, cognome, ruolo, codice_referti, codice_referti_cycle, email, modalita_refertazione').or('ruolo.eq.azienda,ruolo.eq.farmacia,ruolo.eq.cardiologo');
+        const { data } = await supabase.from('user_profiles').select('id, nome, cognome, ruolo, codice_referti, codice_referti_cycle, email, modalita_refertazione, titolo').or('ruolo.eq.azienda,ruolo.eq.farmacia,ruolo.eq.cardiologo');
         if (data) { setClientiCodici(data); const init={}; data.forEach(u=>{ init[u.id]=u.codice_referti||''; }); setCodiciTemp(init); }
       } else {
         const body = { userId: modalCliente.id };
@@ -2786,6 +2789,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
           body.codice_referti = formCliente.codice_referti || null;
         }
         if (formCliente.numero_albo !== undefined) body.numero_albo = formCliente.numero_albo || null;
+        if (formCliente.ruolo === 'cardiologo' && formCliente.titolo !== undefined) body.titolo = formCliente.titolo || 'Dott.';
         body.modalita_refertazione = formCliente.modalita_refertazione || 'overlay';
         const res = await fetch('/api/modifica-cliente', {
           method: 'POST',
@@ -2798,7 +2802,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
         setCodiciTemp(prev => ({...prev, [modalCliente.id]: formCliente.codice_referti || ''}));
         const { data: aggiornati } = await supabase
           .from('user_profiles')
-          .select('id, nome, cognome, ruolo, codice_referti, codice_referti_cycle, email, modalita_refertazione')
+          .select('id, nome, cognome, ruolo, codice_referti, codice_referti_cycle, email, modalita_refertazione, titolo')
           .or('ruolo.eq.azienda,ruolo.eq.cardiologo,ruolo.eq.farmacia')
         if (aggiornati) setClientiCodici(aggiornati)
       }
@@ -2907,7 +2911,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
     if (cardiologo === 'Mansour') return;
     // Trova email del cardiologo
     const { data: profiles } = await supabase.from('user_profiles')
-      .select('id, nome, cognome, ruolo, ruoli')
+      .select('id, nome, cognome, ruolo, ruoli, titolo')
       .or(`ruolo.eq.cardiologo,ruoli.cs.{cardiologo}`);
     const profile = profiles?.find(p => 
       (p.nome ? p.nome + ' ' + p.cognome : p.cognome).trim() === cardiologo
@@ -2919,7 +2923,7 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
     fetch('/api/notify-cardiologo', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: user.email, cardiologo, count, batchNome: batchNome || null })
+      body: JSON.stringify({ email: user.email, cardiologo, titolo: profile.titolo || 'Dott.', count, batchNome: batchNome || null })
     }).catch(() => {});
   };
 
@@ -4062,6 +4066,21 @@ const AdminView = ({ ecgs, setEcgs, cardiologiDB: cardiologiProp = [] }) => {
           {formCliente.ruolo === 'cardiologo' && (
             <div style={{ marginBottom:14 }}>
               <label style={{ fontSize:12, color:C.muted, display:'block', marginBottom:4 }}>
+                Titolo
+              </label>
+              <select
+                value={formCliente.titolo || 'Dott.'}
+                onChange={e => setFormCliente(p => ({...p, titolo: e.target.value}))}
+                style={{ ...inputStyle }}
+              >
+                <option value="Dott.">Dott.</option>
+                <option value="Dott.ssa">Dott.ssa</option>
+              </select>
+            </div>
+          )}
+          {formCliente.ruolo === 'cardiologo' && (
+            <div style={{ marginBottom:14 }}>
+              <label style={{ fontSize:12, color:C.muted, display:'block', marginBottom:4 }}>
                 Numero iscrizione Albo dei Medici
               </label>
               <input
@@ -4411,7 +4430,7 @@ const useIsMobile = () => {
 };
 
 // ── CARDIOLOGO MOBILE ──────────────────────────────────────────────────────
-const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo = '', caricaEcgs, onLogout, pushAbilitato, registraPush }) => {
+const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo = '', titolo = 'Dott.', caricaEcgs, onLogout, pushAbilitato, registraPush }) => {
   const [screen, setScreen] = useState('lista'); // lista | lotto | referta
   const [selectedBatch, setSelectedBatch] = useState(null);
   const [emailInviata, setEmailInviata] = useState(false);
@@ -4678,7 +4697,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo = '', carica
         // 4. Invia email con linkDownload
         await fetch('/api/notify-referto', {
           method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ email:emailDest, cardiologo:meCardiologo, downloadUrl:linkDownload, isBatch:true, batchNome, count:countEffettivo })
+          body: JSON.stringify({ email:emailDest, cardiologo:meCardiologo, titolo, downloadUrl:linkDownload, isBatch:true, batchNome, count:countEffettivo })
         });
         alert('✅ Email inviata a ' + emailDest + notaNonRefertati);
         const fileEcgDaEliminare = batchEcgs.map(e => e.file_ecg_url).filter(Boolean)
@@ -4786,7 +4805,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo = '', carica
           pdf2.text(pdf2.splitTextToSize(commento,pw2-20),10,cy2);
         }
         const nbM2=meCardiologo.replace(/^Dott\.\s*Dr\.?/i,'').replace(/^Dr\.?\s*/i,'').replace(/^Dott\.?\s*/i,'').trim();
-        const nomeFirma2='Dott. '+nbM2;
+        const nomeFirma2=titolo+' '+nbM2;
         if(window.__millefonti_firma){
           const fCvs2=document.createElement('canvas');fCvs2.width=window.__millefonti_firma.width;fCvs2.height=window.__millefonti_firma.height;
           fCvs2.getContext('2d').drawImage(window.__millefonti_firma,0,0);
@@ -4855,7 +4874,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo = '', carica
       });
       // Firma scannerizzata destra (nella sezione crocette)
       const nbM=meCardiologo.replace(/^Dott\.\s*Dr\.?/i,'').replace(/^Dr\.?\s*/i,'').replace(/^Dott\.?\s*/i,'').trim();
-      const nomeFirmaM='Dott. '+nbM;
+      const nomeFirmaM=titolo+' '+nbM;
       if(window.__millefonti_firma){
         const img2=window.__millefonti_firma;
         const maxW=firmaColW*0.92,maxH=crocetteH-pad*2,r2=img2.width/img2.height;
@@ -4936,7 +4955,7 @@ const CardiologoMobile = ({ ecgs, setEcgs, meCardiologo, numeroAlbo = '', carica
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
           <div>
             <div style={{ fontSize:11, opacity:0.7, marginBottom:4, textTransform:'uppercase', letterSpacing:1 }}>Cardiologo</div>
-            <div style={{ fontSize:18, fontWeight:700 }}>Dott. {meCardiologo}</div>
+            <div style={{ fontSize:18, fontWeight:700 }}>{titolo} {meCardiologo}</div>
             <div style={{ fontSize:13, opacity:0.8, marginTop:2 }}>{mieiEcgs.filter(e=>e.stato==='in_attesa').length} ECG da refertare</div>
           </div>
           <div style={{display:'flex',gap:6,marginTop:4,alignItems:'center'}}>
@@ -5300,6 +5319,7 @@ export default function App() {
   const [ruoliDisponibili, setRuoliDisponibili] = useState([]);
   const [meCardiologo, setMeCardiologo] = useState(ME_CARDIOLOGO_DEFAULT);
   const [meNumeroAlbo, setMeNumeroAlbo] = useState('');
+  const [meTitolo, setMeTitolo] = useState('Dott.');
   const [ecgs, setEcgs] = useState([]);
   const [cardiologiDB, setCardiologiDB] = useState([]);
   const isMobile = useIsMobile(); // deve stare prima di qualsiasi return
@@ -5479,10 +5499,11 @@ export default function App() {
     try {
       const { data } = await supabase
         .from('user_profiles')
-        .select('ruolo, ruoli, nome, cognome, numero_albo')
+        .select('ruolo, ruoli, nome, cognome, numero_albo, titolo')
         .eq('id', userId)
         .single();
       setMeNumeroAlbo(data?.numero_albo || '');
+      setMeTitolo(data?.titolo || 'Dott.');
       if (data?.nome || data?.cognome) {
         setMeCardiologo(`${data.nome||''} ${data.cognome||''}`.trim());
       }
@@ -5563,8 +5584,8 @@ export default function App() {
               setRole(r);
               if (r === 'cardiologo') {
                 const { data: { session } } = await supabase.auth.getSession();
-                const { data: profile, error: profErr } = await supabase.from('user_profiles').select('nome, cognome, numero_albo').eq('id', session.user.id).single();
-                if (profile) { setMeCardiologo((profile.nome ? profile.nome + ' ' + profile.cognome : profile.cognome).trim()); setMeNumeroAlbo(profile.numero_albo || ''); }
+                const { data: profile, error: profErr } = await supabase.from('user_profiles').select('nome, cognome, numero_albo, titolo').eq('id', session.user.id).single();
+                if (profile) { setMeCardiologo((profile.nome ? profile.nome + ' ' + profile.cognome : profile.cognome).trim()); setMeNumeroAlbo(profile.numero_albo || ''); setMeTitolo(profile.titolo || 'Dott.'); }
               }
             }}
               style={{ background:"white", border:"2px solid #dde5f0", borderRadius:14, padding:"18px 24px", cursor:"pointer", fontWeight:700, fontSize:16, color:"#1a2640", display:"flex", alignItems:"center", gap:14, boxShadow:"0 2px 12px rgba(46,124,246,0.08)", transition:"all 0.15s" }}>
@@ -5583,7 +5604,7 @@ export default function App() {
   if (!role) return <LoginReale onLogin={handleLogin} />;
 
   // Vista mobile — bypassa completamente Shell
-  if (isMobile && role === 'cardiologo') return <CardiologoMobile ecgs={ecgs} setEcgs={setEcgs} meCardiologo={meCardiologo} numeroAlbo={meNumeroAlbo} caricaEcgs={caricaEcgs} onLogout={handleLogout} pushAbilitato={pushAbilitato} registraPush={registraPush} />;
+  if (isMobile && role === 'cardiologo') return <CardiologoMobile ecgs={ecgs} setEcgs={setEcgs} meCardiologo={meCardiologo} numeroAlbo={meNumeroAlbo} titolo={meTitolo} caricaEcgs={caricaEcgs} onLogout={handleLogout} pushAbilitato={pushAbilitato} registraPush={registraPush} />;
   if (isMobile && role === 'admin') return <AdminMobile ecgs={ecgs} setEcgs={setEcgs} caricaEcgs={caricaEcgs} onLogout={handleLogout} />;
 
   return (
@@ -5591,7 +5612,7 @@ export default function App() {
       {role==="pubblico"   && <PubblicoView setEcgs={setEcgs} />}
       {role==="farmacia"   && <FarmaciaView ecgs={ecgs} setEcgs={setEcgs} />}
       {role==="azienda"    && <AziendaView  ecgs={ecgs} setEcgs={setEcgs} />}
-      {role==="cardiologo" && <CardiologoView ecgs={ecgs} setEcgs={setEcgs} meCardiologo={meCardiologo} meNumeroAlbo={meNumeroAlbo} caricaEcgs={caricaEcgs} pushAbilitato={pushAbilitato} registraPush={registraPush} />}
+      {role==="cardiologo" && <CardiologoView ecgs={ecgs} setEcgs={setEcgs} meCardiologo={meCardiologo} meNumeroAlbo={meNumeroAlbo} meTitolo={meTitolo} caricaEcgs={caricaEcgs} pushAbilitato={pushAbilitato} registraPush={registraPush} />}
       {role==="admin"      && <AdminView    ecgs={ecgs} setEcgs={setEcgs} cardiologiDB={cardiologiDB} />}
     </Shell>
   );

@@ -8,7 +8,7 @@ const supabase = createClient(
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { userId, password, codice_referti, numero_albo, modalita_refertazione, email_autorizzate } = req.body;
+  const { userId, password, codice_referti, numero_albo, titolo, modalita_refertazione, email_autorizzate } = req.body;
 
   if (!userId) {
     return res.status(400).json({ error: 'userId obbligatorio' });
@@ -46,6 +46,14 @@ export default async function handler(req, res) {
       await supabase
         .from('user_profiles')
         .update({ numero_albo: numero_albo || null })
+        .eq('id', userId);
+    }
+
+    // 2b-bis. Aggiorna titolo (Dott./Dott.ssa) se presente nel body
+    if ('titolo' in req.body) {
+      await supabase
+        .from('user_profiles')
+        .update({ titolo: titolo === 'Dott.ssa' ? 'Dott.ssa' : 'Dott.' })
         .eq('id', userId);
     }
 

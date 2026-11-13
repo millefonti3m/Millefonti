@@ -1,6 +1,7 @@
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  const { email, cardiologo, count, batchNome } = req.body;
+  const { email, cardiologo, titolo, count, batchNome } = req.body;
+  const titoloCardiologo = titolo === 'Dott.ssa' ? 'Dott.ssa' : 'Dott.';
   try {
     const response = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
@@ -19,7 +20,7 @@ export default async function handler(req, res) {
               <p style="color: rgba(255,255,255,0.75); margin: 6px 0 0; font-size: 13px;">Piattaforma di Refertazione ECG</p>
             </div>
             <div style="padding: 32px;">
-              <p style="color: #1a2640; font-size: 15px; margin: 0 0 8px;">Gentile Dott. ${cardiologo},</p>
+              <p style="color: #1a2640; font-size: 15px; margin: 0 0 8px;">Gentile ${titoloCardiologo} ${cardiologo},</p>
               <p style="color: #4a5568; font-size: 14px; line-height: 1.6; margin: 0 0 24px;">
                 ${batchNome 
                   ? `le sono stati assegnati <strong style="color: #1a2640;">${count} ECG</strong> del lotto <strong style="color: #1a2640;">${batchNome}</strong> da refertare.`

@@ -1,6 +1,7 @@
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  const { email, paziente, cardiologo, downloadUrl, isBatch, batchNome, count } = req.body;
+  const { email, paziente, cardiologo, titolo, downloadUrl, isBatch, batchNome, count } = req.body;
+  const titoloCardiologo = titolo === 'Dott.ssa' ? 'Dott.ssa' : 'Dott.';
 
   const subject = isBatch
     ? `Referti ECG pronti — Lotto ${batchNome} (${count} pazienti)`
@@ -11,14 +12,14 @@ export default async function handler(req, res) {
       <p style="color:#1a2640;font-size:15px;margin:0 0 8px;">Gentile cliente,</p>
       <p style="color:#4a5568;font-size:14px;line-height:1.6;margin:0 0 28px;">
         la refertazione del lotto <strong style="color:#1a2640;">${batchNome}</strong> 
-        è stata completata dal <strong style="color:#1a2640;">Dott. ${cardiologo}</strong>.<br/>
+        è stata completata dal <strong style="color:#1a2640;">${titoloCardiologo} ${cardiologo}</strong>.<br/>
         Il file ZIP contiene i referti di <strong>${count} pazienti</strong>.
       </p>`
     : `
       <p style="color:#1a2640;font-size:15px;margin:0 0 8px;">Gentile cliente,</p>
       <p style="color:#4a5568;font-size:14px;line-height:1.6;margin:0 0 28px;">
         la documentazione relativa a <strong style="color:#1a2640;">${paziente}</strong> 
-        è stata completata dal <strong style="color:#1a2640;">Dott. ${cardiologo}</strong> 
+        è stata completata dal <strong style="color:#1a2640;">${titoloCardiologo} ${cardiologo}</strong> 
         ed è ora disponibile per il download.
       </p>`;
 
